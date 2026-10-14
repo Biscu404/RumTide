@@ -770,9 +770,9 @@ export const B = {
 // What differs between Season 0 (the beta) and a full season. Nothing else may hardcode these.
 export const SEASON_PRESETS = {
   season0: { lengthTides: 14, progressionCostMult: 0.67, hullsEnabled: ["sloop", "brigantine"],
-             galleonTides: [7, 14], fogOfLegendTides: 0, mawOpens: false },
+             galleonTides: [7, 14], fogOfLegendTides: 0, mawOpens: false, mutinyRules: false },
   full:    { lengthTides: 28, progressionCostMult: 1.0,  hullsEnabled: ["sloop", "brigantine", "frigate"],
-             galleonTides: [7, 14, 21], fogOfLegendTides: 3, mawOpens: true },
+             galleonTides: [7, 14, 21], fogOfLegendTides: 3, mawOpens: true, mutinyRules: false },
 } as const;
 ```
 
@@ -910,6 +910,7 @@ type Good = "rum" | "sugar" | "spice";
 type HullId = "sloop" | "brigantine" | "frigate";
 type Maneuver = "broadside" | "outmaneuver" | "board";
 type Intent = "trade" | "quiet" | "hunt" | "explore" | "escort";
+type NpcKind = "smallTrader" | "fatMerchant" | "galleon";   // Season 0 NPCs only, see DECISIONS.md
 
 interface Season {
   id: string; name: string; status: "draft" | "active" | "ended";

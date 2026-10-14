@@ -28,7 +28,7 @@ Building Season 0: a two week beta (14 Tides) for six friends, built by one deve
 ## Stack
 
 * TypeScript everywhere, built with Vite, tested with Vitest
-* Phaser 4 (pinned to an exact version) for `MapScene` and `ReplayScene` only
+* Phaser 4, pinned to exactly `4.2.1`, for `MapScene` and `ReplayScene` only
 * Preact for every menu, form and text screen
 * Supabase: Postgres, Auth, Edge Functions, pg_cron
 * Static hosting on Cloudflare Pages
@@ -40,7 +40,9 @@ Building Season 0: a two week beta (14 Tides) for six friends, built by one deve
 * The client never writes game tables. All game writes go through Edge Functions, which validate with Zod and then with the engine. The server owns positions, stats, gold, cargo, outcomes and seeds.
 * Inside the engine, iterate collections in sorted id order so every Tide is reproducible from its snapshot and seed.
 * Every engine change needs a unit test. Run the tests and the bot season before finishing a task.
-* Phaser is pinned to version 4. Check the Phaser 4 docs and do not assume Phaser 3 APIs.
+* Phaser is pinned to version 4. Check the Phaser 4 docs (https://docs.phaser.io) and do not assume Phaser 3 APIs. The installed types in `node_modules/phaser/types/phaser.d.ts` always match the pinned version, so check an API there when in doubt.
+* Engine files import each other with the `.ts` extension (`./types.ts`), because Edge Functions run on Deno. The client and tools import the engine as `@engine/...`.
+* Every dependency is pinned to an exact version (`.npmrc` sets `save-exact`).
 * Keep Phaser to `MapScene` and `ReplayScene`. All menus are Preact.
 * Keep `supabase/` and `client/` cleanly separate. When a second developer joins, one owns `supabase/` and the other owns `client/`, and engine changes need both to review.
 
@@ -55,8 +57,8 @@ Building Season 0: a two week beta (14 Tides) for six friends, built by one deve
 
 ## Commands
 
-Fill these in once the project exists:
-
 * Start the dev server: `npm run dev`
 * Run the tests: `npm test`
-* Run a bot season: `npm run bots`
+* Check types: `npm run typecheck`
+* Build for production: `npm run build` (output in `dist/`)
+* Run a bot season: `npm run bots` (not built yet, arrives on day 5 of section 19.1)
