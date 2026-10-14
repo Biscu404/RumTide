@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SEASON_PRESETS } from "./balance.ts";
+import { B, SEASON_PRESETS, speed } from "./balance.ts";
 
 const presets = Object.entries(SEASON_PRESETS);
 
@@ -28,5 +28,24 @@ describe("SEASON_PRESETS", () => {
     expect(s.hullsEnabled).toEqual(["sloop", "brigantine"]);
     expect(s.galleonTides).toEqual([7, 14]);
     expect(s.mawOpens).toBe(false);
+  });
+});
+
+describe("speed", () => {
+  it("is the hull speed until Sails level 5", () => {
+    expect(speed("sloop", 0)).toBe(2);
+    expect(speed("sloop", 4)).toBe(2);
+    expect(speed("brigantine", 0)).toBe(2);
+    expect(speed("frigate", 0)).toBe(3);
+  });
+
+  it("adds one hop at Sails level 5, never above 3", () => {
+    expect(speed("sloop", 5)).toBe(3);
+    expect(speed("brigantine", 10)).toBe(3);
+    expect(speed("frigate", 10)).toBe(3);
+  });
+
+  it("never exceeds the movement steps in a Tide", () => {
+    expect(speed("frigate", 10)).toBeLessThanOrEqual(B.movement.steps);
   });
 });

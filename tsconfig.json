@@ -9,6 +9,7 @@
     "jsxImportSource": "preact",
     "strict": true,
     "noUncheckedIndexedAccess": true,
+    "resolveJsonModule": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
     "allowImportingTsExtensions": true,

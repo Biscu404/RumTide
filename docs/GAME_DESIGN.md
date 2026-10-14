@@ -725,6 +725,8 @@ All tunable numbers live in one file, `balance.ts`, inside the engine. Nothing e
 export const B = {
   startGold: 120,
 
+  movement: { steps: 3 },   // section 4.4: hops happen in up to this many steps per Tide
+
   upgrade: { baseCost: 60, growth: 1.35, statPerLevel: 0.12, maxLevel: 10 },
   baseStat: 10,     // Cannons, Sails and Crew on a level 0 sloop
   baseHull: 100,    // Hull points on a level 0 sloop
