@@ -2,6 +2,7 @@
 // do not replay from their seed always fail. The bands below are loose on purpose: they catch a
 // broken engine, not a balance opinion.
 
+import type { ApiSeasonReport } from "./api_season.ts";
 import type { SeasonReport } from "./season.ts";
 
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
@@ -74,5 +75,16 @@ export function brawlProblems(reports: readonly SeasonReport[]): string[] {
   need(t.fleetBattles >= 0.5, "fleet battles are almost never fought");
   need(t.withBounty > 0, "no bounty was ever earned");
   need(t.towed >= 2, "ships are almost never struck");
+  return problems;
+}
+
+/** A season played through the handlers must be clean and end exactly as the direct season did. */
+export function apiProblems(label: string, direct: SeasonReport, api: ApiSeasonReport): string[] {
+  const problems = api.problems.slice(0, 5).map((p) => `${label} seed ${direct.seed} through the handlers: ${p}`);
+  if (api.problems.length > 5) problems.push(`${label} seed ${direct.seed} through the handlers: and ${api.problems.length - 5} more`);
+  if (JSON.stringify(api.final) !== JSON.stringify(direct.final)) {
+    problems.push(`${label} seed ${direct.seed}: the handlers ended in a different season than the direct run`);
+  }
+  if (api.portActions === 0 || api.orders === 0) problems.push(`${label} seed ${direct.seed}: the bots made no port actions or no orders`);
   return problems;
 }

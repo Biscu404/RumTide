@@ -1,0 +1,252 @@
+// The logic behind each Edge Function (section 15.4 and 15.5), with no Deno, HTTP or Supabase in it.
+// Each handler takes a Deps bundle (the store, the clock, a seed source) and a payload, validates the
+// payload with Zod and then with the engine, and writes through the store. The Edge Function files
+// only wire a request to one of these, which is what lets bots play a season through them.
+
+import type { ZodType, z } from "zod";
+import { speed } from "../engine/balance.ts";
+import type { GameMap } from "../engine/map.ts";
+import { courseError } from "../engine/movement.ts";
+import {
+  PortError, buyGood, buyUpgrade, feedShipwright, repairShip, sellGood, type PortContext,
+} from "../engine/port.ts";
+import { resolveTide } from "../engine/resolve.ts";
+import { startSeason, type NewCaptain } from "../engine/season.ts";
+import type { Gazette, MarketRow, Orders, Ship, Transaction } from "../engine/types.ts";
+import { failureMessage, gazetteMessage } from "./discord.ts";
+import { localDate, nextDueAt } from "./schedule.ts";
+import { portActionSchema, submitOrdersSchema } from "./schemas.ts";
+import { ApiError, type CaptainView, type GameStore, type SeasonInfo } from "./store.ts";
+
+export interface Deps {
+  store: GameStore;
+  getMap(mapId: string): GameMap;
+  now(): Date;
+  /** A fresh 32 bit seed for a Tide. The engine never makes its own. */
+  newSeed(): number;
+  /** Post to the group chat. Optional, and allowed to fail. */
+  notify?(text: string): Promise<void>;
+  siteUrl?: string;
+}
+
+function parse<S extends ZodType>(schema: S, body: unknown): z.infer<S> {
+  const result = schema.safeParse(body);
+  if (result.success) return result.data;
+  const issue = result.error.issues[0];
+  const where = issue && issue.path.length > 0 ? `${issue.path.map(String).join(".")}: ` : "";
+  throw new ApiError(`Bad request. ${where}${issue?.message ?? "Invalid payload"}`, 400);
+}
+
+/** The captain's view, if they play in an open Tide that is not past its due time. */
+async function openView(deps: Deps, userId: string): Promise<CaptainView> {
+  const view = await deps.store.captainView(userId);
+  if (!view) throw new ApiError("You are not a captain in a running season", 404);
+  const { tide } = view.active;
+  if (tide.status !== "open" || deps.now().getTime() >= new Date(tide.dueAt).getTime()) {
+    throw new ApiError("The Tide is turning. Try again once the new Tide opens.", 409);
+  }
+  return view;
+}
+
+// ---- submit_orders ----
+
+export interface SubmitOrdersResult { orders: Orders; }
+
+export async function submitOrders(deps: Deps, userId: string, body: unknown): Promise<SubmitOrdersResult> {
+  const p = parse(submitOrdersSchema, body);
+  const view = await openView(deps, userId);
+  const { captain, ship } = view;
+  if (p.tide !== view.active.tide.number) {
+    throw new ApiError(`Orders are for Tide ${p.tide} but Tide ${view.active.tide.number} is open`, 409);
+  }
+
+  const map = deps.getMap(view.active.season.mapId);
+  const problem = courseError(map, ship.nodeId, p.course, speed(ship.hull, ship.levels.sails));
+  if (problem !== null) throw new ApiError(problem);
+
+  const known = (id: string) => view.roster.find((r) => r.id === id);
+  if (typeof p.huntFilter === "object" && (p.huntFilter.captainId === captain.id || !known(p.huntFilter.captainId))) {
+    throw new ApiError("That captain cannot be hunted");
+  }
+  if (p.intent === "escort") {
+    const mate = p.escortCaptainId === undefined ? undefined : known(p.escortCaptainId);
+    if (!mate || mate.id === captain.id || mate.fleetId === null || mate.fleetId !== captain.fleetId) {
+      throw new ApiError("You can only escort a captain in your own fleet");
+    }
+  }
+
+  // Keep only the fields the intent uses, so a stale hunt filter never rides along.
+  const orders: Orders = {
+    tide: p.tide, captainId: captain.id, course: p.course, intent: p.intent,
+    ...(p.intent === "hunt" && p.huntFilter !== undefined ? { huntFilter: p.huntFilter } : {}),
+    ...(p.intent === "escort" ? { escortCaptainId: p.escortCaptainId! } : {}),
+    plan: p.plan, parley: p.parley, noQuarter: p.noQuarter, ready: p.ready,
+  };
+  await deps.store.saveOrders(view.active.season.id, orders);
+  return { orders };
+}
+
+// ---- port_action ----
+
+export interface PortActionResult { message: string; chestGold: number; ship: Ship; }
+
+export async function portAction(deps: Deps, userId: string, body: unknown): Promise<PortActionResult> {
+  const p = parse(portActionSchema, body);
+  const view = await openView(deps, userId);
+  if (!view.ship.docked) throw new ApiError("The ship is not docked at a port");
+  const { season, tide } = view.active;
+  const ctx: PortContext = {
+    map: deps.getMap(season.mapId), tide: tide.number, settings: season.settings, boomPortId: view.boomPortId,
+  };
+  const rowFor = (good: string): MarketRow => {
+    const row = view.market.find((r) => r.good === good);
+    if (!row) throw new ApiError("There is no market here");
+    return row;
+  };
+
+  let result: { ship: Ship; captain: typeof view.captain; market?: MarketRow; message: string; kind: string };
+  try {
+    switch (p.action) {
+      case "buy": {
+        const r = buyGood(view.ship, view.captain, rowFor(p.good), p.good, p.units, ctx);
+        result = { ...r, kind: "buy", message: `Bought ${r.units} ${p.good} for ${r.gold} doubloons.` };
+        break;
+      }
+      case "sell": {
+        const r = sellGood(view.ship, view.captain, rowFor(p.good), p.good, p.units, ctx);
+        result = { ...r, market: r.row, kind: "sell", message: `Sold ${r.units} ${p.good} for ${r.gold} doubloons.` };
+        break;
+      }
+      case "upgrade": {
+        const r = buyUpgrade(view.ship, view.captain, p.stat, ctx);
+        result = { ...r, kind: "upgrade", message: `${p.stat} is now level ${r.level}. It cost ${r.cost} doubloons.` };
+        break;
+      }
+      case "repair": {
+        const r = repairShip(view.ship, view.captain, ctx, p.points);
+        result = { ...r, kind: "repair", message: r.points > 0 ? `Repaired ${r.points.toFixed(1)} hull points for ${r.cost} doubloons.` : "Nothing to repair." };
+        break;
+      }
+      case "shipwright": {
+        const r = feedShipwright(view.ship, view.captain, p.amount, ctx);
+        result = {
+          ...r, kind: "shipwright",
+          message: r.completed ? `The Shipwright finished your ${r.completed}.` : `The Shipwright took ${r.paid} doubloons.`,
+        };
+        break;
+      }
+    }
+  } catch (error) {
+    if (error instanceof PortError) throw new ApiError(error.message);
+    throw error;
+  }
+
+  const before = result.market ? rowFor(result.market.good) : null;
+  const transaction: Omit<Transaction, "id"> = {
+    captainId: view.captain.id, tide: tide.number, kind: result.kind,
+    amount: result.captain.chestGold - view.captain.chestGold, balanceAfter: result.captain.chestGold,
+    data: p,
+  };
+  await deps.store.applyPortChange({
+    seasonId: season.id, tide: tide.number, captain: result.captain, ship: result.ship,
+    expectedVersion: view.version, market: before && result.market ? { before, after: result.market } : null,
+    transaction,
+  });
+  return { message: result.message, chestGold: result.captain.chestGold, ship: result.ship };
+}
+
+// ---- resolve_tide ----
+
+export type ResolveOutcome =
+  | { status: "idle" }
+  | { status: "waiting"; dueAt: string }
+  | { status: "busy" }
+  | { status: "resolved"; tide: number; reason: "scheduled" | "early" | "forced"; gazette: Gazette; seasonEnded: boolean }
+  | { status: "failed"; tide: number; error: string };
+
+const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
+/**
+ * pg_cron calls this every 5 minutes (section 15.5). It resolves the open Tide when it is due, when
+ * everyone is Ready, or when `force` says so (the admin's Resolve now). Safe to call at any time and
+ * from several places at once: the claim lets exactly one caller resolve a Tide.
+ */
+export async function resolveDueTide(deps: Deps, opts: { force?: boolean } = {}): Promise<ResolveOutcome> {
+  const { store } = deps;
+  const active = await store.activeSeason();
+  if (!active) return { status: "idle" };
+  const { season, tide } = active;
+  if (tide.status !== "open") return { status: "busy" };
+
+  const now = deps.now();
+  let reason: "scheduled" | "early" | "forced";
+  if (opts.force) {
+    reason = "forced";
+  } else if (now.getTime() >= new Date(tide.dueAt).getTime()) {
+    reason = "scheduled";
+  } else {
+    // Early Tide: everyone is Ready, and no Tide has turned yet today (section 11.2).
+    const usedToday = active.lastResolvedAt !== null
+      && localDate(new Date(active.lastResolvedAt), season.timezone) === localDate(now, season.timezone);
+    const { active: captains, ready } = await store.readyCount(season.id, tide.number);
+    if (usedToday || captains === 0 || ready < captains) return { status: "waiting", dueAt: tide.dueAt };
+    reason = "early";
+  }
+
+  if (!(await store.claimTide(season.id, tide.number))) return { status: "busy" };
+
+  let result;
+  let ended = false;
+  try {
+    const state = await store.loadTideState(season.id);
+    if (state.snapshot.tide !== tide.number) {
+      throw new Error(`Snapshot is for Tide ${state.snapshot.tide} but Tide ${tide.number} is being resolved`);
+    }
+    result = resolveTide(deps.getMap(season.mapId), state.snapshot, state.orders, tide.seed);
+    ended = result.tide >= season.lengthTides;
+    await store.applyTideResult({
+      seasonId: season.id, result, resolvedAt: now.toISOString(),
+      // An early or forced Tide uses up the day, so the next one is due tomorrow.
+      next: ended ? null : {
+        dueAt: nextDueAt(now, season.timezone, season.tideTimeLocal, reason !== "scheduled").toISOString(),
+        seed: deps.newSeed(),
+      },
+    });
+  } catch (error) {
+    await store.failTide(season.id, tide.number, message(error)).catch(() => {});
+    await deps.notify?.(failureMessage(season.name, tide.number)).catch(() => {});
+    return { status: "failed", tide: tide.number, error: message(error) };
+  }
+
+  await deps.notify?.(gazetteMessage(season.name, tide.number, result.gazette, deps.siteUrl)).catch(() => {});
+  return { status: "resolved", tide: tide.number, reason, gazette: result.gazette, seasonEnded: ended };
+}
+
+// ---- starting a season ----
+
+export interface StartSeasonInput {
+  seasonId: string;
+  name: string;
+  mapId: string;
+  preset: SeasonInfo["settings"]["preset"];
+  timezone: string;
+  tideTimeLocal: string;
+  captains: (NewCaptain & { userId: string })[];
+}
+
+/** Tide 1: every captain docked in a port, the first Tide open and due at the next Tide time. */
+export async function startNewSeason(deps: Deps, input: StartSeasonInput): Promise<void> {
+  const map = deps.getMap(input.mapId);
+  const snapshot = startSeason(map, input.seasonId, input.preset, input.captains, deps.newSeed());
+  const userIds = new Map(input.captains.map((c) => [c.id, c.userId]));
+  snapshot.captains = snapshot.captains.map((c) => ({ ...c, userId: userIds.get(c.id)! }));
+  await deps.store.createSeason({
+    season: {
+      id: input.seasonId, name: input.name, status: "active", mapId: input.mapId, timezone: input.timezone,
+      tideTimeLocal: input.tideTimeLocal, lengthTides: snapshot.lengthTides, settings: snapshot.settings,
+    },
+    snapshot,
+    dueAt: nextDueAt(deps.now(), input.timezone, input.tideTimeLocal).toISOString(),
+    seed: deps.newSeed(),
+  });
+}

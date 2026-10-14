@@ -37,7 +37,7 @@ Building Season 0: a two week beta (14 Tides) for six friends, built by one deve
 
 * The rules engine (`supabase/functions/_shared/engine`) is pure TypeScript. No network, no database, no `Date.now`, no `Math.random`. Randomness comes only from the seeded Rng passed in.
 * Every gameplay number lives in `balance.ts`. Never hardcode one anywhere else. Season differences (length, cost multiplier, hulls, galleon Tides) come from `SEASON_PRESETS`.
-* The client never writes game tables. All game writes go through Edge Functions, which validate with Zod and then with the engine. The server owns positions, stats, gold, cargo, outcomes and seeds.
+* The client never writes game tables. All game writes go through Edge Functions, which validate with Zod and then with the engine. The server owns positions, stats, gold, cargo, outcomes and seeds. The logic of each function lives in `supabase/functions/_shared/api/handlers.ts` over the `GameStore` interface; the `index.ts` of each function only wires a request to it. Change a migration and the `SupabaseStore` together.
 * Inside the engine, iterate collections in sorted id order so every Tide is reproducible from its snapshot and seed.
 * Every engine change needs a unit test. Run the tests and the bot season before finishing a task.
 * Phaser is pinned to version 4. Check the Phaser 4 docs (https://docs.phaser.io) and do not assume Phaser 3 APIs. The installed types in `node_modules/phaser/types/phaser.d.ts` always match the pinned version, so check an API there when in doubt.
@@ -62,4 +62,4 @@ Building Season 0: a two week beta (14 Tides) for six friends, built by one deve
 * Check types: `npm run typecheck`
 * Build for production: `npm run build` (output in `dist/`)
 * Run the balance simulation: `npm run sim` (checks the combat table of section 7.3, a bot trader against the solo pacing of sections 3.5 and 5.5, and the galleon odds of section 8.2)
-* Run a bot season: `npm run bots` (six scripted captains and a six raider brawl play Season 0 on the real engine over 30 seeds each, `npm run bots -- 100` for more; fails on any impossible state, crash, non deterministic season or insane total)
+* Run a bot season: `npm run bots` (six scripted captains and a six raider brawl play Season 0 on the real engine over 30 seeds each, `npm run bots -- 100` for more; every season is played twice, directly and through the Edge Function handlers, and the two must end identically; fails on any impossible state, crash, non deterministic season or insane total)

@@ -17,6 +17,7 @@ import type { Rng } from "@engine/rng.ts";
 import type { TideSnapshot } from "@engine/season.ts";
 import { shipPowerRating } from "@engine/state.ts";
 import type { Captain, Maneuver, MarketRow, Orders, Ship, Stat } from "@engine/types.ts";
+import type { PortActionPayload } from "../../supabase/functions/_shared/api/schemas.ts";
 import { spend, visitPort, type TraderPolicy } from "../sim/trader.ts";
 
 const MANEUVERS: readonly Maneuver[] = ["broadside", "outmaneuver", "board"];
@@ -34,8 +35,12 @@ export interface BotView {
   captain: Captain;
 }
 
-/** What a bot does: port actions (new ship, Chest and market) and its orders, or none if it skips the Tide. */
-export interface Turn { ship: Ship; captain: Captain; market: MarketRow[]; orders: Orders | null; }
+/**
+ * What a bot does: port actions and its orders, or none if it skips the Tide. `actions` is what the
+ * bot asks the `port_action` function to do, in order. `ship`, `captain` and `market` are what the
+ * state should be afterwards, so the bot season can play them directly or check the real handlers.
+ */
+export interface Turn { ship: Ship; captain: Captain; market: MarketRow[]; orders: Orders | null; actions: PortActionPayload[]; }
 
 export interface Bot {
   id: string;
@@ -68,10 +73,10 @@ const orders = (view: BotView, o: Partial<Orders> & Pick<Orders, "plan">): Order
 });
 
 /** Docked and short of hull: pay for repairs. */
-function repaired(view: BotView): { ship: Ship; captain: Captain } {
-  if (!atPort(view.map, view.ship)) return { ship: view.ship, captain: view.captain };
+function repaired(view: BotView): { ship: Ship; captain: Captain; actions: PortActionPayload[] } {
+  if (!atPort(view.map, view.ship)) return { ship: view.ship, captain: view.captain, actions: [] };
   const r = repairShip(view.ship, view.captain, view.ctx);
-  return { ship: r.ship, captain: r.captain };
+  return { ship: r.ship, captain: r.captain, actions: r.points > 0 ? [{ action: "repair" }] : [] };
 }
 
 /** Is a galleon on the map that this ship and every fleet mate can reach this Tide? Returns its node. */
@@ -94,14 +99,14 @@ export function traderBot(id: string, policy: TraderPolicy, rng: Rng, fleetId: s
     id, role: fleetId ? "convoy trader" : `${policy.route} trader`, fleetId, absent,
     play(view) {
       const { map, ctx } = view;
-      let { ship, captain } = repaired(view);
+      let { ship, captain, actions } = repaired(view);
       let market = view.snap.market;
 
       const target = galleonRun(view);
       if (target !== null) {
         const course = towards(map, ship, target);
         return {
-          ship, captain, market,
+          ship, captain, market, actions,
           orders: orders(view, { plan: GALLEON_COUNTER, intent: "hunt", huntFilter: "merchants", course }),
         };
       }
@@ -110,6 +115,7 @@ export function traderBot(id: string, policy: TraderPolicy, rng: Rng, fleetId: s
       if (atPort(map, ship)) {
         const visit = visitPort({ ship, captain, market }, ctx, policy);
         ({ ship, captain, market } = visit);
+        actions = [...actions, ...visit.actions];
         destination = visit.route.at(-1) ?? null;
         course = visit.route.slice(0, pace(ship));
       } else {
@@ -118,7 +124,7 @@ export function traderBot(id: string, policy: TraderPolicy, rng: Rng, fleetId: s
         course = towards(map, ship, destination);
       }
       return {
-        ship, captain, market,
+        ship, captain, market, actions,
         orders: orders(view, { plan: freshPlan(rng), course, parley: 1.25 }),
       };
     },
@@ -139,12 +145,13 @@ export function hunterBot(id: string, role: "raider" | "reaver", policy: TraderP
     id, role, fleetId, absent: [],
     play(view) {
       const { map, snap, ctx } = view;
-      let { ship, captain } = repaired(view);
+      let { ship, captain, actions } = repaired(view);
       if (atPort(map, ship)) {
         const spent = spend(ship, captain, captain.chestGold, ctx, policy, HUNTER_UPGRADES);
         ({ ship, captain } = spent);
+        actions = [...actions, ...spent.actions];
       }
-      const base = { ship, captain, market: snap.market };
+      const base = { ship, captain, market: snap.market, actions };
       const plan = freshPlan(rng);
       const here = ship.nodeId;
 

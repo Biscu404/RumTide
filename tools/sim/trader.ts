@@ -19,6 +19,7 @@ import {
 import { createRng } from "@engine/rng.ts";
 import { seasonSettings } from "@engine/season.ts";
 import { newCaptain, newShip, shipPowerRating } from "@engine/state.ts";
+import type { PortActionPayload } from "../../supabase/functions/_shared/api/schemas.ts";
 import type { Captain, Good, HullId, MarketRow, SeasonSettings, Ship, Stat } from "@engine/types.ts";
 
 export const brine: GameMap = loadMap(
@@ -69,6 +70,8 @@ export interface PortVisit extends PortState {
   route: string[];
   /** Trade profit from the sales made on this visit. */
   earned: number;
+  /** The port actions of the visit in order, as the `port_action` Edge Function takes them. */
+  actions: PortActionPayload[];
 }
 
 /**
@@ -85,6 +88,7 @@ export function visitPort(
   const drift = (portId: string, good: Good) => market[rowIndex(portId, good)]!.drift;
   let earned = 0;
   let route: string[] = [];
+  const actions: PortActionPayload[] = [];
   ship = dock(ship, captain).ship;
 
   // 1. Sell whatever the Hold has.
@@ -92,6 +96,7 @@ export function visitPort(
     if (ship.cargo[good] === 0) continue;
     const r = sellGood(ship, captain, market[rowIndex(ship.nodeId, good)]!, good, ship.cargo[good], ctx);
     ship = r.ship; captain = r.captain; earned += r.profit; market[rowIndex(r.row.portId, r.row.good)] = r.row;
+    actions.push({ action: "sell", good, units: r.units });
   }
 
   if (!lastVisit) {
@@ -99,20 +104,21 @@ export function visitPort(
     const planned = bestTrip(ship, captain.chestGold, ctx, drift, policy, PORTS);
     const reserve = planned ? Math.ceil(planned.units * buyPriceAt(ship.nodeId, planned.good, ctx)) : 0;
     const spent = spend(ship, captain, Math.max(0, captain.chestGold - reserve), ctx, policy, upgradeOrder);
-    ship = spent.ship; captain = spent.captain;
+    ship = spent.ship; captain = spent.captain; actions.push(...spent.actions);
 
     // 3. Fill the Hold for the best leg and set sail.
     const trip = bestTrip(ship, captain.chestGold, ctx, drift, policy, PORTS);
     if (trip) {
       const bought = buyGood(ship, captain, market[rowIndex(ship.nodeId, trip.good)]!, trip.good, trip.units, ctx);
       ship = { ...bought.ship, docked: false }; captain = bought.captain;
+      actions.push({ action: "buy", good: trip.good, units: trip.units });
       route = shortestPath(brine, ship.nodeId, trip.to);
     }
   } else {
     const spent = spend(ship, captain, captain.chestGold, ctx, policy, upgradeOrder);
-    ship = spent.ship; captain = spent.captain;
+    ship = spent.ship; captain = spent.captain; actions.push(...spent.actions);
   }
-  return { ship, captain, market, route, earned };
+  return { ship, captain, market, route, earned, actions };
 }
 
 interface Trip { good: Good; to: string; tides: number; units: number; score: number; }
@@ -233,13 +239,16 @@ export function spend(
   upgradeOrder: readonly Stat[] = UPGRADE_ORDER,
 ) {
   let money = budget;
+  const actions: PortActionPayload[] = [];
   const pay = (r: { ship: Ship; captain: Captain }, cost: number) => { ship = r.ship; captain = r.captain; money -= cost; };
 
   if (totalLevels(ship) >= policy.saveFromLevels && nextHull(ship, ctx) !== null) {
     const instalment = Math.floor(B.shipwrightShareHint * money);
     if (instalment >= 1) {
-      const r = feedShipwright(ship, captain, Math.min(instalment, captain.chestGold), ctx);
+      const amount = Math.min(instalment, captain.chestGold);
+      const r = feedShipwright(ship, captain, amount, ctx);
       pay(r, r.paid);
+      actions.push({ action: "shipwright", amount });
     }
   }
   for (;;) {
@@ -249,6 +258,7 @@ export function spend(
     if (options.length === 0) break;
     const pick = options.reduce((a, b) => (b.cost < a.cost ? b : a));
     pay(buyUpgrade(ship, captain, pick.stat, ctx), pick.cost);
+    actions.push({ action: "upgrade", stat: pick.stat });
   }
-  return { ship, captain };
+  return { ship, captain, actions };
 }

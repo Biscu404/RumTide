@@ -1,0 +1,17 @@
+# Supabase CLI configuration. Run `supabase init` once to see every option; only what Rumtide
+# changes from the defaults is listed here.
+project_id = "rumtide"
+
+[db]
+major_version = 17
+
+[functions.submit_orders]
+import_map = "./functions/deno.json"
+
+[functions.port_action]
+import_map = "./functions/deno.json"
+
+# pg_cron calls this one with a shared secret (x-cron-secret), not a user's token.
+[functions.resolve_tide]
+import_map = "./functions/deno.json"
+verify_jwt = false

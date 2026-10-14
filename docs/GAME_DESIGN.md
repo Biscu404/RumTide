@@ -899,6 +899,7 @@ rumtide/
     functions/
       _shared/engine/       pure rules engine and balance.ts, zero dependencies
       _shared/maps/         map JSON files (nodes, lanes, ports)
+      _shared/api/          handlers (the logic of each function), GameStore, schemas, schedule, Discord
       submit_orders/
       port_action/
       fleet_action/

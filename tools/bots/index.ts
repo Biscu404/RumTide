@@ -4,7 +4,9 @@
 // if any state is impossible, a season throws, the same seed gives a different season, or the totals
 // look wrong (section 15.6, day 5 of section 19.1).
 
+import { apiProblems } from "./checks.ts";
 import { brawlProblems, commonProblems, mean, sixCaptainProblems, totals } from "./checks.ts";
+import { playSeasonThroughApi } from "./api_season.ts";
 import { brawl, playSeason, sixCaptains, type SeasonReport } from "./season.ts";
 
 const SEASONS = Math.max(1, Number(process.argv[2]) || 30);
@@ -62,7 +64,25 @@ for (const id of first.captains.map((c) => c.id)) {
 console.log(`\nBrawl (six raiders in two fleets of three), ${SEASONS} seasons, mean per season:`);
 console.log(`  ${line(brawls)}`);
 
+// ---- The same seasons through the real handlers ----
+
+let portActions = 0, orderCount = 0;
+const apiChecked: string[] = [];
+const throughApi = async (label: string, reps: SeasonReport[], roster: (seed: number) => ReturnType<typeof sixCaptains>) => {
+  for (const r of reps) {
+    const api = await playSeasonThroughApi(r.seed, roster(r.seed));
+    portActions += api.portActions;
+    orderCount += api.orders;
+    apiChecked.push(...apiProblems(label, r, api));
+  }
+};
+await throughApi("six captains", reports, sixCaptains);
+await throughApi("brawl", brawls, brawl);
+console.log(`
+Through the handlers (submit_orders, port_action, resolve_tide): ${portActions} port actions and ${orderCount} orders over ${2 * SEASONS} seasons.`);
+
 const problems = [
+  ...apiChecked,
   ...commonProblems("six captains", reports, (seed) => playSeason(seed, sixCaptains(seed))),
   ...commonProblems("brawl", brawls, (seed) => playSeason(seed, brawl(seed))),
   ...sixCaptainProblems(reports),
@@ -72,5 +92,5 @@ if (problems.length > 0) {
   console.error("\nThe bot season found problems:\n" + problems.map((p) => `  ${p}`).join("\n"));
   process.exitCode = 1;
 } else {
-  console.log(`\nBot season passed: ${SEASONS} seasons of each roster, no errors, deterministic, results sane.`);
+  console.log(`\nBot season passed: ${SEASONS} seasons of each roster, no errors, deterministic, results sane, and the handlers play them identically.`);
 }

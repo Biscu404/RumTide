@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { brawlProblems, commonProblems, sixCaptainProblems } from "./checks.ts";
+import { apiProblems, brawlProblems, commonProblems, sixCaptainProblems } from "./checks.ts";
+import { playSeasonThroughApi } from "./api_season.ts";
 import { brawl, checkState, playSeason, sixCaptains } from "./season.ts";
 import { brine } from "../sim/trader.ts";
 import { startSeason } from "@engine/season.ts";
@@ -28,6 +29,21 @@ describe("the bot season", () => {
       const bob = r.captains.find((c) => c.id === "bob")!;
       expect(bob.shoreLeave).toBe(3);
       expect(bob.status).toBe("active");
+    }
+  });
+});
+
+describe("the bot season through the Edge Function handlers", () => {
+  const seeds = SEEDS.slice(0, 6);
+
+  it("plays the Season 0 roster and the brawl, ends exactly as the direct season, and posts every Gazette", async () => {
+    for (const seed of seeds) {
+      for (const [label, roster] of [["six captains", sixCaptains], ["brawl", brawl]] as const) {
+        const api = await playSeasonThroughApi(seed, roster(seed));
+        const direct = playSeason(seed, roster(seed));
+        expect(apiProblems(label, direct, api)).toEqual([]);
+        expect(api.posts).toHaveLength(14);
+      }
     }
   });
 });

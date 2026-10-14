@@ -1,0 +1,50 @@
+:root {
+  --bg: #0b2a4a;
+  --panel: #12385f;
+  --text: #f3ead2;
+  --dim: #9db8d4;
+  --accent: #ffd23f;
+  color-scheme: dark;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #app { height: 100%; margin: 0; }
+
+body { background: var(--bg); color: var(--text); }
+
+.screen { display: flex; flex-direction: column; height: 100%; }
+
+.bar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 8px 16px; background: var(--panel);
+}
+.bar .spacer { flex: 1; }
+
+.map-host { flex: 1; min-height: 0; position: relative; overflow: hidden; touch-action: none; }
+.map-host canvas { display: block; }
+
+.dim { color: var(--dim); }
+.center { text-align: center; margin-top: 30vh; }
+
+.login {
+  display: flex; flex-direction: column; gap: 12px;
+  width: min(360px, 100% - 32px); margin: 12vh auto 0;
+}
+.login h1 { margin: 0 0 8px; color: var(--accent); }
+.login label { display: flex; flex-direction: column; gap: 4px; color: var(--dim); }
+.login .row { display: flex; gap: 8px; }
+.notice { margin: 0; color: var(--accent); }
+
+input {
+  padding: 10px; font: inherit; color: var(--text);
+  background: var(--bg); border: 1px solid var(--dim); border-radius: 4px;
+}
+
+button {
+  padding: 10px 14px; font: inherit; font-weight: bold; cursor: pointer;
+  color: #1a1206; background: var(--accent); border: 0; border-radius: 4px;
+}
+button.secondary { color: var(--text); background: transparent; border: 1px solid var(--dim); }
+button:disabled { opacity: 0.5; cursor: default; }

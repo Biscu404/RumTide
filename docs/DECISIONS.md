@@ -2,6 +2,50 @@
 
 What was decided, when and why. Newest first. When a design decision changes, add an entry here in the same commit.
 
+## 2026-10-14: Client step 1, login and MapScene
+
+* **Email and password sign in** through Supabase Auth, with a Create account button. Nothing else is asked.
+* **The client reads `seasons`, `public_captains`, `public_ships` and the player's own `captains` row,** never the private tables, and writes nothing.
+* **Without `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (client/.env.local) the app shows a preview:** the Brine with three made up ships, so the map can be tried with no server. With them set, it shows the login.
+* **Maps are looked up by the season's `map_id`** in `client/src/scenes/maps.ts`. Season 0 has only `brine`.
+* **`@supabase/supabase-js` stays in `devDependencies`** for now (it is bundled by Vite either way). Move it when the client is deployed.
+* **Not run against a real project yet:** the sign in and the reads need a Supabase project with a running season.
+
+## 2026-10-14: Day 6 Edge Function handlers, the database and the Discord webhook
+
+Section 15.4 and 15.5 leave these open. The logic of each function lives in `supabase/functions/_shared/api` as plain TypeScript over a `GameStore` interface, so it runs against memory in the tests and bots and against Postgres in production. The files in `submit_orders/`, `port_action/` and `resolve_tide/` only wire a request to a handler.
+
+**Early and late Tides**
+* **An early Tide needs every active captain Ready and no Tide resolved yet on today's local date.** "At most once a day" (section 11.2) is read as one resolve per calendar day in the season's timezone. Ashore captains do not count.
+* **An early or forced Tide uses up the day:** the next Tide is due at the next 21:00 on a later date. A scheduled Tide that runs late (cron was down) gets the next 21:00 after now, so a late Tide never doubles up with the following one.
+* **21:00 stays 21:00 on the clock** across daylight saving. The due time is worked out from the season's timezone each time (`schedule.ts`), not by adding 24 hours.
+* **Orders and port actions close the moment a Tide is due,** even before the cron claims it (up to 5 minutes later), so nobody gets a few free minutes. They also close while a Tide is resolving or failed.
+
+**Writes and races**
+* **Each captain row has a `version`.** A port action carries the version it was worked out from and fails with a 409 if the captain changed since, so two taps on Buy cannot spend the same gold twice. A market row is compared on its drift and units sold. A 409 means "look again and retry".
+* **Orders and port actions lock the open Tide row "for share";** claiming a Tide for resolving needs the row exclusively, so the two cannot interleave.
+* **The seed of a Tide is fixed when it opens** (random, from the Edge Function) and stored in `tides`, where clients cannot read it. A retry reuses it, so a failed Tide resolves the same way the second time.
+* **A failed Tide stays failed** until the admin retries it (day 7). The cron skips it.
+
+**What clients can read**
+* **Other captains' Chest, plunder, cargo, Hold level, orders and user ids are hidden;** `public_captains` and `public_ships` show the rest (Legend, bounty, shield, fleet, hull, place, hull points and the other four levels). A ship's Power Rating can be worked out from what is public, as section 4 expects.
+* **Orders are readable by fleet mates for the open Tide and by everyone once it has resolved,** for replays (section 15.4).
+* **Only the Treasure Galleon's habit is public;** the merchants' habits are not, so a hunter cannot read a merchant's plan.
+* **`create_season` can start a draft season,** so fleets can be set up first (a captain's fleet must exist). With no draft it just creates the season.
+
+**The end of a season**
+* **After Tide 14 there is no Tide 15 row.** The season is `ended` and the final standings are the last snapshot. The database shows Tide 14's NPCs and boom port, not the ones the engine prepared for a Tide that never opens.
+
+**Not built yet (open)**
+* **Shore Leave (+50%), Fair Winds (+20%) and the convoy bonus (+10% per fleet mate) are still not applied to income.** Day 5 expected them to arrive with `port_action`, but the design does not say which income they boost (sale profit, prizes, or both) or on which Tide a stored Shore Leave is spent. Stored Shore Leave rises to 3 and is never used. Needs a decision before Season 0, because Shore Leave is a Must in section 16.1.
+* **The 18:00 Discord reminder, the `profile` function and `fleet_action`** are not built. The reminder needs a "sent today" marker; fleets and profile are week 2.
+* **The admin function** (resolve now, retry, logs) is day 7. `resolveDueTide` already takes `force`.
+
+**How this was checked**
+* `npm test` covers the handlers, the schedule (including the 25 October clock change), the HTTP shell and the Discord message. `npm run bots` now also plays every seed through `submit_orders`, `port_action` and `resolve_tide` and requires the season to end exactly as the direct one.
+* The migrations, `SupabaseStore` and the row level security were run once on a throwaway in process Postgres (PGlite, not a project dependency): five bot seasons through the real SQL ended identically to the direct engine, and 23 access checks passed as a signed in player.
+* **Not run anywhere yet:** the Deno entry files, `config.toml`, the cron migration (pg_cron, pg_net and Vault are not in PGlite) and `auth.getUser`. They need a real Supabase project.
+
 ## 2026-10-14: Day 5 Tide resolver and the bot season
 
 Section 4.4, 12.4 and 15.5 leave these open. `engine/resolve.ts` (`resolveTide(map, snapshot, orders, seed)`) and `engine/season.ts` (`TideSnapshot`, `startSeason`) are new, and `tools/bots` plays whole seasons on them. Change a line here and the matching test in the same commit.
