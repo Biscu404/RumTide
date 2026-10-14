@@ -973,7 +973,9 @@ interface Tide {
 interface Battle {
   id: string; tide: number; nodeId: string;
   sides: BattleSide[]; rounds: RoundRecord[];      // everything the replay needs
-  outcome: "decisive" | "victory" | "draw"; loot: LootRecord[]; bountiesAdded: BountyRecord[];
+  outcome: "decisive" | "victory" | "draw";
+  winner: 0 | 1 | null;                            // index into sides, null on a draw
+  loot: LootRecord[]; bountiesAdded: BountyRecord[];
 }
 
 interface Npc { id: string; seasonId: string; kind: NpcKind; nodeId: string; pr: number;

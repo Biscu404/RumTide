@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "sim": "node --import ./tools/register.mjs tools/sim/index.ts"
+    "sim": "node --import ./tools/register.mjs tools/sim/index.ts",
+    "bots": "node --import ./tools/register.mjs tools/bots/index.ts"
   },
   "dependencies": {
     "phaser": "4.2.1",

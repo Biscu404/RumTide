@@ -1,6 +1,6 @@
 // Starting state for a new captain: a fresh sloop docked in port with the starting gold (section 5).
 
-import { B, maxHullPoints } from "./balance.ts";
+import { B, maxHullPoints, powerRating, statValue } from "./balance.ts";
 import type { Captain, Ship } from "./types.ts";
 
 export function newShip(captainId: string, nodeId: string): Ship {
@@ -25,3 +25,12 @@ export function newCaptain(id: string, seasonId: string): Captain {
     shoreLeaveTides: 0, lastOrdersTide: 0, status: "active",
   };
 }
+
+/** Power Rating of a ship as it stands (section 14). A fresh sloop is 10. */
+export const shipPowerRating = (ship: Ship) =>
+  powerRating({
+    hull: maxHullPoints(ship.hull, ship.levels.hull),
+    cannons: statValue(ship.hull, ship.levels.cannons),
+    sails: statValue(ship.hull, ship.levels.sails),
+    crew: statValue(ship.hull, ship.levels.crew),
+  });

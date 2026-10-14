@@ -3,7 +3,7 @@ import brineJson from "../maps/brine.json";
 import { B, boom } from "./balance.ts";
 import { loadMap } from "./map.ts";
 import {
-  GOODS, advanceMarket, driftAfterSelling, driftNextTide, newMarket, pickBoomPort, portMult,
+  GOODS, advanceMarket, boomPortForTide, driftAfterSelling, driftNextTide, newMarket, pickBoomPort, portMult,
   saleRevenue, unitPrice, weekOf, weeklyBoomActive,
 } from "./market.ts";
 import { createRng } from "./rng.ts";
@@ -124,5 +124,14 @@ describe("the Trade Winds boom", () => {
     expect(picks).not.toContain("last_lantern");
     expect(new Set(picks)).toEqual(new Set(["port_regal", "saint_brine", "rumhaven", "gullrock", "driftwood_key"]));
     expect(pickBoomPort(brine, createRng(7))).toBe(pickBoomPort(brine, createRng(7)));
+  });
+
+  it("boomPortForTide is none in week 1, a fresh pick on Tide 8, and the same port for the rest of week 2", () => {
+    const rng = createRng(3);
+    expect(boomPortForTide(brine, 1, null, rng)).toBeNull();
+    expect(boomPortForTide(brine, 7, null, rng)).toBeNull();
+    const week2 = boomPortForTide(brine, 8, null, rng);
+    expect(week2).not.toBeNull();
+    for (let tide = 9; tide <= 14; tide++) expect(boomPortForTide(brine, tide, week2, rng)).toBe(week2);
   });
 });

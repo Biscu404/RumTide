@@ -5,8 +5,9 @@
 // best leg back); the casual trader only looks at one leg and can be left in a port with nothing
 // good to carry away. The documented trader should earn between the two.
 
+import { seasonSettings } from "@engine/season.ts";
 import { median } from "./stats.ts";
-import { DEFAULT_POLICY, runTrader, seasonSettings, type TraderPolicy, type TraderRun } from "./trader.ts";
+import { DEFAULT_POLICY, runTrader, type TraderPolicy, type TraderRun } from "./trader.ts";
 
 /** Section 3.5, Season 0, solo trader: income per Tide, total upgrade levels, and the headline numbers. */
 export const SECTION_3_5 = {

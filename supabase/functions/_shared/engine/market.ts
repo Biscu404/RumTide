@@ -64,6 +64,15 @@ export const advanceMarket = (rows: readonly MarketRow[]): MarketRow[] =>
   rows.map((r) => ({ ...r, drift: driftNextTide(r.drift), soldThisTide: 0 }));
 
 /**
+ * The Trade Winds port while `tide` is open: none before week 2, a fresh pick on the first Tide of
+ * each week after that, and the same port for the rest of the week. `current` is last Tide's port.
+ */
+export function boomPortForTide(map: GameMap, tide: number, current: string | null, rng: Rng): string | null {
+  if (!weeklyBoomActive(tide)) return null;
+  return current === null || weekOf(tide) !== weekOf(tide - 1) ? pickBoomPort(map, rng) : current;
+}
+
+/**
  * The Trade Winds boom (section 6.3): one random port with a wanted good gets it for the week.
  * Last Lantern already wants everything, so it is left out.
  */

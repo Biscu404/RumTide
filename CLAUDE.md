@@ -62,4 +62,4 @@ Building Season 0: a two week beta (14 Tides) for six friends, built by one deve
 * Check types: `npm run typecheck`
 * Build for production: `npm run build` (output in `dist/`)
 * Run the balance simulation: `npm run sim` (checks the combat table of section 7.3, a bot trader against the solo pacing of sections 3.5 and 5.5, and the galleon odds of section 8.2)
-* Run a bot season: `npm run bots` (not built yet, arrives on day 5 of section 19.1)
+* Run a bot season: `npm run bots` (six scripted captains and a six raider brawl play Season 0 on the real engine over 30 seeds each, `npm run bots -- 100` for more; fails on any impossible state, crash, non deterministic season or insane total)

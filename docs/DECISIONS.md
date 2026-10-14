@@ -2,7 +2,41 @@
 
 What was decided, when and why. Newest first. When a design decision changes, add an entry here in the same commit.
 
-## 2026-10-14: Day 4 ports, trade, upgrades, Shipwright, NPCs and the galleon
+## 2026-10-14: Day 5 Tide resolver and the bot season
+
+Section 4.4, 12.4 and 15.5 leave these open. `engine/resolve.ts` (`resolveTide(map, snapshot, orders, seed)`) and `engine/season.ts` (`TideSnapshot`, `startSeason`) are new, and `tools/bots` plays whole seasons on them. Change a line here and the matching test in the same commit.
+
+**Encounters in the resolver**
+* **Meetings at one node form one group.** Everyone on a node is looked at together, so two hunters reaching the same merchant fight it as one side and share the prize by damage (section 4.6). Otherwise whoever sorted first would take it all. A side also gets the fleet battle bonus when unrelated hunters share a merchant, because `combat.ts` counts ships, not fleets.
+* **Target choice:** a hunter picks players before merchants, in id order. A ship that fought a battle is out of every other encounter that Tide, which also stops a struck ship from fighting again. A pair that escaped, or settled by tribute, does not meet again that Tide.
+* **No combat in a port.** Any ship on a port node counts as docked, even one passing through, because section 4.2 says ports have no combat ever.
+* **Merchants roll to escape like any hunted ship; the Treasure Galleon never flees.** A boss built for fleets that ran away 3 times in 4 (its PR is 2.8 times the median) would make the section 8.2 odds meaningless. The Small Trader escapes about 45% of the time against a sloop, so a Hunt on merchants needs about two tries, which is a balance knob.
+* **Tribute goes to the hunter as plunder:** the plunder lost plus the cargo lost at prize value. The hunted ship sails on and no battle is recorded.
+* **A loss to an NPC costs hull only.** NPCs take no loot, because loot is never destroyed. A hull at zero still means being towed.
+* **Bounties collected are paid into plunder,** not the Chest, so they are at risk until the winner docks. A bounty earned this Tide does not shrink at the end of it; older ones shrink by 10%.
+* **A struck ship is towed to the nearest port** (fewest hops from where it fought, ties to the lowest id), half patched, and docks and banks what it has left. All of this happens when the Tide ends.
+* **Ships at sea at the end of a Tide patch 10% of their hull;** ships in port repair as a paid port action.
+
+**Standing orders, Shore Leave, Ashore**
+* **No valid orders means standing orders:** stay in port, or at sea sail Quietly towards the nearest port as far as speed allows. Orders with a bad course or plan are replaced the same way and a private log line says why.
+* **A missed Tide stores one Tide of Shore Leave (cap 3).** A captain whose last orders were 5 Tides ago is marked Ashore. Submitting orders makes them active again.
+* **Not built yet: the income side.** Shore Leave (+50%), Fair Winds (+20%) and the convoy bonus (+10% per fleet mate) multiply income, which is earned in port actions, so they arrive with `port_action` on day 6. Until then a trader who misses Tides 5 to 7 earns about 40% less than one who does not, against the doc's 15% (section 3.5). Also not built: exploration events (rule 7) and the Escort intent's course copy (an Escort still joins fleet mates' fights). Both are `Should` in section 16.1.
+
+**Data**
+* **`Battle` gained `winner`** (0 or 1, an index into `sides`, or null for a draw), because the record did not say who won. Section 15.3 is updated.
+* **`resolveTide` takes the map as an argument,** a `GameMap` is not part of a snapshot. It returns the next `TideSnapshot` (tide + 1, prices drifted, NPCs spawned for it, the Trade Winds port picked on Tide 8), this Tide's NPCs as `taken` or `gone`, battles, log and Gazette. After the last Tide it spawns no NPCs.
+* **`startSeason` hands out ports in id order,** one per captain, so six captains use six ports.
+* **`boomPortForTide`, `shipPowerRating`, `seasonSettings` and `median` moved into the engine** from `tools/sim`, so the sim and the bots use the same code. `tools/sim/trader.ts` now exports `visitPort` (a trader's whole stop in port). The sim output is unchanged to the digit.
+
+**What the bot season showed** (`npm run bots`, 30 seeds of each roster)
+* **No crashes and no impossible states** in 60 seasons, and a season replays exactly from its seed.
+* **The real resolver agrees with the economy sim.** A lone bot trader starting at Driftwood Key ends with 26.8 upgrade levels after Tide 14, the sim gets 27.0 at the same point (casual: 13.2 and 12.6). The difference to section 3.5 comes from the start port and from the sim's closing port visit after Tide 14, which the bots do not make.
+* **A convoy of two sinks the galleon in about 40% of seasons without trying,** by happening to be within 2 hops on Tide 7. It nearly always wins a Victory, which is the half prize (Day 4: 5% of counter plays are Decisive). Expect players to plan for it, so the real rate will be higher.
+* **The six raider brawl strikes about 9 ships a season** and fleet battles are most of its fights. Bounties are rare (0.4 a season), because equal ships rarely meet the "hunted a weaker ship" rule.
+* **Raiders earn less Legend than traders** (67 and 82 against 246 for the careful solo trader). That is the Day 4 trade pacing plus no Shore Leave, not a verdict on raiding.
+* **Tribute is never taken in a bot season** (nobody catches a trader that has set a parley), so it is covered by unit tests only.
+
+ trade, upgrades, Shipwright, NPCs and the galleon
 
 Section 4.2, 5, 6 and 8 leave these open. The engine now does the following (`market.ts`, `port.ts`, `npc.ts`, `state.ts`, plus the Hold cap in `loot.ts`). Change a line here and the matching test in the same commit.
 

@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { B } from "@engine/balance.ts";
+import { seasonSettings } from "@engine/season.ts";
 import { newShip } from "@engine/state.ts";
 import { CAREFUL, CASUAL, economyProblems, runFullSeason, runSeason0, summarise } from "./economy.ts";
 import { galleonProblems, runGalleon } from "./galleon.ts";
-import { runTrader, seasonSettings, totalLevels } from "./trader.ts";
+import { runTrader, totalLevels } from "./trader.ts";
 
 describe("the bot trader", () => {
   const run = runTrader(CAREFUL, 3);
