@@ -1,6 +1,6 @@
 // supabase/functions/_shared/engine/balance.ts
 // Every gameplay number lives here. Change values, rerun tools/sim, then playtest.
-// The formulas of section 14 arrive with the first code that uses them (speed so far).
+// The formulas of section 14 arrive with the first code that uses them (combat and loot so far).
 
 import type { HullId, SeasonSettings } from "./types.ts";
 
@@ -26,7 +26,8 @@ export const B = {
   combat: { k: 22, exponent: 0.6, win: 2.0, tie: 1.0, lose: 0.5, stale: 0.8,
             luckMin: 0.9, luckMax: 1.1, rounds: 3, victoryMargin: 0.10 },
   loot: { decisive: 0.40, victory: 0.20, capPerBattle: 600,
-          crownWaters: 0.5, maw: 1.5, calmSeasWeek: 0.5 },
+          crownWaters: 0.5, maw: 1.5, calmSeasWeek: 0.5,
+          calmSeasLastTide: 7 },  // week 1 (Tides 1 to 7) halves PvP loot, section 9 rule 10
   fairness: { floor: 0.25, underdogCap: 1.5, bountyBelowRatio: 2 / 3, bountyKeepPerTide: 0.9 },
   fleet: { battleBonusPerExtraShip: 0.10, battleBonusCap: 0.30,
            desperatePerExtraEnemy: 0.25, desperateCap: 0.75,
@@ -66,6 +67,44 @@ export const SEASON_PRESETS = {
              galleonTides: [7, 14, 21], fogOfLegendTides: 3, mawOpens: true, mutinyRules: false },
 } as const satisfies Record<SeasonSettings["preset"], SeasonPreset>;
 
-// Hops per Tide. Section 14.
+// The formulas below are copied from section 14.
+
+export const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x));
+
+export const boom = (tide: number) => 1 + B.boomPerTide * tide;
+
+// Hops per Tide.
 export const speed = (hull: HullId, sailsLevel: number) =>
   Math.min(3, B.hulls[hull].speed + (sailsLevel >= B.sailsSpeedBonusAtLevel ? 1 : 0));
+
+export const statValue = (hull: HullId, level: number) =>
+  B.baseStat * B.hulls[hull].mult * (1 + B.upgrade.statPerLevel * level);
+
+export const maxHullPoints = (hull: HullId, level: number) =>
+  B.baseHull * B.hulls[hull].mult * (1 + B.upgrade.statPerLevel * level);
+
+// A fresh sloop has PR 10.
+export const powerRating = (s: { hull: number; cannons: number; sails: number; crew: number }) =>
+  (s.hull / 10 + s.cannons + s.sails + s.crew) / 4;
+
+export const roundDamage = (stat: number, matchup: number, stale: boolean, luck: number) =>
+  B.combat.k * (stat / 10) ** B.combat.exponent * matchup * (stale ? B.combat.stale : 1) * luck;
+
+export const escapeChance = (targetSails: number, hunterSails: number, quiet: boolean) =>
+  clamp((targetSails / (targetSails + hunterSails)) * (quiet ? B.escape.quietMult : 1),
+        B.escape.min, B.escape.max);
+
+export const fairnessFactor = (loserPR: number, winnerSidePR: number) => {
+  const r = loserPR / winnerSidePR;
+  return r < 1 ? Math.max(B.fairness.floor, r ** 2) : Math.min(B.fairness.underdogCap, r);
+};
+
+export const lootTaken = (carriedValue: number, outcome: "decisive" | "victory",
+                          fairness: number, zoneMult: number, tide: number) =>
+  Math.min(carriedValue * B.loot[outcome] * fairness * zoneMult, B.loot.capPerBattle * boom(tide));
+
+export const fleetBattleBonus = (extraShips: number) =>
+  1 + Math.min(B.fleet.battleBonusCap, B.fleet.battleBonusPerExtraShip * extraShips);
+
+export const desperateDefence = (extraEnemyShips: number) =>
+  1 + Math.min(B.fleet.desperateCap, B.fleet.desperatePerExtraEnemy * extraEnemyShips);

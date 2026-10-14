@@ -61,4 +61,5 @@ Building Season 0: a two week beta (14 Tides) for six friends, built by one deve
 * Run the tests: `npm test`
 * Check types: `npm run typecheck`
 * Build for production: `npm run build` (output in `dist/`)
+* Run the balance simulation: `npm run sim` (checks the combat table of section 7.3; the pacing tables arrive on day 4)
 * Run a bot season: `npm run bots` (not built yet, arrives on day 5 of section 19.1)

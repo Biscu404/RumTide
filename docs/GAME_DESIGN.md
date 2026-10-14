@@ -743,7 +743,8 @@ export const B = {
   combat: { k: 22, exponent: 0.6, win: 2.0, tie: 1.0, lose: 0.5, stale: 0.8,
             luckMin: 0.9, luckMax: 1.1, rounds: 3, victoryMargin: 0.10 },
   loot: { decisive: 0.40, victory: 0.20, capPerBattle: 600,
-          crownWaters: 0.5, maw: 1.5, calmSeasWeek: 0.5 },
+          crownWaters: 0.5, maw: 1.5, calmSeasWeek: 0.5,
+          calmSeasLastTide: 7 },  // week 1 (Tides 1 to 7) halves PvP loot, section 9 rule 10
   fairness: { floor: 0.25, underdogCap: 1.5, bountyBelowRatio: 2 / 3, bountyKeepPerTide: 0.9 },
   fleet: { battleBonusPerExtraShip: 0.10, battleBonusCap: 0.30,
            desperatePerExtraEnemy: 0.25, desperateCap: 0.75,

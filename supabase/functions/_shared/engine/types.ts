@@ -73,12 +73,32 @@ export interface LogEvent { id: string; tide: number; captainId: string | null;
 export interface Transaction { id: string; captainId: string; tide: number; kind: string;
   amount: number; balanceAfter: number; data: unknown; }   // audit trail for debugging and charts
 
-// Section 15.3 uses the types below without defining them. These are placeholders:
-// give them real fields when the engine first produces them (battles and loot on day 3,
-// the Gazette when Tide resolution is built).
+// Section 15.3 uses the types below without defining them. The battle and loot records are real
+// (day 3); the Gazette is still a placeholder until Tide resolution is built.
 
-export interface BattleSide { captainIds: string[]; npcIds: string[]; }
-export interface RoundRecord { round: number; }
+/** One side of a battle. Ids are captain ids or NPC ids, each list in sorted order. */
+export interface BattleSide { captainIds: string[]; npcIds: string[]; flagshipId: string; }
+
+/** What one ship did in one round. Everything the replay needs. */
+export interface RoundShipRecord {
+  shipId: string; maneuver: Maneuver;
+  matchup: number;      // 2.0, 1.0 or 0.5 against the enemy flagship's maneuver
+  stale: boolean;       // repeated last round's maneuver
+  luck: number;
+  damage: number;       // before the side multipliers (fleet bonus, Desperate Defence)
+}
+
+export interface RoundRecord {
+  round: number;        // 1 to 3
+  ships: RoundShipRecord[];                       // side 0 ships first, each side in id order
+  sideDamage: [number, number];                   // damage each side dealt, after the side multipliers
+  hullAfter: Record<string, number>;              // hull points of every ship after the round, never below 0
+}
+
+/** Gold moving from one captain's plunder to another's. Cargo follows by LootSettlement.lossFraction. */
 export interface LootRecord { fromId: string; toId: string; gold: number; }
-export interface BountyRecord { captainId: string; amount: number; }
+
+export type BountyReason = "huntedWeaker" | "refusedParley" | "crownWaters";
+export interface BountyRecord { captainId: string; amount: number; reasons: BountyReason[]; }
+
 export interface Gazette { headlines: string[]; }
