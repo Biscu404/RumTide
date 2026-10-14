@@ -1,0 +1,27 @@
+// Starting state for a new captain: a fresh sloop docked in port with the starting gold (section 5).
+
+import { B, maxHullPoints } from "./balance.ts";
+import type { Captain, Ship } from "./types.ts";
+
+export function newShip(captainId: string, nodeId: string): Ship {
+  return {
+    captainId, hull: "sloop", nodeId, docked: true,
+    hullPoints: maxHullPoints("sloop", 0),
+    levels: { hull: 0, cannons: 0, sails: 0, crew: 0, hold: 0 },
+    plunderGold: 0,
+    cargo: { rum: 0, sugar: 0, spice: 0 },
+    cargoCostBasis: { rum: 0, sugar: 0, spice: 0 },
+    shipwrightProgress: 0,
+  };
+}
+
+export function newCaptain(id: string, seasonId: string): Captain {
+  return {
+    id, seasonId, userId: `user-${id}`,
+    shipName: id, flag: "black", partingShot: "",
+    legend: 0, chestGold: B.startGold, bounty: 0,
+    shieldUntilTide: null, fleetId: null,
+    standingPlan: ["broadside", "outmaneuver", "board"], standingParley: "off",
+    shoreLeaveTides: 0, lastOrdersTide: 0, status: "active",
+  };
+}

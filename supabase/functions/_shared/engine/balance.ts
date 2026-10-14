@@ -36,14 +36,21 @@ export const B = {
   parley: { tribute: 0.10, thresholds: [1.25, 1.5] },
   shieldTidesAfterPvpLoss: 2,
 
+  weekTides: 7,   // Tides per week: Calm Seas, the Trade Winds boom and the weekly galleon follow it
+
   trade: { basePrice: 20, madeMult: 0.6, wantedMult: 1.6,
-           priceKeptPerUnitSold: 0.985, weeklyBoomMult: 2.0 },
+           priceKeptPerUnitSold: 0.985, weeklyBoomMult: 2.0,
+           weeklyBoomFromWeek: 1 + 1,        // Trade Winds, from week 2 (section 3.5)
+           lastLanternMult: 1.8 },           // "wants everything, at a premium" (section 4.2)
   repair: { costPerHullPoint: 0.3, crewPatchAtSea: 0.10, strikeFreePatch: 0.5 },
 
   npc: { merchantsPerPlayer: 0.75, prizeUnitValue: 19,
-         smallTrader: { prVsMedian: 0.8, cargo: 10 },
-         fatMerchant: { prVsMedian: 1.3, cargo: 30 },
-         galleon: { prVsMedian: 2.8, basePrize: 250, victoryPays: 0.5 } },
+         fatMerchantShare: 1 / 3,            // of the merchants spawned each Tide
+         merchantVictoryPays: 0.5,           // a Victory over a merchant pays this share of the cargo
+         smallTrader: { prVsMedian: 0.8, cargo: 10, favourite: "outmaneuver", favouriteShare: 0.6 },
+         fatMerchant: { prVsMedian: 1.3, cargo: 30, plan: ["outmaneuver", "board", "board"] },
+         galleon: { prVsMedian: 2.8, basePrize: 250, victoryPays: 0.5,
+                    plan: ["broadside", "board", "broadside"] } },
 
   catchUp: { shoreLeaveBonus: 0.5, shoreLeaveCap: 3,
              fairWindsBelowMedian: 0.7, fairWindsBonus: 0.2,
@@ -82,6 +89,27 @@ export const statValue = (hull: HullId, level: number) =>
 
 export const maxHullPoints = (hull: HullId, level: number) =>
   B.baseHull * B.hulls[hull].mult * (1 + B.upgrade.statPerLevel * level);
+
+// costMult comes from the season preset (0.67 in Season 0, 1.0 in a full season).
+export const upgradeCost = (currentLevel: number, costMult = 1) =>
+  Math.round(B.upgrade.baseCost * B.upgrade.growth ** currentLevel * costMult);
+
+export const hullCost = (hull: HullId, costMult = 1) =>
+  Math.round(B.hulls[hull].cost * costMult);
+
+// Cargo units are whole, so the Hold a captain can fill rounds down (docs/DECISIONS.md).
+export const holdUnits = (hull: HullId, level: number) =>
+  Math.floor(B.hulls[hull].hold * (1 + B.upgrade.statPerLevel * level));
+
+// The Boom raises every price and prize by 4% per Tide.
+export const cargoValue = (units: number, tide: number) => units * B.npc.prizeUnitValue * boom(tide);
+
+export const npcPR = (kind: "smallTrader" | "fatMerchant" | "galleon", medianCaptainPR: number) =>
+  B.npc[kind].prVsMedian * medianCaptainPR;  // NPC stats all equal PR, hull = 10 * PR
+
+// Co op prizes pay base * boom * N ** 1.5 in total, split evenly. This is one captain's share.
+export const coopShare = (basePrize: number, tide: number, captains: number) =>
+  (basePrize * boom(tide) * captains ** B.fleet.coopExponent) / captains;
 
 // A fresh sloop has PR 10.
 export const powerRating = (s: { hull: number; cannons: number; sails: number; crew: number }) =>

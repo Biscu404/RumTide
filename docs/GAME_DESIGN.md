@@ -418,7 +418,7 @@ The **Boom** multiplier raises all prices and prizes by 4% per Tide (about 2.1 t
 
 * Base price 20 doubloons per unit, times the Boom.
 * A port's made good sells at 0.6 times base; its wanted good buys at 1.6 times base; the third good trades at base.
-* Every unit sold at a port lowers that port's price for that good by 1.5% until the next Tide; each Tide prices drift halfway back to normal. Two captains dumping rum on the same port both earn less, which gives friends a reason to coordinate routes or race each other.
+* Every unit sold at a port lowers that port's price for that good by 1.5% until the next Tide; each Tide prices drift halfway back to normal. Buyers always pay the normal price, so selling a lot and buying it back cheaper never pays. Two captains dumping rum on the same port both earn less, which gives friends a reason to coordinate routes or race each other.
 * The Trade Winds beat (week start) gives one random port a boom (its wanted good at 2 times base for that week).
 * Typical profit is 8 to 15 doubloons per unit per leg, more for long or dangerous routes.
 
@@ -739,6 +739,7 @@ export const B = {
   shipwrightShareHint: 0.7,   // UI suggestion only: put 70% of income into the next hull
 
   boomPerTide: 0.04,
+  weekTides: 7,   // Tides per week: Calm Seas, the Trade Winds boom and the weekly galleon follow it
 
   combat: { k: 22, exponent: 0.6, win: 2.0, tie: 1.0, lose: 0.5, stale: 0.8,
             luckMin: 0.9, luckMax: 1.1, rounds: 3, victoryMargin: 0.10 },
@@ -754,13 +755,18 @@ export const B = {
   shieldTidesAfterPvpLoss: 2,
 
   trade: { basePrice: 20, madeMult: 0.6, wantedMult: 1.6,
-           priceKeptPerUnitSold: 0.985, weeklyBoomMult: 2.0 },
+           priceKeptPerUnitSold: 0.985, weeklyBoomMult: 2.0,
+           weeklyBoomFromWeek: 1 + 1,        // Trade Winds, from week 2 (section 3.5)
+           lastLanternMult: 1.8 },           // "wants everything, at a premium" (section 4.2)
   repair: { costPerHullPoint: 0.3, crewPatchAtSea: 0.10, strikeFreePatch: 0.5 },
 
   npc: { merchantsPerPlayer: 0.75, prizeUnitValue: 19,
-         smallTrader: { prVsMedian: 0.8, cargo: 10 },
-         fatMerchant: { prVsMedian: 1.3, cargo: 30 },
-         galleon: { prVsMedian: 2.8, basePrize: 250, victoryPays: 0.5 } },
+         fatMerchantShare: 1 / 3,            // of the merchants spawned each Tide
+         merchantVictoryPays: 0.5,           // a Victory over a merchant pays this share of the cargo
+         smallTrader: { prVsMedian: 0.8, cargo: 10, favourite: "outmaneuver", favouriteShare: 0.6 },
+         fatMerchant: { prVsMedian: 1.3, cargo: 30, plan: ["outmaneuver", "board", "board"] },
+         galleon: { prVsMedian: 2.8, basePrize: 250, victoryPays: 0.5,
+                    plan: ["broadside", "board", "broadside"] } },
 
   catchUp: { shoreLeaveBonus: 0.5, shoreLeaveCap: 3,
              fairWindsBelowMedian: 0.7, fairWindsBonus: 0.2,
@@ -799,8 +805,12 @@ export const statValue = (hull: HullId, level: number) =>
 export const maxHullPoints = (hull: HullId, level: number) =>
   B.baseHull * B.hulls[hull].mult * (1 + B.upgrade.statPerLevel * level);
 
+// Cargo units are whole, so the Hold a captain can fill rounds down.
 export const holdUnits = (hull: HullId, level: number) =>
-  B.hulls[hull].hold * (1 + B.upgrade.statPerLevel * level);
+  Math.floor(B.hulls[hull].hold * (1 + B.upgrade.statPerLevel * level));
+
+// What a cargo unit is worth to a looter (PvP loot and merchant prizes), with the Boom.
+export const cargoValue = (units: number, tide: number) => units * B.npc.prizeUnitValue * boom(tide);
 
 export const speed = (hull: HullId, sailsLevel: number) =>
   Math.min(3, B.hulls[hull].speed + (sailsLevel >= B.sailsSpeedBonusAtLevel ? 1 : 0));
@@ -838,6 +848,7 @@ export const price = (good: Good, port: Port, tide: number, drift: number) =>
   B.trade.basePrice * portMult(good, port) * boom(tide) * drift;
 // After selling n units: drift = drift * B.trade.priceKeptPerUnitSold ** n
 // Each Tide:             drift = (drift + 1) / 2   (halfway back to normal)
+// A buyer always pays the price with drift = 1. Only sellers feel the drift (see docs/DECISIONS.md).
 
 export const npcPR = (kind: "smallTrader" | "fatMerchant" | "galleon", medianCaptainPR: number) =>
   B.npc[kind].prVsMedian * medianCaptainPR;  // NPC stats all equal PR, hull = 10 * PR

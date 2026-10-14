@@ -1,8 +1,10 @@
-// Section 7.2 (loot), section 9 rules 1, 2, 3, 7 and 10: what a PvP win pays, who gets it,
-// the fairness factor, bounties and shields. NPC prizes arrive with the economy on day 4.
+// Section 7.2 (loot), section 5.1 (the Hold caps what a winner can carry off), section 9 rules 1, 2,
+// 3, 7 and 10: what a PvP win pays, who gets it, the fairness factor, bounties and shields.
+// NPC prizes are in npc.ts.
 //
-// Pure arithmetic on numbers handed in. The caller works out each captain's carried value
-// (plunder plus cargo at its value) and applies the settlement to the ships and captains.
+// Pure arithmetic on numbers handed in. The caller works out each captain's carried value and
+// hold cap (port.ts has carriedValue and holdLootCap) and applies the settlement to the ships
+// and captains (port.ts has applyLoss).
 
 import { B, fairnessFactor, lootTaken } from "./balance.ts";
 import { shieldUntilAfterLoss } from "./encounter.ts";
@@ -16,6 +18,8 @@ export interface LootParty {
   carriedValue: number;
   /** Damage dealt in the battle (BattleResult.damageDealt). Winners split by this. */
   damageDealt: number;
+  /** Most gold this captain can carry off if they win, from holdLootCap. No cap if left out. */
+  holdCap?: number;
   /** The bounty on this captain before the battle. */
   bounty: number;
   /** Is this captain the Legend leader? Beating them pays more Legend (section 9 rule 7). */
@@ -42,7 +46,7 @@ export interface LootSettlement {
   totalGold: number;
   /** Who paid whom. Sums to totalGold. */
   loot: LootRecord[];
-  /** Share of each loser's plunder AND cargo that is gone. Day 4 applies it to the cargo. */
+  /** Share of each loser's plunder AND cargo that is gone. port.ts applyLoss applies it. */
   lossFraction: Record<string, number>;
   /** Gold each winner gained from loot. */
   gained: Record<string, number>;
@@ -93,6 +97,30 @@ export function apportion(total: number, weights: readonly number[]): number[] {
   return parts;
 }
 
+/**
+ * Split a whole number by weight like apportion, but no part may pass its cap. What a capped part
+ * cannot take goes to the others, and anything nobody has room for is left out, so the parts can
+ * add up to less than the total.
+ */
+export function apportionCapped(total: number, weights: readonly number[], caps: readonly number[]): number[] {
+  const parts = weights.map(() => 0);
+  const full = new Set<number>();
+  const room = (i: number) => Math.max(0, Math.floor(caps[i]!)) - parts[i]!;
+  weights.forEach((_, i) => { if (room(i) <= 0) full.add(i); });
+  for (let pass = 0; pass <= weights.length; pass++) {
+    const left = total - parts.reduce((a, b) => a + b, 0);
+    const open = weights.map((_, i) => i).filter((i) => !full.has(i));
+    if (left <= 0 || open.length === 0) break;
+    const shares = apportion(left, open.map((i) => weights[i]!));
+    open.forEach((i, k) => {
+      const give = Math.min(shares[k]!, room(i));
+      parts[i]! += give;
+      if (room(i) <= 0) full.add(i);
+    });
+  }
+  return parts;
+}
+
 /** Match what losers pay to what winners gain, in id order, so every doubloon has one source and one sink. */
 function payments(losers: { id: string; pays: number }[], winners: { id: string; gains: number }[]): LootRecord[] {
   const records: LootRecord[] = [];
@@ -126,9 +154,12 @@ export function settlePvpBattle(input: SettleInput): LootSettlement {
   const zoneMult = zoneLootMult(input.zone, input.mawOpens, input.tide, true);
 
   const carried = losers.map((p) => p.carriedValue);
-  const totalGold = Math.round(lootTaken(sum(losers, (p) => p.carriedValue), input.outcome, fairness, zoneMult, input.tide));
+  const wanted = Math.round(lootTaken(sum(losers, (p) => p.carriedValue), input.outcome, fairness, zoneMult, input.tide));
+  // Winners split the loot by damage, but nobody carries off more than their Hold takes (section 5.1).
+  // What does not fit stays with the losers, so the loot actually taken can be less than `wanted`.
+  const gains = apportionCapped(wanted, winners.map((p) => p.damageDealt), winners.map((p) => p.holdCap ?? Infinity));
+  const totalGold = gains.reduce((a, b) => a + b, 0);
   const pays = apportion(totalGold, carried);
-  const gains = apportion(totalGold, winners.map((p) => p.damageDealt));
 
   const lossFraction: Record<string, number> = {};
   losers.forEach((p, i) => { lossFraction[p.id] = p.carriedValue > 0 ? pays[i]! / p.carriedValue : 0; });

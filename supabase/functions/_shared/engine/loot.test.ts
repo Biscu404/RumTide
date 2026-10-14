@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { B, boom } from "./balance.ts";
-import { apportion, settlePvpBattle, shrinkBounty, zoneLootMult, type LootParty, type SettleInput } from "./loot.ts";
+import { apportion, apportionCapped, settlePvpBattle, shrinkBounty, zoneLootMult, type LootParty, type SettleInput } from "./loot.ts";
 
 const party = (id: string, over: Partial<LootParty> = {}): LootParty => ({
   id, pr: 10, carriedValue: 0, damageDealt: 100, bounty: 0, ...over,
@@ -55,6 +55,36 @@ describe("apportion", () => {
 
   it("splits evenly when every weight is zero", () => {
     expect(apportion(4, [0, 0])).toEqual([2, 2]);
+  });
+});
+
+describe("apportionCapped", () => {
+  it("is plain apportion when nobody hits a cap", () => {
+    expect(apportionCapped(100, [3, 1], [Infinity, Infinity])).toEqual([75, 25]);
+    expect(apportionCapped(10, [1, 1, 1], [100, 100, 100])).toEqual(apportion(10, [1, 1, 1]));
+  });
+
+  it("stops a part at its cap and gives the rest to the others", () => {
+    expect(apportionCapped(100, [1, 1], [30, Infinity])).toEqual([30, 70]);
+    expect(apportionCapped(90, [1, 1, 1], [10, 20, Infinity])).toEqual([10, 20, 60]);
+  });
+
+  it("leaves out what nobody has room for", () => {
+    expect(apportionCapped(100, [1, 1], [10, 15])).toEqual([10, 15]);
+    expect(apportionCapped(100, [1], [0])).toEqual([0]);
+    expect(apportionCapped(0, [1, 1], [5, 5])).toEqual([0, 0]);
+  });
+
+  it("never passes a cap and never creates gold", () => {
+    for (const total of [1, 7, 50, 333]) {
+      for (const caps of [[5, 40, Infinity], [0, 0, 9], [12.9, 3.2, 100]]) {
+        const parts = apportionCapped(total, [4, 1, 2], caps);
+        const sum = parts.reduce((a, b) => a + b, 0);
+        expect(sum).toBeLessThanOrEqual(total);
+        parts.forEach((p, i) => expect(p).toBeLessThanOrEqual(Math.floor(caps[i]!)));
+        expect(sum).toBe(Math.min(total, caps.reduce((a, b) => a + Math.floor(b), 0)));
+      }
+    }
   });
 });
 
@@ -163,6 +193,39 @@ describe("loot", () => {
   it("refuses a settlement with nobody on one side", () => {
     expect(() => settle({ winners: [], losers: [party("l")] })).toThrow();
     expect(() => settle({ winners: [party("w")], losers: [] })).toThrow();
+  });
+});
+
+describe("the Hold cap (section 5.1)", () => {
+  const losers = [party("l", { carriedValue: 1000 })];
+
+  it("limits what a winner carries off, and the loser keeps the rest", () => {
+    const result = settle({ winners: [party("w", { holdCap: 150 })], losers });
+    expect(result.totalGold).toBe(150);                 // 400 without the cap
+    expect(result.gained).toEqual({ w: 150 });
+    expect(result.loot).toEqual([{ fromId: "l", toId: "w", gold: 150 }]);
+    expect(result.lossFraction.l).toBeCloseTo(0.15, 8);
+  });
+
+  it("changes nothing when the Hold is big enough", () => {
+    expect(settle({ winners: [party("w", { holdCap: 5000 })], losers }).totalGold).toBe(400);
+    expect(settle({ winners: [party("w")], losers }).totalGold).toBe(400);
+  });
+
+  it("passes what a small Hold cannot carry to the winner with more room", () => {
+    const result = settle({
+      // PR 5 each against PR 10, so the sides are even and fairness is 1.
+      winners: [party("a", { pr: 5, holdCap: 50 }), party("b", { pr: 5, holdCap: 1000 })], losers,
+    });
+    expect(result.gained).toEqual({ a: 50, b: 350 });
+    expect(result.totalGold).toBe(400);
+  });
+
+  it("only puts a bounty on the gold actually taken", () => {
+    const result = settle({
+      winnersHunted: true, refusedParley: true, winners: [party("w", { holdCap: 150 })], losers,
+    });
+    expect(result.bountiesAdded).toEqual([{ captainId: "w", amount: 150, reasons: ["refusedParley"] }]);
   });
 });
 

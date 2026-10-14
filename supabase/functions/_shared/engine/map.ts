@@ -1,12 +1,18 @@
 // The sea is a graph of named nodes joined by lanes (section 4.1).
 // loadMap validates raw JSON and builds the adjacency lookups. Lanes work in both directions.
 
+import type { Good } from "./types.ts";
+
 export type NodeType = "port" | "sea" | "island" | "wreck" | "fort";
 export type Zone = "crown" | "free" | "maw";
+
+/** What a port makes (cheap) and wants (dear). Last Lantern makes nothing and wants "all" at a premium. */
+export interface PortTrade { makes: Good | null; wants: Good | "all"; }
 
 export interface MapNode {
   id: string; name: string; type: NodeType; zone: Zone;
   x: number; y: number;                    // drawing position only, never used by rules
+  trade?: PortTrade;                       // every port has one, no other node does
 }
 
 export interface MapData {
@@ -28,6 +34,7 @@ export interface GameMap {
 
 const NODE_TYPES: readonly string[] = ["port", "sea", "island", "wreck", "fort"];
 const ZONES: readonly string[] = ["crown", "free", "maw"];
+const GOODS: readonly string[] = ["rum", "sugar", "spice"];
 
 const compareIds = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
@@ -46,6 +53,14 @@ export function loadMap(raw: unknown): GameMap {
     if (!NODE_TYPES.includes(n.type)) throw new Error(`Node ${n.id} has unknown type ${n.type}`);
     if (!ZONES.includes(n.zone)) throw new Error(`Node ${n.id} has unknown zone ${n.zone}`);
     if (!Number.isFinite(n.x) || !Number.isFinite(n.y)) throw new Error(`Node ${n.id} needs x and y`);
+    if (n.type === "port") {
+      const t = n.trade;
+      if (!t || !(t.makes === null || GOODS.includes(t.makes)) || !(t.wants === "all" || GOODS.includes(t.wants))) {
+        throw new Error(`Port ${n.id} needs trade with makes and wants`);
+      }
+    } else if (n.trade !== undefined) {
+      throw new Error(`Node ${n.id} is not a port and cannot trade`);
+    }
     nodes.set(n.id, n);
   }
 
@@ -108,4 +123,22 @@ export function hopsFrom(map: GameMap, from: string): Map<string, number> {
     }
   }
   return dist;
+}
+
+/**
+ * The nodes to sail through to get from `from` to `to`, not counting `from`. Of several shortest
+ * routes it takes the one that goes through the lowest node ids, so the answer is always the same.
+ * Empty when `from` is `to`.
+ */
+export function shortestPath(map: GameMap, from: string, to: string): string[] {
+  const back = hopsFrom(map, to);   // hops to the destination from every node
+  const path: string[] = [];
+  let here = from;
+  while (here !== to) {
+    const next = map.neighbours(here).find((n) => back.get(n) === back.get(here)! - 1);
+    if (next === undefined) throw new Error(`No route from ${from} to ${to}`);
+    path.push(next);
+    here = next;
+  }
+  return path;
 }

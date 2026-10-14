@@ -2,6 +2,58 @@
 
 What was decided, when and why. Newest first. When a design decision changes, add an entry here in the same commit.
 
+## 2026-10-14: Day 4 ports, trade, upgrades, Shipwright, NPCs and the galleon
+
+Section 4.2, 5, 6 and 8 leave these open. The engine now does the following (`market.ts`, `port.ts`, `npc.ts`, `state.ts`, plus the Hold cap in `loot.ts`). Change a line here and the matching test in the same commit.
+
+**Market and trade**
+* **Buyers always pay the normal price; only sellers feel the drift.** With one price for both, a captain could sell 10 rum, buy it back at the lowered price and repeat. The probe made 195 doubloons in 20 loops without leaving port. Section 6.3 only says units *sold* lower the price, so this keeps its wording. Test: `gives no free gold for selling at a port and buying the same goods back`.
+* **Each unit sells a little cheaper than the one before** (1.5% per unit), so a lot of `n` units pays `price * (1 - 0.985^n) / 0.015`. Selling in two lots pays the same as one. Gold is whole doubloons, rounded to nearest.
+* **Port goods live in the map JSON** (`trade` on every port, checked by `loadMap`), because they are part of the map, not the rules. Section 4.2's table is the source.
+* **Last Lantern buys and sells every good at 1.8 times base** (`B.trade.lastLanternMult`). The doc only says "a premium", so the number is mine. It is above the 1.6 of a wanted good, so a long haul to the edge pays slightly more than a normal leg but is not the best route.
+* **The Trade Winds boom starts in week 2** (`B.trade.weeklyBoomFromWeek`), matching section 3.5, where week 1 is Calm Seas. `pickBoomPort` picks one port other than Last Lantern. The doc says "a random port", this is also my reading of "its wanted good at 2 times".
+* **Hold units round down** (`holdUnits`): 11.2 is 11 units. Section 14 gave the unrounded value.
+* **Legend from trade is fractional** (profit banked / 10, and a sale at a loss earns nothing and costs nothing). Rounding every sale would lose small ones.
+
+**Carrying, loot and the Hold cap**
+* **A cargo unit is worth `prizeUnitValue * boom` to a looter,** the same 19 as an NPC prize, so PvP loot of cargo and merchant prizes agree (`cargoValue`, `carriedValue`).
+* **The Hold cap of section 5.1 is now applied, to PvP loot and merchant prizes** (Day 3 left it open). A winner carries off at most a full Hold of cargo at prize value per battle (`holdLootCap`). What does not fit stays with the loser and nothing is created. The galleon prize has no cap in Season 0; section 8.3 puts that cap in a V2 rig.
+* **The loser's cargo shrinks like their plunder** (`applyLoss`), whole units rounded to nearest, cost basis shrinking with it.
+
+**Repairs, upgrades, Shipwright**
+* **Repairs cost 0.3 per hull point, rounded up, and the Boom does not apply.** Section 6.2 only says the Boom raises "prices and prizes".
+* **Buying a Hull level adds the extra hull points,** so it does not leave the ship looking damaged. A new hull from the Shipwright arrives fully repaired. Levels carry over.
+* **The last Shipwright instalment is trimmed to what is still owed,** and there is no refund of progress.
+* Sea patching (10% a Tide) and the free patch after a strike (50%) are in `port.ts` as small helpers for the Tide resolver.
+
+**NPCs and the galleon**
+* **Merchants are created while the Tide before resolves,** sit on one node for the one Tide they exist, and are met there. That is "visible one Tide ahead" without any NPC movement. Position: a random node strictly between two ports on a random shortest path, never a port.
+* **One merchant in three is a Fat Merchant** (`B.npc.fatMerchantShare`). The doc gives no mix, so the number is mine. Count is `0.75 * players`, rounded up or down by a roll (6 players give 4 or 5).
+* **Habits:** Small Trader plays its favourite maneuver (Outmaneuver) 60% of the time and the other two 20% each. Fat Merchant plays Outmaneuver, Board, Board ("outmaneuvers, then boards"). Galleon plays Broadside, Board, Broadside. The Fat Merchant's plan is my reading of one line.
+* **Prizes:** a Decisive win over a merchant pays all its cargo, a Victory half (`B.npc.merchantVictoryPays`, mirroring the galleon). Winners split by damage dealt. Each winner gets the NPC Legend. The galleon pays `coopShare` to each of the N winning captains, half on a Victory, plus the co op Legend.
+* **The `merchants` hunt filter still matches the galleon** (Day 3 said Day 4 may split it). I left it, so a Hunt with the default filter will go after the galleon. A lone ship cannot win, so this only costs it a fight.
+
+**Pacing results** (`npm run sim`, details in the sim output)
+* **Section 3.5 and 5.5 cannot be reproduced to the doubloon:** they came from a simulation we do not have. Two bots bracket them. The *careful* trader plans a loop (a leg and the best leg back). The *casual* trader looks one leg ahead and can be left in a port with nothing good to carry away.
+
+| Season 0, solo trader | Careful bot | Doc (section 3.5) | Casual bot |
+|-|-|-|-|
+| Earned by Tide 14 | about 3,950 | about 3,100 | about 2,240 |
+| Brigantine, median Tide | 7 | 8 | 9 |
+| Full costs, 28 Tides: earned | about 11,250 | about 10,400 | about 5,800 |
+| Full costs: Brigantine, median Tide | 9 | 11 | 13 |
+
+* **Read this as:** the documented trader sits between the two bots, so Day 4's "done when" holds. A player who plans loops will earn about 25% more than section 3.5 and reach the Brigantine a Tide early, so if the beta feels fast, raise `upgrade.growth` or `progressionCostMult` before touching income.
+* **Income comes in lumps** on two Tide legs (a sale every second Tide), where the doc tables are smooth averages. Compare running totals, not single Tides.
+* **Not modelled:** Shore Leave, Fair Winds, the convoy bonus, hunters, exploration and standing orders. They arrive with Tide resolution and the bot season (Days 5 and 6).
+
+**Galleon odds (section 8.2), real engine:** a lone ship never wins; two ships with random plans win 23.8% (doc 22 to 32%); three ships with random plans win 90% (doc about 80%). A pair that plays the perfect counter to the printed habit wins 100% (doc 75 to 87%), but only 5% of those are Decisive, so a pair usually takes the **half** prize. Three ships with perfect reads win 100% Decisive.
+
+**Open questions for the design doc (not decided here)**
+* **Should merchant prizes be Hold capped?** I applied section 5.1 literally. At Hold 10 a Fat Merchant (30 units) then pays no more than a Small Trader (10 units), so it is only a better target for a bigger Hold. If you want Fat Merchants to be a prize in themselves, drop the cap for merchants in `settleMerchantBattle` callers (do not pass `holdCap`).
+* **Section 9 rule 4 (ganging 96%) is still 100%,** unchanged from Day 3.
+* **How good are the friends at routes?** The careful and casual bots differ by a factor of 1.7 in earnings. Season 0 will tell you which one your group is.
+
 ## 2026-10-14: Day 3 combat, loot, bounty and shield choices
 
 Section 7, 9 and 4.4 leave these open. The engine now does the following (`combat.ts`, `loot.ts`, `encounter.ts`). Change a line here and the matching test in the same commit.
