@@ -7,8 +7,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TideSnapshot } from "../engine/season.ts";
 import type { Captain, MarketRow, Npc, Orders, Ship } from "../engine/types.ts";
 import {
-  ApiError, type ActiveSeason, type ApplyTideArgs, type CaptainView, type CreateSeasonArgs, type GameStore,
-  type PortChange, type SeasonInfo, type TideInfo, type TideState,
+  ApiError, type ActiveSeason, type AdminLogEntry, type ApplyTideArgs, type CaptainView, type CreateSeasonArgs,
+  type GameStore, type PortChange, type SeasonInfo, type TideHistoryEntry, type TideInfo, type TideState,
 } from "./store.ts";
 
 type Row = Record<string, unknown>;
@@ -126,8 +126,8 @@ export class SupabaseStore implements GameStore {
     return { active: active.length, ready: active.filter((id) => ready.has(id)).length };
   }
 
-  async claimTide(seasonId: string, tide: number): Promise<boolean> {
-    return unwrap(await this.db.rpc("claim_tide", { p_season: seasonId, p_tide: tide })) === true;
+  async claimTide(seasonId: string, tide: number, from: "open" | "failed" = "open"): Promise<boolean> {
+    return unwrap(await this.db.rpc("claim_tide", { p_season: seasonId, p_tide: tide, p_from: from })) === true;
   }
 
   async loadTideState(seasonId: string): Promise<TideState> {
@@ -164,5 +164,35 @@ export class SupabaseStore implements GameStore {
 
   async createSeason(args: CreateSeasonArgs): Promise<void> {
     unwrap(await this.db.rpc("create_season", { p_args: args }));
+  }
+
+  async isAdmin(userId: string): Promise<boolean> {
+    return unwrap(await this.db.from("admins").select("user_id").eq("user_id", userId).maybeSingle()) !== null;
+  }
+
+  async tideHistory(seasonId: string): Promise<TideHistoryEntry[]> {
+    const rows = unwrap(await this.db.from("tides").select("*").eq("season_id", seasonId)
+      .order("number", { ascending: false }).limit(20)) as Row[];
+    return rows.map((r) => ({
+      number: Number(r.number), status: r.status as TideHistoryEntry["status"], dueAt: iso(r.due_at),
+      resolvedAt: r.resolved_at ? iso(r.resolved_at) : null, error: (r.error as string | null) ?? null,
+    }));
+  }
+
+  async adminLog(seasonId: string): Promise<AdminLogEntry[]> {
+    const rows = unwrap(await this.db.from("admin_log").select("*").eq("season_id", seasonId)
+      .order("id", { ascending: false }).limit(50)) as Row[];
+    return rows.map((r) => ({
+      seasonId: String(r.season_id), at: iso(r.at), adminId: (r.admin_id as string | null) ?? null,
+      action: r.action as AdminLogEntry["action"], tide: Number(r.tide), outcome: String(r.outcome),
+      detail: (r.detail as string | null) ?? null,
+    }));
+  }
+
+  async appendAdminLog(entry: AdminLogEntry): Promise<void> {
+    unwrap(await this.db.from("admin_log").insert({
+      season_id: entry.seasonId, at: entry.at, admin_id: entry.adminId, action: entry.action,
+      tide: entry.tide, outcome: entry.outcome, detail: entry.detail,
+    }));
   }
 }

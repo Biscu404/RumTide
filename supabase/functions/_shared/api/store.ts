@@ -98,12 +98,41 @@ export interface GameStore {
   applyPortChange(change: PortChange): Promise<void>;
   /** Active captains, and how many of them have pressed Ready for this Tide. */
   readyCount(seasonId: string, tide: number): Promise<{ active: number; ready: number }>;
-  /** Move the Tide from open to resolving. True for exactly one caller. */
-  claimTide(seasonId: string, tide: number): Promise<boolean>;
+  /** Move the Tide from `from` (open, or failed when an admin retries it) to resolving. True for exactly one caller. */
+  claimTide(seasonId: string, tide: number, from?: "open" | "failed"): Promise<boolean>;
   loadTideState(seasonId: string): Promise<TideState>;
   /** Write the whole result and open the next Tide (or end the season), in one transaction. */
   applyTideResult(args: ApplyTideArgs): Promise<void>;
   /** Mark a resolving Tide as failed. Nothing else changes, so it can be retried. */
   failTide(seasonId: string, tide: number, message: string): Promise<void>;
   createSeason(args: CreateSeasonArgs): Promise<void>;
+  /** Is this user one of the game masters (a row in `admins`)? */
+  isAdmin(userId: string): Promise<boolean>;
+  /** The last Tides of a season, newest first, with any error. */
+  tideHistory(seasonId: string): Promise<TideHistoryEntry[]>;
+  /** The last admin actions of a season, newest first. */
+  adminLog(seasonId: string): Promise<AdminLogEntry[]>;
+  appendAdminLog(entry: AdminLogEntry): Promise<void>;
+}
+
+export interface TideHistoryEntry {
+  number: number;
+  status: Tide["status"];
+  /** ISO time. */
+  dueAt: string;
+  /** ISO time, or null if the Tide has not resolved. */
+  resolvedAt: string | null;
+  error: string | null;
+}
+
+export interface AdminLogEntry {
+  seasonId: string;
+  /** ISO time. */
+  at: string;
+  adminId: string | null;
+  action: "resolve" | "retry";
+  tide: number;
+  /** The status the resolver ended on, such as "resolved", "failed" or "busy". */
+  outcome: string;
+  detail: string | null;
 }

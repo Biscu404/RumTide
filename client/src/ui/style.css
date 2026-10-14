@@ -48,3 +48,10 @@ button {
 }
 button.secondary { color: var(--text); background: transparent; border: 1px solid var(--dim); }
 button:disabled { opacity: 0.5; cursor: default; }
+
+.admin { padding: 16px; display: flex; flex-direction: column; gap: 16px; overflow: auto; }
+.admin-panel { background: var(--panel); padding: 12px 16px; border-radius: 4px; }
+.admin-panel h2 { margin: 0 0 8px; font-size: 1.1em; color: var(--accent); }
+.admin-panel button { margin-top: 8px; }
+.admin-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.error { color: #ff8a80; }

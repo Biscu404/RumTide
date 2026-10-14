@@ -34,3 +34,10 @@ export const portActionSchema = z.discriminatedUnion("action", [
   z.strictObject({ action: z.literal("shipwright"), amount: z.number().int().min(1).max(1_000_000) }),
 ]);
 export type PortActionPayload = z.infer<typeof portActionSchema>;
+
+export const adminSchema = z.discriminatedUnion("action", [
+  z.strictObject({ action: z.literal("status") }),
+  /** `tide` is the Tide the page shows, so a stale page cannot resolve a Tide that has moved on. */
+  z.strictObject({ action: z.literal("resolve"), tide: z.number().int().min(1) }),
+]);
+export type AdminPayload = z.infer<typeof adminSchema>;

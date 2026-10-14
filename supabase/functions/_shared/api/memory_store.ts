@@ -7,8 +7,8 @@ import type { TideResult } from "../engine/resolve.ts";
 import type { TideSnapshot } from "../engine/season.ts";
 import type { Battle, Gazette, LogEvent, Orders, Transaction } from "../engine/types.ts";
 import {
-  ApiError, type ActiveSeason, type ApplyTideArgs, type CaptainView, type CreateSeasonArgs, type GameStore,
-  type PortChange, type SeasonInfo, type TideInfo, type TideState,
+  ApiError, type ActiveSeason, type AdminLogEntry, type ApplyTideArgs, type CaptainView, type CreateSeasonArgs,
+  type GameStore, type PortChange, type SeasonInfo, type TideHistoryEntry, type TideInfo, type TideState,
 } from "./store.ts";
 
 interface SeasonRecord {
@@ -18,6 +18,8 @@ interface SeasonRecord {
   snapshot: TideSnapshot;
   versions: Map<string, number>;
   orders: Map<string, Orders>;
+  /** The error of the Tide if it failed, else null. */
+  error: string | null;
 }
 
 const clone = <T>(x: T): T => structuredClone(x);
@@ -117,10 +119,11 @@ export class MemoryStore implements GameStore {
     return { active: active.length, ready: active.filter((c) => rec.orders.get(ordersKey(tide, c.id))?.ready).length };
   }
 
-  async claimTide(seasonId: string, tide: number): Promise<boolean> {
+  async claimTide(seasonId: string, tide: number, from: "open" | "failed" = "open"): Promise<boolean> {
     const rec = this.mustFind(seasonId);
-    if (rec.tide.number !== tide || rec.tide.status !== "open") return false;
+    if (rec.tide.number !== tide || rec.tide.status !== from) return false;
     rec.tide.status = "resolving";
+    rec.error = null;
     return true;
   }
 
@@ -150,7 +153,10 @@ export class MemoryStore implements GameStore {
 
   async failTide(seasonId: string, tide: number, message: string): Promise<void> {
     const rec = this.mustFind(seasonId);
-    if (rec.tide.number === tide && rec.tide.status === "resolving") rec.tide.status = "failed";
+    if (rec.tide.number === tide && rec.tide.status === "resolving") {
+      rec.tide.status = "failed";
+      rec.error = message;
+    }
     this.failures.push(message);
   }
 
@@ -160,7 +166,34 @@ export class MemoryStore implements GameStore {
       info: clone({ ...season, status: "active" }),
       tide: { seasonId: season.id, number: snapshot.tide, status: "open", dueAt, seed },
       lastResolvedAt: null, snapshot: clone(snapshot),
-      versions: new Map(snapshot.captains.map((c) => [c.id, 0])), orders: new Map(),
+      versions: new Map(snapshot.captains.map((c) => [c.id, 0])), orders: new Map(), error: null,
     });
+  }
+
+  /** The user ids that may use the admin page. Tests add to it. */
+  readonly admins = new Set<string>();
+
+  async isAdmin(userId: string): Promise<boolean> {
+    return this.admins.has(userId);
+  }
+
+  async tideHistory(seasonId: string): Promise<TideHistoryEntry[]> {
+    const rec = this.mustFind(seasonId);
+    const t = rec.tide;
+    // The memory store keeps only the open or latest Tide, so the history is that one Tide.
+    return [{
+      number: t.number, status: t.status, dueAt: t.dueAt,
+      resolvedAt: rec.lastResolvedAt, error: rec.error,
+    }];
+  }
+
+  readonly adminEntries: AdminLogEntry[] = [];
+
+  async adminLog(seasonId: string): Promise<AdminLogEntry[]> {
+    return clone(this.adminEntries.filter((e) => e.seasonId === seasonId)).reverse();
+  }
+
+  async appendAdminLog(entry: AdminLogEntry): Promise<void> {
+    this.adminEntries.push(clone(entry));
   }
 }

@@ -11,6 +11,9 @@ import_map = "./functions/deno.json"
 [functions.port_action]
 import_map = "./functions/deno.json"
 
+[functions.admin]
+import_map = "./functions/deno.json"
+
 # pg_cron calls this one with a shared secret (x-cron-secret), not a user's token.
 [functions.resolve_tide]
 import_map = "./functions/deno.json"

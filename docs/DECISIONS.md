@@ -195,3 +195,11 @@ The engine runs in Deno (Edge Functions) and in Vite and Vitest (client, tests, 
 ## 2026-10-14: One `package.json` at the repo root
 
 A single install and a single `npm test` cover the client, the engine tests and the tools. Edge Functions run on Deno and need no npm packages. If the client ever needs its own package for the second developer, split it out then.
+
+## 2026-10-14: The admin page (Day 7)
+
+* **Game masters are a table, not a setting.** `admins` lists user ids, and you add yourself once in the SQL editor. Nothing in the app grants admin, so a player cannot promote themselves.
+* **Every admin resolve or retry is logged** to `admin_log` with the admin, the Tide and the outcome, and the page shows the log (section 10.4: every admin action is logged).
+* **The page acts on the Tide it shows.** A resolve names its Tide number, and the server refuses it with a 409 if the open Tide has moved on, so a stale tab cannot resolve the wrong Tide.
+* **Only the admin retries a failed Tide.** `claim_tide` now takes the status it claims from. The cron still claims only open Tides, so a failed Tide waits for a person to look at it, as section 15.5 says. A retry uses the Tide's stored seed, so it gives the same result as the first attempt would have.
+* **Known gap:** a Tide stuck in `resolving` (the function was killed between claiming and writing) is not retried by the page yet. It needs a check on how old the claim is before it can be taken over safely.

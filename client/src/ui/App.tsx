@@ -3,6 +3,7 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../net/supabase.ts";
 import { loadWorld, type World } from "../net/world.ts";
 import { DEFAULT_MAP_ID, mapById } from "../scenes/maps.ts";
+import { Admin } from "./Admin.tsx";
 import { Login } from "./Login.tsx";
 import { MapView } from "./MapView.tsx";
 
@@ -49,6 +50,7 @@ function Game({ client, session }: { client: NonNullable<typeof supabase>; sessi
   const [world, setWorld] = useState<World>(NO_WORLD);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [inAdmin, setInAdmin] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -80,6 +82,8 @@ function Game({ client, session }: { client: NonNullable<typeof supabase>; sessi
     ?? (!season ? "No season is running yet." : null)
     ?? (!hasShip ? "You are not a captain in this season." : null);
 
+  if (inAdmin) return <Admin client={client} onClose={() => setInAdmin(false)} />;
+
   return (
     <div class="screen">
       <header class="bar">
@@ -87,6 +91,7 @@ function Game({ client, session }: { client: NonNullable<typeof supabase>; sessi
         {status && <span class="dim" role="status">{status}</span>}
         <span class="spacer" />
         <button class="secondary" disabled={loading} onClick={() => void refresh()}>Refresh</button>
+        <button class="secondary" onClick={() => setInAdmin(true)}>Game master</button>
         <button class="secondary" onClick={() => void client.auth.signOut()}>Sign out</button>
       </header>
       <MapView map={map} ships={world.ships} />

@@ -15,8 +15,10 @@ import { startSeason, type NewCaptain } from "../engine/season.ts";
 import type { Gazette, MarketRow, Orders, Ship, Transaction } from "../engine/types.ts";
 import { failureMessage, gazetteMessage } from "./discord.ts";
 import { localDate, nextDueAt } from "./schedule.ts";
-import { portActionSchema, submitOrdersSchema } from "./schemas.ts";
-import { ApiError, type CaptainView, type GameStore, type SeasonInfo } from "./store.ts";
+import { adminSchema, portActionSchema, submitOrdersSchema } from "./schemas.ts";
+import {
+  ApiError, type AdminLogEntry, type CaptainView, type GameStore, type SeasonInfo, type TideHistoryEntry,
+} from "./store.ts";
 
 export interface Deps {
   store: GameStore;
@@ -176,7 +178,9 @@ export async function resolveDueTide(deps: Deps, opts: { force?: boolean } = {})
   const active = await store.activeSeason();
   if (!active) return { status: "idle" };
   const { season, tide } = active;
-  if (tide.status !== "open") return { status: "busy" };
+  // Only the admin's force retries a failed Tide. The cron leaves it alone until someone looks at it.
+  const retry = opts.force === true && tide.status === "failed";
+  if (tide.status !== "open" && !retry) return { status: "busy" };
 
   const now = deps.now();
   let reason: "scheduled" | "early" | "forced";
@@ -193,7 +197,7 @@ export async function resolveDueTide(deps: Deps, opts: { force?: boolean } = {})
     reason = "early";
   }
 
-  if (!(await store.claimTide(season.id, tide.number))) return { status: "busy" };
+  if (!(await store.claimTide(season.id, tide.number, retry ? "failed" : "open"))) return { status: "busy" };
 
   let result;
   let ended = false;
@@ -220,6 +224,52 @@ export async function resolveDueTide(deps: Deps, opts: { force?: boolean } = {})
 
   await deps.notify?.(gazetteMessage(season.name, tide.number, result.gazette, deps.siteUrl)).catch(() => {});
   return { status: "resolved", tide: tide.number, reason, gazette: result.gazette, seasonEnded: ended };
+}
+
+// ---- admin (section 10.4) ----
+
+export type AdminResult =
+  | { season: null; tides: []; log: [] }
+  | {
+    season: { id: string; name: string; lengthTides: number; timezone: string };
+    tide: { number: number; status: string; dueAt: string };
+    tides: TideHistoryEntry[];
+    log: AdminLogEntry[];
+  }
+  | { outcome: ResolveOutcome };
+
+/**
+ * The game master's page. Callers must be in `admins`. `status` reads the running season, its recent
+ * Tides and the admin log. `resolve` forces the open Tide now, or retries it when it has failed. Each
+ * `resolve` is written to the admin log, so every admin action leaves a trace.
+ */
+export async function adminRequest(deps: Deps, userId: string, body: unknown): Promise<AdminResult> {
+  const p = parse(adminSchema, body);
+  if (!(await deps.store.isAdmin(userId))) throw new ApiError("Only the game master can do that", 403);
+  const active = await deps.store.activeSeason();
+
+  if (p.action === "status") {
+    if (!active) return { season: null, tides: [], log: [] };
+    const { season, tide } = active;
+    return {
+      season: { id: season.id, name: season.name, lengthTides: season.lengthTides, timezone: season.timezone },
+      tide: { number: tide.number, status: tide.status, dueAt: tide.dueAt },
+      tides: await deps.store.tideHistory(season.id),
+      log: await deps.store.adminLog(season.id),
+    };
+  }
+
+  if (!active) throw new ApiError("No season is running", 404);
+  if (active.tide.number !== p.tide) {
+    throw new ApiError(`Tide ${active.tide.number} is the Tide now, not Tide ${p.tide}. Reload the page.`, 409);
+  }
+  const action = active.tide.status === "failed" ? "retry" : "resolve";
+  const outcome = await resolveDueTide(deps, { force: true });
+  await deps.store.appendAdminLog({
+    seasonId: active.season.id, at: deps.now().toISOString(), adminId: userId, action, tide: p.tide,
+    outcome: outcome.status, detail: outcome.status === "failed" ? outcome.error : null,
+  });
+  return { outcome };
 }
 
 // ---- starting a season ----
