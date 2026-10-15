@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useState } from "preact/hooks";
 import type { Session } from "@supabase/supabase-js";
+import { loadMe, type Me } from "../net/captain.ts";
 import { supabase } from "../net/supabase.ts";
 import { loadWorld, type World } from "../net/world.ts";
 import { DEFAULT_MAP_ID, mapById } from "../scenes/maps.ts";
 import { Admin } from "./Admin.tsx";
 import { Login } from "./Login.tsx";
 import { MapView } from "./MapView.tsx";
+import { OrdersPanel } from "./OrdersPanel.tsx";
+import { PortPanel } from "./PortPanel.tsx";
+import { hold } from "./portModel.ts";
+import { shipSpeed } from "./ordersModel.ts";
 
 const NO_WORLD: World = { season: null, ships: [] };
 
@@ -48,6 +53,8 @@ function Online({ client }: { client: NonNullable<typeof supabase> }) {
 
 function Game({ client, session }: { client: NonNullable<typeof supabase>; session: Session }) {
   const [world, setWorld] = useState<World>(NO_WORLD);
+  const [me, setMe] = useState<Me | null>(null);
+  const [tab, setTab] = useState<"orders" | "port" | null>("orders");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [inAdmin, setInAdmin] = useState(false);
@@ -55,7 +62,10 @@ function Game({ client, session }: { client: NonNullable<typeof supabase>; sessi
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      setWorld(await loadWorld(client, session.user.id));
+      const next = await loadWorld(client, session.user.id);
+      const mine = next.season ? await loadMe(client, session.user.id, next.season.id, next.season.currentTide) : null;
+      setWorld(next);
+      setMe(mine);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -95,6 +105,24 @@ function Game({ client, session }: { client: NonNullable<typeof supabase>; sessi
         <button class="secondary" onClick={() => void client.auth.signOut()}>Sign out</button>
       </header>
       <MapView map={map} ships={world.ships} />
+      {me && (
+        <section class="dock" aria-label="Captain's desk">
+          <div class="tabs" role="tablist">
+            <button role="tab" aria-selected={tab === "orders"} class={tab === "orders" ? "tab on" : "tab"} onClick={() => setTab(tab === "orders" ? null : "orders")}>
+              Orders
+            </button>
+            <button role="tab" aria-selected={tab === "port"} class={tab === "port" ? "tab on" : "tab"} onClick={() => setTab(tab === "port" ? null : "port")}>
+              {me.ship.docked ? "Port" : "Port (at sea)"}
+            </button>
+            <span class="spacer" />
+            <span class="dim small stats">
+              {Math.round(me.captain.chestGold).toLocaleString()} gold, hull {me.ship.hullPoints.toFixed(0)}, hold {hold(me).used}/{hold(me).capacity}, speed {shipSpeed(me.ship)}
+            </span>
+          </div>
+          {tab === "orders" && <OrdersPanel key={`orders-${me.tide.number}`} client={client} map={map} me={me} onChanged={refresh} />}
+          {tab === "port" && <PortPanel client={client} map={map} me={me} onChanged={refresh} />}
+        </section>
+      )}
     </div>
   );
 }

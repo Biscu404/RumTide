@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "preact/hooks";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { explain } from "../net/api.ts";
 
 // The shapes the admin function returns (supabase/functions/_shared/api/handlers.ts, adminRequest).
 // Keep them in step with that file. The client only reads them; the server decides everything.
@@ -14,20 +15,6 @@ interface StatusReply {
 }
 interface ResolveReply {
   outcome: { status: string; tide?: number; reason?: string; error?: string; seasonEnded?: boolean };
-}
-
-/** Supabase puts the server's message (for example "Only the game master can do that") on the error's response. */
-async function explain(error: unknown): Promise<string> {
-  const response = (error as { context?: Response }).context;
-  if (response && typeof response.json === "function") {
-    try {
-      const body = (await response.json()) as { error?: string };
-      if (body.error) return body.error;
-    } catch {
-      // Not JSON, so fall through to the plain message.
-    }
-  }
-  return error instanceof Error ? error.message : String(error);
 }
 
 const when = (iso: string) => new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
