@@ -1,4 +1,4 @@
-import type { Captain, Good, MarketRow, Orders, Ship } from "@engine/types.ts";
+import type { Battle, Captain, Good, MarketRow, Orders, Ship } from "@engine/types.ts";
 
 // Turns the rows the client may read (snake_case, see supabase/migrations/20261014000003_security.sql)
 // into the engine's types, so the Orders and Port screens can use the same functions as the server.
@@ -44,5 +44,15 @@ export function marketFromRow(row: Row): MarketRow {
   return {
     seasonId: String(row.season_id), portId: String(row.port_id), good: row.good as Good,
     drift: Number(row.drift), soldThisTide: Number(row.sold_this_tide),
+  };
+}
+
+export function battleFromRow(row: Row): Battle {
+  return {
+    id: String(row.id), tide: Number(row.tide), nodeId: String(row.node_id),
+    sides: row.sides as Battle["sides"], rounds: row.rounds as Battle["rounds"],
+    outcome: row.outcome as Battle["outcome"],
+    winner: row.winner === null || row.winner === undefined ? null : (Number(row.winner) as 0 | 1),
+    loot: row.loot as Battle["loot"], bountiesAdded: row.bounties_added as Battle["bountiesAdded"],
   };
 }

@@ -220,3 +220,10 @@ A single install and a single `npm test` cover the client, the engine tests and 
 * **Fields an intent does not use are not sent.** A hunt filter and No Quarter only go with Hunt, and an escort target only with Escort. The Escort intent is only offered to captains who have fleet mates.
 * **The maneuver hint is derived from `matchup` in `combat.ts`,** so the triangle is not written down twice.
 * **Not done on purpose:** the 200 fight forecast of section 7.7 (a Should in section 16.1) and showing the planned route on the map.
+
+## 2026-10-15: Gazette screen and text replay (client step 3)
+
+* **The Gazette is a third tab in the captain's desk.** It lists the resolved Tides, newest first, and shows the headlines the engine printed, the captain's own log lines (private and fleet lines that row level security lets them read) and every battle of that Tide.
+* **The text replay is built only from the saved `Battle` record** (`gazetteModel.ts`). Each round lists what every ship chose, whether it had the edge, whether it repeated its last move, the damage it dealt, the damage each side dealt and the hull left. It adds the result, gold that changed hands and bounties put on heads. Luck rolls are left out on purpose, so the screen does not invite players to read the dice.
+* **Names come from `public_captains` and `public_npcs`.** Merchants are shown by kind, as in the Gazette text. The client still never reads `tides`, so the seed stays hidden.
+* **Not done on purpose:** the 200 fight forecast, and reading the Gazette without a ship in the season (the Gazette tab sits in the captain's desk, which needs a captain).

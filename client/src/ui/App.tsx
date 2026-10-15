@@ -6,6 +6,7 @@ import { loadWorld, type World } from "../net/world.ts";
 import { DEFAULT_MAP_ID, mapById } from "../scenes/maps.ts";
 import { Admin } from "./Admin.tsx";
 import { Login } from "./Login.tsx";
+import { GazettePanel } from "./GazettePanel.tsx";
 import { MapView } from "./MapView.tsx";
 import { OrdersPanel } from "./OrdersPanel.tsx";
 import { PortPanel } from "./PortPanel.tsx";
@@ -54,7 +55,7 @@ function Online({ client }: { client: NonNullable<typeof supabase> }) {
 function Game({ client, session }: { client: NonNullable<typeof supabase>; session: Session }) {
   const [world, setWorld] = useState<World>(NO_WORLD);
   const [me, setMe] = useState<Me | null>(null);
-  const [tab, setTab] = useState<"orders" | "port" | null>("orders");
+  const [tab, setTab] = useState<"orders" | "port" | "gazette" | null>("orders");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [inAdmin, setInAdmin] = useState(false);
@@ -114,6 +115,9 @@ function Game({ client, session }: { client: NonNullable<typeof supabase>; sessi
             <button role="tab" aria-selected={tab === "port"} class={tab === "port" ? "tab on" : "tab"} onClick={() => setTab(tab === "port" ? null : "port")}>
               {me.ship.docked ? "Port" : "Port (at sea)"}
             </button>
+            <button role="tab" aria-selected={tab === "gazette"} class={tab === "gazette" ? "tab on" : "tab"} onClick={() => setTab(tab === "gazette" ? null : "gazette")}>
+              Gazette
+            </button>
             <span class="spacer" />
             <span class="dim small stats">
               {Math.round(me.captain.chestGold).toLocaleString()} gold, hull {me.ship.hullPoints.toFixed(0)}, hold {hold(me).used}/{hold(me).capacity}, speed {shipSpeed(me.ship)}
@@ -121,6 +125,9 @@ function Game({ client, session }: { client: NonNullable<typeof supabase>; sessi
           </div>
           {tab === "orders" && <OrdersPanel key={`orders-${me.tide.number}`} client={client} map={map} me={me} onChanged={refresh} />}
           {tab === "port" && <PortPanel client={client} map={map} me={me} onChanged={refresh} />}
+          {tab === "gazette" && season && (
+            <GazettePanel client={client} map={map} seasonId={season.id} seasonName={season.name} currentTide={season.currentTide} />
+          )}
         </section>
       )}
     </div>
