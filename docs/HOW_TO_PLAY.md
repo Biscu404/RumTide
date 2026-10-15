@@ -56,3 +56,4 @@ Nothing bad happens. Your ship follows your **standing orders**: it stays docked
 * A **treasure galleon** sails on Tides 7 and 14. A lone ship never beats it, but two or three ships can, and the prize is worth more when shared. Sail it home to a port to bank it.
 * Your score is **Legend**: profit from trade and plunder, fights won, and taking part in a galleon hunt. The Legend tab ranks everyone. The leader is marked **Most Wanted**, and beating them pays extra.
 * Captains far behind the median get a small income bonus (**Fair Winds**), so catching up is always possible.
+* When the last Tide has turned the season is over. The app stays open to read: the Legend tab becomes the **final ranking** with every score shown, and the Gazette keeps every Tide. Orders, Port and Fleet are closed.

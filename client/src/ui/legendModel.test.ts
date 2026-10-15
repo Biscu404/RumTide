@@ -8,7 +8,7 @@ const row = (id: string, legend: number, extra: Partial<LegendRow> = {}): Legend
   id, shipName: `Ship ${id}`, legend, bounty: 0, fleetId: null, status: "active", ...extra,
 });
 const input = (captains: LegendRow[], extra: Partial<LegendInput> = {}): LegendInput => ({
-  captains, fleets: [], myCaptainId: "bob", tide: 3, lengthTides: 14, fogOfLegendTides: 0, ...extra,
+  captains, fleets: [], myCaptainId: "bob", tide: 3, lengthTides: 14, fogOfLegendTides: 0, ended: false, ...extra,
 });
 
 describe("Legend leaderboard model", () => {
@@ -111,5 +111,39 @@ describe("Legend leaderboard model", () => {
     expect(screen.entries[0]).toMatchObject({ captainId: "ann", rank: 1, isMe: true, mostWanted: true });
     expect(screen.entries[0]!.legend).toBeGreaterThan(0);
     expect(screen.fogged).toBe(false);
+  });
+
+  describe("the final ranking, once the season has ended", () => {
+    const captains = [row("ann", 120.4), row("bob", 80.2), row("cat", 30)];
+
+    it("takes the fog down in a season that has one, so every score shows", () => {
+      const running = legendScreen(input(captains, { tide: 28, lengthTides: 28, fogOfLegendTides: 3 }));
+      expect(running.fogged).toBe(true);
+      expect(running.entries.filter((e) => e.legend === null)).toHaveLength(2);
+
+      const final = legendScreen(input(captains, { tide: 28, lengthTides: 28, fogOfLegendTides: 3, ended: true }));
+      expect(final).toMatchObject({ fogged: false, final: true });
+      expect(final.entries.map((e) => [e.captainId, e.rank, e.legend])).toEqual([["ann", 1, 120], ["bob", 2, 80], ["cat", 3, 30]]);
+    });
+
+    it("names the champion, and drops the Most Wanted mark that only matters while the season runs", () => {
+      const final = legendScreen(input(captains, { ended: true }));
+      expect(final.entries.map((e) => e.champion)).toEqual([true, false, false]);
+      expect(final.entries.some((e) => e.mostWanted)).toBe(false);
+      expect(final.note).toBe("Final ranking. Ship ann is the Legend champion of the season.");
+      expect(legendScreen(input(captains)).entries.some((e) => e.champion)).toBe(false);
+    });
+
+    it("shares first place between captains on the same score", () => {
+      const final = legendScreen(input([row("ann", 90), row("bob", 90), row("cat", 10)], { ended: true }));
+      expect(final.entries.map((e) => [e.captainId, e.rank, e.champion])).toEqual([["ann", 1, true], ["bob", 1, true], ["cat", 3, false]]);
+      expect(final.note).toBe("Final ranking. Ship ann and Ship bob share first place.");
+    });
+
+    it("says so when the season ended before anyone earned Legend", () => {
+      const final = legendScreen(input([row("ann", 0), row("bob", 0)], { ended: true }));
+      expect(final.entries.every((e) => e.rank === null && !e.champion)).toBe(true);
+      expect(final.note).toBe("Final ranking. The season ended before anyone earned any Legend.");
+    });
   });
 });
