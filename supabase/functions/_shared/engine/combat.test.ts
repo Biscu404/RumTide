@@ -272,3 +272,27 @@ describe("bad input", () => {
     expect(() => resolveBattle([[sloop("a", plan, { hullPoints: 0 })], [sloop("b", plan)]], fixedLuck())).toThrow(/hull/);
   });
 });
+
+describe("the record the replay draws from", () => {
+  it("keeps each ship's hull at the start and its maximum, in id order, and the rounds add up to what is left", () => {
+    const hurt = sloop("a", ["board", "board", "board"], { hullPoints: 60 });
+    const result = resolveBattle([[hurt], [sloop("b", ["broadside", "broadside", "broadside"])]], fixedLuck());
+    expect(Object.keys(result.ships)).toEqual(["a", "b"]);
+    expect(result.ships.a).toEqual({ hullBefore: 60, maxHull: 100 });
+    expect(result.ships.b).toEqual({ hullBefore: 100, maxHull: 100 });
+
+    // Start hull minus what each round took is what the last round says is left, so a replay can
+    // show the hull going down without any number the record does not hold.
+    let hull = result.ships.b!.hullBefore;
+    for (const r of result.rounds) {
+      expect(r.hullAfter.b).toBeCloseTo(Math.max(0, hull - r.sideDamage[0]), 6);
+      hull = r.hullAfter.b!;
+    }
+  });
+
+  it("does not change how a battle is fought", () => {
+    const sides = () => [[sloop("a", ["board", "outmaneuver", "broadside"])], [sloop("b", ["broadside", "board", "outmaneuver"])]] as const;
+    const { ships: _ships, ...rest } = resolveBattle(sides(), createRng(7));
+    expect(rest.rounds).toEqual(resolveBattle(sides(), createRng(7)).rounds);
+  });
+});

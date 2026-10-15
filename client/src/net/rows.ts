@@ -1,4 +1,4 @@
-import type { Battle, Captain, Good, MarketRow, Orders, Ship } from "@engine/types.ts";
+import type { Battle, Captain, Fleet, FleetInvite, FleetMember, Good, MarketRow, Orders, Ship } from "@engine/types.ts";
 
 // Turns the rows the client may read (snake_case, see supabase/migrations/20261014000003_security.sql)
 // into the engine's types, so the Orders and Port screens can use the same functions as the server.
@@ -51,8 +51,29 @@ export function battleFromRow(row: Row): Battle {
   return {
     id: String(row.id), tide: Number(row.tide), nodeId: String(row.node_id),
     sides: row.sides as Battle["sides"], rounds: row.rounds as Battle["rounds"],
+    ...(row.ships ? { ships: row.ships as NonNullable<Battle["ships"]> } : {}),
     outcome: row.outcome as Battle["outcome"],
     winner: row.winner === null || row.winner === undefined ? null : (Number(row.winner) as 0 | 1),
     loot: row.loot as Battle["loot"], bountiesAdded: row.bounties_added as Battle["bountiesAdded"],
+  };
+}
+
+export function fleetFromRow(row: Row): Fleet {
+  return {
+    id: String(row.id), seasonId: String(row.season_id), name: String(row.name), flag: String(row.flag),
+    colour: String(row.colour), createdTide: Number(row.created_tide),
+  };
+}
+
+export function fleetMemberFromRow(row: Row): FleetMember {
+  return {
+    fleetId: String(row.fleet_id), captainId: String(row.captain_id), joinedTide: Number(row.joined_tide),
+    leavingAtTide: row.leaving_at_tide === null || row.leaving_at_tide === undefined ? null : Number(row.leaving_at_tide),
+  };
+}
+
+export function fleetInviteFromRow(row: Row): FleetInvite {
+  return {
+    fleetId: String(row.fleet_id), captainId: String(row.captain_id), invitedBy: String(row.invited_by), tide: Number(row.tide),
   };
 }

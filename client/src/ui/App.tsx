@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useState } from "preact/hooks";
 import type { Session } from "@supabase/supabase-js";
 import { loadMe, type Me } from "../net/captain.ts";
+import { NO_FLEETS, loadFleets, type FleetsState } from "../net/fleets.ts";
 import { supabase } from "../net/supabase.ts";
 import { loadWorld, type World } from "../net/world.ts";
 import { DEFAULT_MAP_ID, mapById } from "../scenes/maps.ts";
 import { Admin } from "./Admin.tsx";
 import { Login } from "./Login.tsx";
+import { FleetPanel } from "./FleetPanel.tsx";
 import { GazettePanel } from "./GazettePanel.tsx";
 import { MapView } from "./MapView.tsx";
 import { OrdersPanel } from "./OrdersPanel.tsx";
+import { withFleetColours } from "./fleetModel.ts";
 import { PortPanel } from "./PortPanel.tsx";
 import { hold } from "./portModel.ts";
 import { shipSpeed } from "./ordersModel.ts";
@@ -55,7 +58,8 @@ function Online({ client }: { client: NonNullable<typeof supabase> }) {
 function Game({ client, session }: { client: NonNullable<typeof supabase>; session: Session }) {
   const [world, setWorld] = useState<World>(NO_WORLD);
   const [me, setMe] = useState<Me | null>(null);
-  const [tab, setTab] = useState<"orders" | "port" | "gazette" | null>("orders");
+  const [fleets, setFleets] = useState<FleetsState>(NO_FLEETS);
+  const [tab, setTab] = useState<"orders" | "port" | "fleet" | "gazette" | null>("orders");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [inAdmin, setInAdmin] = useState(false);
@@ -65,8 +69,10 @@ function Game({ client, session }: { client: NonNullable<typeof supabase>; sessi
     try {
       const next = await loadWorld(client, session.user.id);
       const mine = next.season ? await loadMe(client, session.user.id, next.season.id, next.season.currentTide) : null;
+      const theirs = next.season && mine ? await loadFleets(client, next.season.id, mine.tide.number, mine.captain.id) : NO_FLEETS;
       setWorld(next);
       setMe(mine);
+      setFleets(theirs);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -87,6 +93,8 @@ function Game({ client, session }: { client: NonNullable<typeof supabase>; sessi
   }
 
   const { season } = world;
+  const ships = withFleetColours(world.ships, fleets.fleets);
+  const invitations = me && me.captain.fleetId === null ? fleets.invites.filter((i) => i.captainId === me.captain.id).length : 0;
   const hasShip = world.ships.some((s) => s.isMine);
   const status = error ?? mapError
     ?? (loading && !season ? "Loading" : null)
@@ -105,7 +113,7 @@ function Game({ client, session }: { client: NonNullable<typeof supabase>; sessi
         <button class="secondary" onClick={() => setInAdmin(true)}>Game master</button>
         <button class="secondary" onClick={() => void client.auth.signOut()}>Sign out</button>
       </header>
-      <MapView map={map} ships={world.ships} />
+      <MapView map={map} ships={ships} />
       {me && (
         <section class="dock" aria-label="Captain's desk">
           <div class="tabs" role="tablist">
@@ -114,6 +122,9 @@ function Game({ client, session }: { client: NonNullable<typeof supabase>; sessi
             </button>
             <button role="tab" aria-selected={tab === "port"} class={tab === "port" ? "tab on" : "tab"} onClick={() => setTab(tab === "port" ? null : "port")}>
               {me.ship.docked ? "Port" : "Port (at sea)"}
+            </button>
+            <button role="tab" aria-selected={tab === "fleet"} class={tab === "fleet" ? "tab on" : "tab"} onClick={() => setTab(tab === "fleet" ? null : "fleet")}>
+              {invitations > 0 ? `Fleet (${invitations})` : "Fleet"}
             </button>
             <button role="tab" aria-selected={tab === "gazette"} class={tab === "gazette" ? "tab on" : "tab"} onClick={() => setTab(tab === "gazette" ? null : "gazette")}>
               Gazette
@@ -125,6 +136,7 @@ function Game({ client, session }: { client: NonNullable<typeof supabase>; sessi
           </div>
           {tab === "orders" && <OrdersPanel key={`orders-${me.tide.number}`} client={client} map={map} me={me} onChanged={refresh} />}
           {tab === "port" && <PortPanel client={client} map={map} me={me} onChanged={refresh} />}
+          {tab === "fleet" && <FleetPanel client={client} map={map} me={me} state={fleets} ships={ships} onChanged={refresh} />}
           {tab === "gazette" && season && (
             <GazettePanel client={client} map={map} seasonId={season.id} seasonName={season.name} currentTide={season.currentTide} />
           )}

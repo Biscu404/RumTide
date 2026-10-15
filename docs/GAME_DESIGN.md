@@ -749,7 +749,8 @@ export const B = {
   fairness: { floor: 0.25, underdogCap: 1.5, bountyBelowRatio: 2 / 3, bountyKeepPerTide: 0.9 },
   fleet: { battleBonusPerExtraShip: 0.10, battleBonusCap: 0.30,
            desperatePerExtraEnemy: 0.25, desperateCap: 0.75,
-           convoyPerMate: 0.10, coopExponent: 1.5 },
+           convoyPerMate: 0.10, coopExponent: 1.5,
+           capShare: 0.5, minCap: 2, maxCap: 4 },   // section 8.1: half the players, at least 2, at most 4
   escape: { quietMult: 1.3, min: 0.05, max: 0.75 },
   parley: { tribute: 0.10, thresholds: [1.25, 1.5] },
   shieldTidesAfterPvpLoss: 2,
@@ -974,6 +975,7 @@ interface Tide {
 interface Battle {
   id: string; tide: number; nodeId: string;
   sides: BattleSide[]; rounds: RoundRecord[];      // everything the replay needs
+  ships?: Record<string, { hullBefore: number; maxHull: number }>;   // hulls at the start; missing on old battles
   outcome: "decisive" | "victory" | "draw";
   winner: 0 | 1 | null;                            // index into sides, null on a draw
   loot: LootRecord[]; bountiesAdded: BountyRecord[];

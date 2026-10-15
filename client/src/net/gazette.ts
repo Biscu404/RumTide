@@ -11,6 +11,8 @@ export interface TideReport {
   /** Lines only this captain (or their fleet) may read. */
   ownLog: string[];
   captainNames: Record<string, string>;
+  /** Each captain's Parting Shot, for the winner's line in the replay. Empty for captains who wrote none. */
+  partingShots: Record<string, string>;
   npcKinds: Record<string, NpcKind>;
 }
 
@@ -35,7 +37,7 @@ export async function loadTideReport(client: SupabaseClient, seasonId: string, t
   const [tides, battles, captains, npcs, log] = await Promise.all([
     client.from("public_tides").select("gazette").eq("season_id", seasonId).eq("number", tide),
     client.from("battles").select("*").eq("season_id", seasonId).eq("tide", tide).order("id"),
-    client.from("public_captains").select("id, ship_name").eq("season_id", seasonId),
+    client.from("public_captains").select("id, ship_name, parting_shot").eq("season_id", seasonId),
     client.from("public_npcs").select("id, kind").eq("season_id", seasonId),
     client.from("log_events").select("id, text").eq("season_id", seasonId).eq("tide", tide).neq("visibility", "public").order("id"),
   ]);
@@ -46,6 +48,7 @@ export async function loadTideReport(client: SupabaseClient, seasonId: string, t
     battles: rows("battles", battles).map(battleFromRow),
     ownLog: rows("log", log).map((r) => String(r.text)),
     captainNames: Object.fromEntries(rows("captains", captains).map((r) => [String(r.id), String(r.ship_name)])),
+    partingShots: Object.fromEntries(rows("captains", captains).map((r) => [String(r.id), String(r.parting_shot ?? "")])),
     npcKinds: Object.fromEntries(rows("npcs", npcs).map((r) => [String(r.id), r.kind as NpcKind])),
   };
 }

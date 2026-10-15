@@ -27,6 +27,11 @@ export function failureMessage(seasonName: string, tide: number): string {
   return `Tide ${tide} of ${seasonName} could not be resolved. The captains' orders are safe, and the admin can retry it.`;
 }
 
+/** Section 8.1: leaving a fleet is announced, so a fleet mate can see the knife coming. */
+export function fleetLeaveMessage(seasonName: string, shipName: string, fleetName: string, effectiveTide: number): string {
+  return `**${seasonName}:** ${shipName} has given notice to leave the ${fleetName}. They sail with the fleet until Tide ${effectiveTide} opens.`;
+}
+
 /** Post to a Discord webhook URL. Throws on a non 2xx answer so the caller can log it. */
 export async function postToDiscord(
   webhookUrl: string, content: string, fetchImpl: typeof fetch = fetch,

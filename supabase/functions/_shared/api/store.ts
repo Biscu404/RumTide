@@ -6,6 +6,7 @@
 // compare and swap: a captain row carries a `version`, and a write made against an old version
 // fails with a 409 so the caller can look again.
 
+import type { FleetBook } from "../engine/fleet.ts";
 import type { TideResult } from "../engine/resolve.ts";
 import type { TideSnapshot } from "../engine/season.ts";
 import type { Captain, MarketRow, Orders, Season, Ship, Tide, Transaction } from "../engine/types.ts";
@@ -50,8 +51,23 @@ export interface CaptainView {
   version: number;
   /** The market rows at the ship's node. Empty at sea. */
   market: MarketRow[];
-  /** Every captain in the season, for checking hunt and escort targets. */
-  roster: { id: string; fleetId: string | null }[];
+  /** Every captain in the season, for checking hunt, escort and invite targets. */
+  roster: { id: string; shipName: string; fleetId: string | null }[];
+}
+
+/** The fleets of a season and the revision they were read at, which a change hands back. */
+export interface FleetState {
+  book: FleetBook;
+  rev: number;
+}
+
+export interface FleetChange {
+  seasonId: string;
+  tide: number;
+  /** The `rev` the new book was worked out from. */
+  expectedRev: number;
+  /** The season's whole fleet book as it should be. Each captain's fleet follows from its members. */
+  book: FleetBook;
 }
 
 export interface PortChange {
@@ -96,6 +112,9 @@ export interface GameStore {
   saveOrders(seasonId: string, orders: Orders): Promise<void>;
   /** Write a port action. Throws a 409 if the Tide is not open or the captain changed since `expectedVersion`. */
   applyPortChange(change: PortChange): Promise<void>;
+  loadFleets(seasonId: string): Promise<FleetState>;
+  /** Replace the season's fleets. Throws a 409 unless the Tide is open and the fleets are still as they were at `expectedRev`. */
+  applyFleetChange(change: FleetChange): Promise<void>;
   /** Active captains, and how many of them have pressed Ready for this Tide. */
   readyCount(seasonId: string, tide: number): Promise<{ active: number; ready: number }>;
   /** Move the Tide from `from` (open, or failed when an admin retries it) to resolving. True for exactly one caller. */

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { loadMap } from "@engine/map.ts";
 import brine from "../../../supabase/functions/_shared/maps/brine.json";
-import { fitZoom, nodePoint, placeShips, sailColour, worldSize, WORLD_MARGIN, WORLD_UNIT, type ShipMarker } from "./layout.ts";
+import { fitZoom, hexColour, nodePoint, placeShips, sailColour, worldSize, WORLD_MARGIN, WORLD_UNIT, type ShipMarker } from "./layout.ts";
 
 const map = loadMap(brine);
 
@@ -47,5 +47,14 @@ describe("MapScene layout", () => {
 
   it("gives the same sail colour to the same name", () => {
     expect(sailColour("Black Pearl")).toBe(sailColour("Black Pearl"));
+  });
+});
+
+describe("hexColour", () => {
+  it("reads #rrggbb and falls back to grey for anything else", () => {
+    expect(hexColour("#e43b44")).toBe(0xe43b44);
+    expect(hexColour("#FFFFFF")).toBe(0xffffff);
+    expect(hexColour("red")).toBe(0x9aa5b1);
+    expect(hexColour("#fff")).toBe(0x9aa5b1);
   });
 });

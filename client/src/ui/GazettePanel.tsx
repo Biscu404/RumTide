@@ -2,7 +2,9 @@ import { useEffect, useState } from "preact/hooks";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { GameMap } from "@engine/map.ts";
 import { loadResolvedTides, loadTideReport, type TideReport } from "../net/gazette.ts";
+import { ReplayView } from "./ReplayView.tsx";
 import { describeBattle } from "./gazetteModel.ts";
+import { buildReplay, type Replay } from "./replayModel.ts";
 
 interface Props { client: SupabaseClient; map: GameMap; seasonId: string; seasonName: string; currentTide: number }
 
@@ -12,6 +14,8 @@ export function GazettePanel({ client, map, seasonId, seasonName, currentTide }:
   const [chosen, setChosen] = useState<number | null>(null);
   const [report, setReport] = useState<TideReport | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** The battle being watched, built once when it is opened so a redraw never restarts it. One at a time. */
+  const [watching, setWatching] = useState<Replay | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -23,6 +27,7 @@ export function GazettePanel({ client, map, seasonId, seasonName, currentTide }:
   }, [client, seasonId, currentTide]);
 
   useEffect(() => {
+    setWatching(null);
     if (chosen === null) { setReport(null); return; }
     let live = true;
     setReport(null);
@@ -78,6 +83,14 @@ export function GazettePanel({ client, map, seasonId, seasonName, currentTide }:
                 ))}
                 <p><strong>{text.result}</strong></p>
                 {text.aftermath.map((line, i) => <p key={i} class="dim">{line}</p>)}
+                {watching?.id === battle.id ? (
+                  <>
+                    <ReplayView replay={watching} />
+                    <div class="actions"><button class="secondary" onClick={() => setWatching(null)}>Close the replay</button></div>
+                  </>
+                ) : (
+                  <div class="actions"><button onClick={() => setWatching(buildReplay(battle, names, map, report.partingShots))}>Watch the replay</button></div>
+                )}
               </details>
             );
           })}

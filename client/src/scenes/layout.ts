@@ -16,6 +16,9 @@ export interface ShipMarker {
   hull: string;
   hullPoints: number;
   isMine: boolean;
+  fleetId?: string | null;
+  /** The fleet's sail colour as "#rrggbb", when the ship sails in a fleet (section 8.1). */
+  fleetColour?: string;
 }
 
 export interface PlacedShip extends ShipMarker { x: number; y: number }
@@ -81,4 +84,9 @@ export function sailColour(shipName: string): number {
   let hash = 0;
   for (const ch of shipName) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
   return SAIL_COLOURS[hash % SAIL_COLOURS.length]!;
+}
+
+/** "#rrggbb" as the number Phaser wants. Anything else is a neutral grey, so a bad colour never breaks the map. */
+export function hexColour(hex: string): number {
+  return /^#[0-9a-fA-F]{6}$/.test(hex) ? parseInt(hex.slice(1), 16) : 0x9aa5b1;
 }

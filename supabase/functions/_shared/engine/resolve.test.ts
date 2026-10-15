@@ -155,6 +155,19 @@ describe("meetings and encounters", () => {
     expect(hit?.battles[0]?.nodeId).toBe("sea06");
   });
 
+  it("saves each fighter's starting hull in the battle record, for the replay", () => {
+    const base = at(at(world(["ann", "bob"]), "ann", "sea06", { hullPoints: 70 }), "bob", "sea06");
+    const hit = SEEDS.map((seed) => resolveTide(map, base, [order("ann", { intent: "hunt", huntFilter: "players" }), order("bob")], seed))
+      .find((r) => r.battles.length > 0)!;
+    expect(hit).toBeDefined();
+    const { ships, rounds } = hit.battles[0]!;
+    expect(ships).toEqual({
+      ann: { hullBefore: 70, maxHull: maxHullPoints("sloop", 0) },
+      bob: { hullBefore: maxHullPoints("sloop", 0), maxHull: maxHullPoints("sloop", 0) },
+    });
+    expect(rounds[0]!.hullAfter.ann).toBeLessThanOrEqual(70);
+  });
+
   it("never fights when two ships hunt each other and neither can flee", () => {
     const base = at(at(world(["ann", "bob"]), "ann", "sea06"), "bob", "sea06");
     for (const seed of SEEDS.slice(0, 60)) {

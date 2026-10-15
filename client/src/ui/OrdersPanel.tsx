@@ -82,6 +82,7 @@ export function OrdersPanel({ client, map, me, onChanged }: Props) {
           </select>
         </label>
         <p class="dim small">{INTENTS.find((i) => i.id === draft.intent)?.help}</p>
+        {mates.length > 0 && <p class="dim small">Your fleet mates' orders are on the Fleet tab.</p>}
 
         {draft.intent === "hunt" && (
           <>

@@ -59,6 +59,8 @@ export interface Tide {
 export interface Battle {
   id: string; tide: number; nodeId: string;
   sides: BattleSide[]; rounds: RoundRecord[];      // everything the replay needs
+  /** Each ship's hull when the battle began. Missing on battles saved before the replay existed. */
+  ships?: Record<string, ShipStart>;
   outcome: "decisive" | "victory" | "draw";
   winner: 0 | 1 | null;                            // index into sides, null on a draw
   loot: LootRecord[]; bountiesAdded: BountyRecord[];
@@ -69,6 +71,8 @@ export interface Npc { id: string; seasonId: string; kind: NpcKind; nodeId: stri
 
 export interface Fleet { id: string; seasonId: string; name: string; flag: string; colour: string; createdTide: number; }
 export interface FleetMember { fleetId: string; captainId: string; joinedTide: number; leavingAtTide: number | null; }
+/** An open invitation to join a fleet. It ends when it is accepted or declined, or the fleet is gone. */
+export interface FleetInvite { fleetId: string; captainId: string; invitedBy: string; tide: number; }
 export interface MarketRow { seasonId: string; portId: string; good: Good; drift: number; soldThisTide: number; }
 export interface LogEvent { id: string; tide: number; captainId: string | null;
   visibility: "public" | "fleet" | "private"; kind: string; text: string; data: unknown; }
@@ -80,6 +84,9 @@ export interface Transaction { id: string; captainId: string; tide: number; kind
 
 /** One side of a battle. Ids are captain ids or NPC ids, each list in sorted order. */
 export interface BattleSide { captainIds: string[]; npcIds: string[]; flagshipId: string; }
+
+/** A ship as the battle found it: the hull it started with and the most it could have had. */
+export interface ShipStart { hullBefore: number; maxHull: number; }
 
 /** What one ship did in one round. Everything the replay needs. */
 export interface RoundShipRecord {

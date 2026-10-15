@@ -3,6 +3,7 @@
 
 import { z } from "zod";
 import { B } from "../engine/balance.ts";
+import { FLAGS } from "../engine/fleet.ts";
 
 const maneuver = z.enum(["broadside", "outmaneuver", "board"]);
 const good = z.enum(["rum", "sugar", "spice"]);
@@ -36,6 +37,16 @@ export const portActionSchema = z.discriminatedUnion("action", [
   z.strictObject({ action: z.literal("shipwright"), amount: z.number().int().min(1).max(1_000_000) }),
 ]);
 export type PortActionPayload = z.infer<typeof portActionSchema>;
+
+export const fleetActionSchema = z.discriminatedUnion("action", [
+  /** The engine trims the name and checks its length and the colour is the server's to give. */
+  z.strictObject({ action: z.literal("create"), name: z.string().max(80), flag: z.enum(FLAGS) }),
+  z.strictObject({ action: z.literal("invite"), captainId: id }),
+  z.strictObject({ action: z.literal("accept"), fleetId: id }),
+  z.strictObject({ action: z.literal("decline"), fleetId: id }),
+  z.strictObject({ action: z.literal("leave") }),
+]);
+export type FleetActionPayload = z.infer<typeof fleetActionSchema>;
 
 export const adminSchema = z.discriminatedUnion("action", [
   z.strictObject({ action: z.literal("status") }),

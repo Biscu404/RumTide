@@ -53,9 +53,20 @@ describe("Battle text", () => {
     const battle = fight().battles[0]!;
     const row = {
       id: battle.id, tide: battle.tide, node_id: battle.nodeId, sides: battle.sides, rounds: battle.rounds,
-      outcome: battle.outcome, winner: battle.winner, loot: battle.loot, bounties_added: battle.bountiesAdded,
+      ships: battle.ships, outcome: battle.outcome, winner: battle.winner, loot: battle.loot, bounties_added: battle.bountiesAdded,
     };
     expect(battleFromRow(row)).toEqual(battle);
+    expect(battle.ships).toBeDefined();
+  });
+
+  it("reads a battle saved before the record held starting hulls, without them", () => {
+    const { ships: _ships, ...old } = fight().battles[0]!;
+    const row = {
+      id: old.id, tide: old.tide, node_id: old.nodeId, sides: old.sides, rounds: old.rounds, ships: null,
+      outcome: old.outcome, winner: old.winner, loot: old.loot, bounties_added: old.bountiesAdded,
+    };
+    expect(battleFromRow(row)).toEqual(old);
+    expect("ships" in battleFromRow(row)).toBe(false);
   });
 
   it("lists loot and bounties from the record", () => {

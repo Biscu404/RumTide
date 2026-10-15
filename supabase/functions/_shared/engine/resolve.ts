@@ -193,7 +193,7 @@ export function resolveTide(map: GameMap, snap: TideSnapshot, orders: readonly O
 
     const battle: Battle = {
       id: `battle-t${tide}-${battles.length + 1}`, tide, nodeId,
-      sides: result.sides, rounds: result.rounds, outcome: result.outcome, winner: result.winner, loot: [], bountiesAdded: [],
+      sides: result.sides, rounds: result.rounds, ships: result.ships, outcome: result.outcome, winner: result.winner, loot: [], bountiesAdded: [],
     };
     battles.push(battle);
     const where = place(nodeId);

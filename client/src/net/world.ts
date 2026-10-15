@@ -9,7 +9,7 @@ export interface World {
 }
 
 interface SeasonRow { id: string; name: string; map_id: string; current_tide: number; length_tides: number }
-interface CaptainRow { id: string; ship_name: string; user_id?: string }
+interface CaptainRow { id: string; ship_name: string; fleet_id?: string | null; user_id?: string }
 interface ShipRow { captain_id: string; node_id: string; docked: boolean; hull: string; hull_points: number }
 
 function fail<T>(what: string, result: { data: T | null; error: { message: string } | null }): T {
@@ -32,7 +32,7 @@ export async function loadWorld(client: SupabaseClient, userId: string): Promise
   };
 
   const [captains, mine] = await Promise.all([
-    client.from("public_captains").select("id, ship_name").eq("season_id", season.id),
+    client.from("public_captains").select("id, ship_name, fleet_id").eq("season_id", season.id),
     client.from("captains").select("id").eq("season_id", season.id).eq("user_id", userId),
   ]);
   const captainRows = fail("captains", captains) as CaptainRow[];
@@ -45,6 +45,7 @@ export async function loadWorld(client: SupabaseClient, userId: string): Promise
     .in("captain_id", captainRows.map((c) => c.id))) as ShipRow[];
 
   const names = new Map(captainRows.map((c) => [c.id, c.ship_name]));
+  const fleets = new Map(captainRows.map((c) => [c.id, c.fleet_id ?? null]));
   const ships = shipRows.map((s): ShipMarker => ({
     captainId: s.captain_id,
     shipName: names.get(s.captain_id) ?? "Unknown ship",
@@ -53,6 +54,7 @@ export async function loadWorld(client: SupabaseClient, userId: string): Promise
     hull: s.hull,
     hullPoints: s.hull_points,
     isMine: myIds.has(s.captain_id),
+    fleetId: fleets.get(s.captain_id) ?? null,
   }));
   return { season, ships };
 }

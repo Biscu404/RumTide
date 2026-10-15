@@ -1,7 +1,7 @@
 import Phaser from "phaser";
 import type { GameMap, MapNode } from "@engine/map.ts";
 import {
-  fitZoom, nodePoint, placeShips, sailColour, worldSize,
+  fitZoom, hexColour, nodePoint, placeShips, sailColour, worldSize,
   type PlacedShip, type ShipMarker, type WorldSize,
 } from "./layout.ts";
 
@@ -175,7 +175,8 @@ export class MapScene extends Phaser.Scene {
   }
 
   private shipObjects(ship: PlacedShip): Phaser.GameObjects.GameObject[] {
-    const sail = ship.isMine ? MINE : sailColour(ship.shipName);
+    // A fleet's ships all fly its colour; your own ship is told apart by the ring.
+    const sail = ship.fleetColour !== undefined ? hexColour(ship.fleetColour) : ship.isMine ? MINE : sailColour(ship.shipName);
     const g = this.add.graphics();
     g.fillStyle(0x3b2a1a, 1).fillRect(ship.x - 8, ship.y + 2, 16, 5); // hull
     g.fillStyle(sail, 1).fillTriangle(ship.x - 7, ship.y + 1, ship.x + 7, ship.y + 1, ship.x, ship.y - 12); // sail

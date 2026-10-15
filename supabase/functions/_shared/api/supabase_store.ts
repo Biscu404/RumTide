@@ -5,10 +5,11 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TideSnapshot } from "../engine/season.ts";
-import type { Captain, MarketRow, Npc, Orders, Ship } from "../engine/types.ts";
+import type { Captain, Fleet, FleetInvite, FleetMember, MarketRow, Npc, Orders, Ship } from "../engine/types.ts";
 import {
   ApiError, type ActiveSeason, type AdminLogEntry, type ApplyTideArgs, type CaptainView, type CreateSeasonArgs,
-  type GameStore, type PortChange, type SeasonInfo, type TideHistoryEntry, type TideInfo, type TideState,
+  type FleetChange, type FleetState, type GameStore, type PortChange, type SeasonInfo, type TideHistoryEntry,
+  type TideInfo, type TideState,
 } from "./store.ts";
 
 type Row = Record<string, unknown>;
@@ -101,8 +102,8 @@ export class SupabaseStore implements GameStore {
     const ship = fromRow<Ship>(unwrap(await this.db.from("ships").select("*").eq("captain_id", captain.id).single()) as Row);
     const market = (unwrap(await this.db.from("market").select("*").eq("season_id", seasonId).eq("port_id", ship.nodeId)) as Row[])
       .map((r) => fromRow<MarketRow>(r));
-    const roster = (unwrap(await this.db.from("captains").select("id, fleet_id").eq("season_id", seasonId).order("id")) as Row[])
-      .map((r) => ({ id: String(r.id), fleetId: (r.fleet_id as string | null) ?? null }));
+    const roster = (unwrap(await this.db.from("captains").select("id, ship_name, fleet_id").eq("season_id", seasonId).order("id")) as Row[])
+      .map((r) => ({ id: String(r.id), shipName: String(r.ship_name), fleetId: (r.fleet_id as string | null) ?? null }));
     const tide = await this.tideRow(seasonId, active.tide.number);
     return {
       active, boomPortId: (tide.boom_port_id as string | null) ?? null, captain, ship,
@@ -116,6 +117,23 @@ export class SupabaseStore implements GameStore {
 
   async applyPortChange(change: PortChange): Promise<void> {
     unwrap(await this.db.rpc("apply_port_change", { p_args: change }));
+  }
+
+  async loadFleets(seasonId: string): Promise<FleetState> {
+    const season = unwrap(await this.db.from("seasons").select("fleet_rev").eq("id", seasonId).single()) as Row;
+    const fleets = (unwrap(await this.db.from("fleets").select("*").eq("season_id", seasonId).order("id")) as Row[])
+      .map((r) => fromRow<Fleet>(r));
+    const members = fleets.length === 0 ? [] : (unwrap(await this.db.from("fleet_members").select("*")
+      .in("fleet_id", fleets.map((f) => f.id)).order("fleet_id").order("captain_id")) as Row[])
+      .map((r) => fromRow<FleetMember>(r));
+    const invites = (unwrap(await this.db.from("fleet_invites").select("*").eq("season_id", seasonId)
+      .order("fleet_id").order("captain_id")) as Row[])
+      .map((r): FleetInvite => ({ fleetId: String(r.fleet_id), captainId: String(r.captain_id), invitedBy: String(r.invited_by), tide: Number(r.tide) }));
+    return { book: { fleets, members, invites }, rev: Number(season.fleet_rev) };
+  }
+
+  async applyFleetChange(change: FleetChange): Promise<void> {
+    unwrap(await this.db.rpc("apply_fleet_change", { p_args: change }));
   }
 
   async readyCount(seasonId: string, tide: number): Promise<{ active: number; ready: number }> {

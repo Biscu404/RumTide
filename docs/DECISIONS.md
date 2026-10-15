@@ -2,6 +2,38 @@
 
 What was decided, when and why. Newest first. When a design decision changes, add an entry here in the same commit.
 
+## 2026-10-15: ReplayScene v0 (client step 5)
+
+Section 16.1 asks for "two sprites, plans revealed round by round, damage numbers, smoke". Each battle in the Gazette now has a Watch the replay button under its text replay. The text replay stays, and says the same things in words.
+
+* **The replay is built from the saved `Battle` record only** (`replayModel.ts`), so it can only show what happened. A `Timeline` (`scenes/timeline.ts`, pure and tested) holds every beat; `ReplayScene` draws it. Pausing is not moving the clock, skipping is moving it to the end in one step, and watching again builds a new one.
+* **`Battle` gained `ships`:** each ship's `hullBefore` and `maxHull` when the fight began. The record had only the hull left after each round, so a hull bar had nothing to start from. Section 15.3 calls the record "everything the replay needs", so this is that, and it changes nothing about how a battle is fought (a test checks the rounds are identical). It is stored in a new `battles.ships` column (migration `20261015000004_battle_ships.sql`, additive, replacing `apply_tide_result` again). Battles saved before it have no `ships`; the replay then works the start hull out from round 1 (exact for one ship a side, an even split for a fleet).
+* **Fleet battles show every ship, not two.** Each side lines up with its flagship nearest the middle, up to 3 or 4 a side. Names and maneuver words shorten when it is crowded.
+* **Internal resolution is 320 by 180, scaled by whole numbers only** (section 2.1): the host works out the largest whole zoom that fits and the canvas is drawn with nearest neighbour. On a phone that is 1, so the canvas is 320 pixels wide.
+* **Maneuvers have a shape as well as a colour** in the replay (`MANEUVER_STYLE`): Broadside a red circle, Outmaneuver a blue triangle, Board an amber diamond. Who had the edge is written as EDGE, EVEN or WEAK, and a repeated maneuver is marked REPEAT. Nothing relies on colour alone (section 16.1). The Orders screen still shows words only; giving it the same icons is a polish task.
+* **A Parting Shot shows over the winning side's deck** if its captain wrote one (the first on the winning side, flagship first). The `profile` function is not built, so nobody can write one yet, and the line never appears for a merchant or a loser.
+* **Reduced motion:** a player whose device asks for less motion sees the fight already finished, and Watch again plays it. The replay also has Pause and Skip to the end.
+* **Luck rolls are not shown,** as in the text replay. The numbers on screen are hull points actually lost, so a ship that sinks shows what it really lost, not the overkill.
+* **Placeholders until the art pass:** ships, smoke and icons are drawn shapes in Endesga 32 colours, and the text is a system monospace font. Sounds (the drum roll, the brass hit) are not built; they are in the `Should` row of section 16.1.
+* **Checked in a browser** with a throwaway page (deleted again) at desktop and phone width: the sail in, the reveal, smoke and damage numbers, the sinking, the headline and the Parting Shot bubble, a fleet against the galleon, and the buttons. The throwaway page found one bug (a Phaser scene has no `events` until it is booted, so the host uses a plain callback). **Not checked:** against a real project, since the replay needs a season with a battle in it.
+
+## 2026-10-15: Fleets (client step 4)
+
+Section 8.1 and 15.4 give the rules in one line each. The rules live in `engine/fleet.ts` (pure, tested), the `fleet_action` function runs them through `handlers.fleetAction`, and the Fleet tab in the captain's desk is the screen.
+
+* **Size cap is `fleetCap(players)`:** half the captains, at least 2, at most 4 (`B.fleet.capShare`, `minCap`, `maxCap`). Six captains give 3. Section 14 is updated to match.
+* **Joining is immediate, leaving is not.** Giving notice in Tide N sets `leaving_at_tide` to N+1. The captain is a fleet mate for the whole resolution of Tide N (cannot hunt mates, fights beside them) and is out when Tide N+1 opens. That is how I read "takes effect at the next Tide" and "the knife is visible for one Tide".
+* **Leaving is announced twice:** the Discord webhook posts a line at once, and `fleet_members` is readable by every player, so the Fleet tab shows "leaving when Tide N opens" next to the name. Failing to post never fails the action.
+* **A captain alone in a fleet who leaves disbands it at once,** with no notice, because there is nobody to warn. Nothing is posted.
+* **Added to the table in 15.4: `decline`.** Without it an invitation can only be ignored. It is one line in the engine and does nothing else.
+* **Fleet names:** 2 to 24 characters, trimmed, no control characters, unique in the season ignoring case (also a unique index). **Flags** are six ids (`skull`, `anchor`, `cutlass`, `kraken`, `gull`, `star`), shown as words until there is art. **The colour is the server's to give:** the first of six Endesga 32 colours no fleet uses. The client never sends one. Ships in a fleet fly its colour on the map, and the name always appears next to the colour swatch, so colour is never the only signal.
+* **Invitations are private to the captain asked and to the fleet that asked.** Fleets and members are public. A fleet that fills up cannot be joined even with an invitation in hand (the first to accept wins). Accepting drops every other invitation to that captain.
+* **Fleet changes need an open Tide,** like orders and port actions, and lock the open Tide row "for share". Two changes made from one reading cannot both land: `seasons.fleet_rev` is a compare and swap (`apply_fleet_change`), and a captain whose fleet changes gets a new `version`, so a port action started earlier cannot write the old fleet back over it.
+* **Fleet mates' orders** were already readable by fleet mates through row level security. The Fleet tab now shows them as the same one sentence the Orders tab writes, plus Ready or Not Ready.
+* **Migration `20261015000003_fleets.sql` is additive:** `fleet_invites`, `seasons.fleet_rev`, a unique index on `fleet_members (captain_id)` and on fleet names, `apply_fleet_change`, and a replacement `apply_tide_result` that also takes departing captains out of their fleet when the new Tide opens. It was run on an in process Postgres (PGlite, not a project dependency) with the other migrations: the compare and swap, the unique indexes, the row level security of invitations and orders, and a real Tide with a departing captain all behaved.
+* **Not built:** Mutiny Rules (instant betrayal, `mutinyRules` stays false and unused), and the convoy bonus. The convoy bonus is an income rule and waits for the same decision as Shore Leave and Fair Winds (see the open item under Day 6 below).
+* **Not run against a real project yet:** the `fleet_action` Deno entry file and the new `SupabaseStore` reads (`loadFleets`).
+
 ## 2026-10-14: Client step 1, login and MapScene
 
 * **Email and password sign in** through Supabase Auth, with a Create account button. Nothing else is asked.

@@ -4,7 +4,7 @@
 
 import { B, desperateDefence, fleetBattleBonus, roundDamage } from "./balance.ts";
 import type { Rng } from "./rng.ts";
-import type { BattleSide, Maneuver, RoundRecord, RoundShipRecord } from "./types.ts";
+import type { BattleSide, Maneuver, RoundRecord, RoundShipRecord, ShipStart } from "./types.ts";
 
 /** A ship as the battle sees it. `kind` is "npc" for merchants and the galleon. */
 export interface Combatant {
@@ -34,6 +34,8 @@ export interface BattleResult {
   damageDealt: Record<string, number>;
   /** Hull points left, never below 0. */
   hullAfter: Record<string, number>;
+  /** Every ship's hull at the start and its maximum, for the replay. */
+  ships: Record<string, ShipStart>;
 }
 
 const compareIds = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
@@ -166,5 +168,7 @@ export function resolveBattle(
     sides: [sideRecord(0), sideRecord(1)],
     rounds, outcome, winner, shares, damageDealt,
     hullAfter: Object.fromEntries([...hull].sort(([a], [b]) => compareIds(a, b))),
+    ships: Object.fromEntries([...sides[0], ...sides[1]].sort((a, b) => compareIds(a.id, b.id))
+      .map((c) => [c.id, { hullBefore: c.hullPoints, maxHull: c.maxHull }])),
   };
 }

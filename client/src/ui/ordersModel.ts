@@ -58,22 +58,31 @@ export function fleetMates(me: Pick<Me, "captain" | "others">): Rival[] {
   return fleetId === null ? [] : me.others.filter((r) => r.fleetId === fleetId);
 }
 
-/** The saved orders if there are any, otherwise a quiet start from the captain's standing orders. */
-export function draftFor(me: Pick<Me, "captain" | "ship" | "orders" | "others">): Draft {
-  const o = me.orders;
-  const course = o?.course ?? [];
-  const filter = o?.huntFilter;
+/** Saved orders as form state. `nodeId` is where the ship is, for orders that do not move it. */
+export function draftFromOrders(o: Orders, nodeId: string): Draft {
+  const filter = o.huntFilter;
   return {
-    destination: course.length > 0 ? course[course.length - 1]! : me.ship.nodeId,
-    intent: o?.intent ?? "trade",
+    destination: o.course.length > 0 ? o.course[o.course.length - 1]! : nodeId,
+    intent: o.intent,
     huntKind: filter === undefined ? "merchants" : typeof filter === "string" ? filter : "captain",
     huntCaptainId: typeof filter === "object" ? filter.captainId : "",
-    escortCaptainId: o?.escortCaptainId ?? fleetMates(me)[0]?.id ?? "",
-    plan: o?.plan ?? me.captain.standingPlan,
-    parley: o?.parley ?? me.captain.standingParley,
-    noQuarter: o?.noQuarter ?? false,
-    ready: o?.ready ?? false,
+    escortCaptainId: o.escortCaptainId ?? "",
+    plan: o.plan,
+    parley: o.parley,
+    noQuarter: o.noQuarter,
+    ready: o.ready,
   };
+}
+
+/** The saved orders if there are any, otherwise a quiet start from the captain's standing orders. */
+export function draftFor(me: Pick<Me, "captain" | "ship" | "orders" | "others">): Draft {
+  const base: Draft = me.orders
+    ? draftFromOrders(me.orders, me.ship.nodeId)
+    : {
+      destination: me.ship.nodeId, intent: "trade", huntKind: "merchants", huntCaptainId: "", escortCaptainId: "",
+      plan: me.captain.standingPlan, parley: me.captain.standingParley, noQuarter: false, ready: false,
+    };
+  return { ...base, escortCaptainId: base.escortCaptainId || (fleetMates(me)[0]?.id ?? "") };
 }
 
 export interface Destination { nodeId: string; name: string; hops: number }
@@ -128,7 +137,9 @@ export function toPayload(
 }
 
 /** The orders as one sentence (section 2.2): "Sail to X, Hunt merchants, fight with A, B, C, parley if they are 50% stronger." */
-export function sentence(map: GameMap, me: Pick<Me, "ship" | "others">, draft: Draft): string {
+export function sentence(
+  map: GameMap, me: { ship: Pick<Ship, "nodeId" | "docked">; others: readonly Pick<Rival, "id" | "shipName">[] }, draft: Draft,
+): string {
   const { ship } = me;
   const parts: string[] = [];
   if (draft.destination === ship.nodeId) {

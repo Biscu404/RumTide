@@ -3,12 +3,14 @@
 // Tide can be claimed once. Used by the handler tests and by the bot season, so a whole season
 // can be played through the real handlers without a database.
 
+import { bookFromCaptains, fleetIds, settleDepartures, type FleetBook } from "../engine/fleet.ts";
 import type { TideResult } from "../engine/resolve.ts";
 import type { TideSnapshot } from "../engine/season.ts";
 import type { Battle, Gazette, LogEvent, Orders, Transaction } from "../engine/types.ts";
 import {
   ApiError, type ActiveSeason, type AdminLogEntry, type ApplyTideArgs, type CaptainView, type CreateSeasonArgs,
-  type GameStore, type PortChange, type SeasonInfo, type TideHistoryEntry, type TideInfo, type TideState,
+  type FleetChange, type FleetState, type GameStore, type PortChange, type SeasonInfo, type TideHistoryEntry,
+  type TideInfo, type TideState,
 } from "./store.ts";
 
 interface SeasonRecord {
@@ -18,6 +20,9 @@ interface SeasonRecord {
   snapshot: TideSnapshot;
   versions: Map<string, number>;
   orders: Map<string, Orders>;
+  fleets: FleetBook;
+  /** Bumped by every change to the fleets, so two changes made from the same reading cannot both land. */
+  fleetRev: number;
   /** The error of the Tide if it failed, else null. */
   error: string | null;
 }
@@ -80,7 +85,7 @@ export class MemoryStore implements GameStore {
       active: { season: rec.info, tide: rec.tide, lastResolvedAt: rec.lastResolvedAt },
       boomPortId: rec.snapshot.boomPortId, captain, ship, version: rec.versions.get(captain.id)!,
       market: rec.snapshot.market.filter((m) => m.portId === ship.nodeId),
-      roster: rec.snapshot.captains.map((c) => ({ id: c.id, fleetId: c.fleetId })),
+      roster: rec.snapshot.captains.map((c) => ({ id: c.id, shipName: c.shipName, fleetId: c.fleetId })),
     });
   }
 
@@ -113,6 +118,31 @@ export class MemoryStore implements GameStore {
     this.transactions.push({ ...clone(change.transaction), id: `txn-${this.transactions.length + 1}` });
   }
 
+  async loadFleets(seasonId: string): Promise<FleetState> {
+    const rec = this.mustFind(seasonId);
+    return clone({ book: rec.fleets, rev: rec.fleetRev });
+  }
+
+  async applyFleetChange({ seasonId, tide, expectedRev, book }: FleetChange): Promise<void> {
+    const rec = this.mustFind(seasonId);
+    this.requireOpen(rec, tide);
+    if (rec.fleetRev !== expectedRev) throw new ApiError("The fleets changed. Please try again.", 409);
+    this.setFleets(rec, book);
+  }
+
+  /** Keep the book and each captain's `fleetId` in step. A captain whose fleet changed gets a new version. */
+  private setFleets(rec: SeasonRecord, book: FleetBook): void {
+    const of = fleetIds(book);
+    rec.snapshot.captains = rec.snapshot.captains.map((c) => {
+      const next = of.get(c.id) ?? null;
+      if (next === c.fleetId) return c;
+      rec.versions.set(c.id, (rec.versions.get(c.id) ?? 0) + 1);
+      return { ...c, fleetId: next };
+    });
+    rec.fleets = clone(book);
+    rec.fleetRev += 1;
+  }
+
   async readyCount(seasonId: string, tide: number): Promise<{ active: number; ready: number }> {
     const rec = this.mustFind(seasonId);
     const active = rec.snapshot.captains.filter((c) => c.status === "active");
@@ -137,6 +167,8 @@ export class MemoryStore implements GameStore {
     const rec = this.mustFind(seasonId);
     if (rec.tide.number !== result.tide || rec.tide.status !== "resolving") throw new ApiError("That Tide is not being resolved", 409);
     rec.snapshot = clone(result.next);
+    // Captains who gave notice to leave their fleet are out as the new Tide opens (section 8.1).
+    this.setFleets(rec, settleDepartures(rec.fleets, result.next.tide).book);
     for (const c of rec.snapshot.captains) rec.versions.set(c.id, (rec.versions.get(c.id) ?? 0) + 1);
     this.battles.push(...clone(result.battles));
     this.log.push(...clone(result.log));
@@ -167,6 +199,7 @@ export class MemoryStore implements GameStore {
       tide: { seasonId: season.id, number: snapshot.tide, status: "open", dueAt, seed },
       lastResolvedAt: null, snapshot: clone(snapshot),
       versions: new Map(snapshot.captains.map((c) => [c.id, 0])), orders: new Map(), error: null,
+      fleets: bookFromCaptains(season.id, snapshot.tide, snapshot.captains), fleetRev: 0,
     });
   }
 

@@ -32,7 +32,8 @@ export const B = {
   fairness: { floor: 0.25, underdogCap: 1.5, bountyBelowRatio: 2 / 3, bountyKeepPerTide: 0.9 },
   fleet: { battleBonusPerExtraShip: 0.10, battleBonusCap: 0.30,
            desperatePerExtraEnemy: 0.25, desperateCap: 0.75,
-           convoyPerMate: 0.10, coopExponent: 1.5 },
+           convoyPerMate: 0.10, coopExponent: 1.5,
+           capShare: 0.5, minCap: 2, maxCap: 4 },   // section 8.1: half the players, at least 2, at most 4
   escape: { quietMult: 1.3, min: 0.05, max: 0.75 },
   parley: { tribute: 0.10, thresholds: [1.25, 1.5] },
   shieldTidesAfterPvpLoss: 2,
@@ -137,3 +138,7 @@ export const fleetBattleBonus = (extraShips: number) =>
 
 export const desperateDefence = (extraEnemyShips: number) =>
   1 + Math.min(B.fleet.desperateCap, B.fleet.desperatePerExtraEnemy * extraEnemyShips);
+
+// Most captains one fleet may hold (section 8.1): 3 in a six player game.
+export const fleetCap = (players: number) =>
+  clamp(Math.floor(players * B.fleet.capShare), B.fleet.minCap, B.fleet.maxCap);

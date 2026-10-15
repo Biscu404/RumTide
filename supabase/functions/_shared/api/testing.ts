@@ -29,8 +29,9 @@ export function testWorld(options: { notifyFails?: boolean } = {}): TestWorld {
   const posts: string[] = [];
   let now = NOON;
   let seeds = 0;
+  let fleets = 0;
   const deps: Deps = {
-    store, getMap: () => brineMap, now: () => now, newSeed: () => 1000 + ++seeds,
+    store, getMap: () => brineMap, now: () => now, newSeed: () => 1000 + ++seeds, newId: () => `fleet-${++fleets}`,
     notify: async (text) => {
       if (options.notifyFails) throw new Error("Discord is down");
       posts.push(text);

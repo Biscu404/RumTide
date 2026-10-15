@@ -6,6 +6,9 @@
 import type { ZodType, z } from "zod";
 import { speed } from "../engine/balance.ts";
 import type { GameMap } from "../engine/map.ts";
+import {
+  FleetError, acceptInvite, createFleet, declineInvite, fleetById, inviteCaptain, leaveFleet, type FleetBook,
+} from "../engine/fleet.ts";
 import { courseError } from "../engine/movement.ts";
 import {
   PortError, buyGood, buyUpgrade, feedShipwright, repairShip, sellGood, type PortContext,
@@ -13,9 +16,11 @@ import {
 import { resolveTide } from "../engine/resolve.ts";
 import { startSeason, type NewCaptain } from "../engine/season.ts";
 import type { Gazette, MarketRow, Orders, Ship, Transaction } from "../engine/types.ts";
-import { failureMessage, gazetteMessage } from "./discord.ts";
+import { failureMessage, fleetLeaveMessage, gazetteMessage } from "./discord.ts";
 import { localDate, nextDueAt } from "./schedule.ts";
-import { adminSchema, portActionSchema, submitOrdersSchema, type AdminPayload } from "./schemas.ts";
+import {
+  adminSchema, fleetActionSchema, portActionSchema, submitOrdersSchema, type AdminPayload,
+} from "./schemas.ts";
 import {
   ApiError, type AdminLogEntry, type CaptainView, type GameStore, type SeasonInfo, type TideHistoryEntry,
 } from "./store.ts";
@@ -26,6 +31,8 @@ export interface Deps {
   now(): Date;
   /** A fresh 32 bit seed for a Tide. The engine never makes its own. */
   newSeed(): number;
+  /** A fresh id for a fleet. Defaults to a random UUID; tests give predictable ones. */
+  newId?(): string;
   /** Post to the group chat. Optional, and allowed to fail. */
   notify?(text: string): Promise<void>;
   siteUrl?: string;
@@ -155,6 +162,75 @@ export async function portAction(deps: Deps, userId: string, body: unknown): Pro
     transaction,
   });
   return { message: result.message, chestGold: result.captain.chestGold, ship: result.ship };
+}
+
+// ---- fleet_action (section 8.1) ----
+
+export interface FleetActionResult { message: string; }
+
+/**
+ * Found a fleet, invite a captain, accept or decline an invitation, or give notice to leave. Joining
+ * is immediate. Leaving takes effect when the next Tide opens and is announced to the group chat.
+ * Like orders and port actions, fleets can only change while the Tide is open.
+ */
+export async function fleetAction(deps: Deps, userId: string, body: unknown): Promise<FleetActionResult> {
+  const p = parse(fleetActionSchema, body);
+  const view = await openView(deps, userId);
+  const { season, tide } = view.active;
+  const { captain, roster } = view;
+  const { book, rev } = await deps.store.loadFleets(season.id);
+  const players = roster.length;
+  const nameOf = (id: string) => roster.find((r) => r.id === id)?.shipName ?? "a captain";
+  const fleetName = (b: FleetBook, id: string) => fleetById(b, id)?.name ?? "the fleet";
+
+  let next: FleetBook;
+  let message: string;
+  let announce: string | null = null;
+  try {
+    switch (p.action) {
+      case "create": {
+        const id = (deps.newId ?? (() => crypto.randomUUID()))();
+        next = createFleet(book, { id, seasonId: season.id, captainId: captain.id, name: p.name, flag: p.flag, tide: tide.number });
+        message = `You founded the ${fleetName(next, id)}.`;
+        break;
+      }
+      case "invite": {
+        next = inviteCaptain(book, {
+          from: captain.id, to: p.captainId, tide: tide.number, players, known: (id) => roster.some((r) => r.id === id),
+        });
+        message = `You invited ${nameOf(p.captainId)}.`;
+        break;
+      }
+      case "accept": {
+        next = acceptInvite(book, { captainId: captain.id, fleetId: p.fleetId, tide: tide.number, players });
+        message = `You joined the ${fleetName(next, p.fleetId)}.`;
+        break;
+      }
+      case "decline": {
+        next = declineInvite(book, captain.id, p.fleetId);
+        message = "Invitation declined.";
+        break;
+      }
+      case "leave": {
+        const out = leaveFleet(book, captain.id, tide.number);
+        next = out.book;
+        if (out.kind === "disbanded") {
+          message = `The ${out.fleet.name} is disbanded.`;
+        } else {
+          message = `You will leave the ${out.fleet.name} when Tide ${out.effectiveTide} opens. Your fleet mates can see it.`;
+          announce = fleetLeaveMessage(season.name, captain.shipName, out.fleet.name, out.effectiveTide);
+        }
+        break;
+      }
+    }
+  } catch (error) {
+    if (error instanceof FleetError) throw new ApiError(error.message);
+    throw error;
+  }
+
+  await deps.store.applyFleetChange({ seasonId: season.id, tide: tide.number, expectedRev: rev, book: next });
+  if (announce !== null) await deps.notify?.(announce).catch(() => {});
+  return { message };
 }
 
 // ---- resolve_tide ----
