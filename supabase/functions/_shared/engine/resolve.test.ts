@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import brineJson from "../maps/brine.json";
 import { B, maxHullPoints, npcPR } from "./balance.ts";
-import { hopsFrom, loadMap } from "./map.ts";
+import { hopsFrom, loadMap, shortestPath } from "./map.ts";
 import { nearestPort, resolveTide } from "./resolve.ts";
 import { startSeason, type TideSnapshot } from "./season.ts";
 import { settleGalleonBattle } from "./npc.ts";
@@ -360,6 +360,26 @@ describe("parley", () => {
       expect(resolveTide(map, even, hunt(false), seed).log.some((e) => e.kind === "tribute")).toBe(false);
     }
   });
+
+  // A captain who sent no orders at sea sails Quietly towards the nearest port, so Ann waits on the first node of that way.
+  const onTheWay = (snap: TideSnapshot) => at(snap, "ann", shortestPath(map, "sea06", nearestPort(map, "sea06"))[0]!);
+  const waiting = [order("ann", { intent: "hunt", huntFilter: "players" })];
+
+  it("offers the standing parley of a captain who sent no orders, and none when it is off", () => {
+    const tribute = (snap: TideSnapshot, seed: number) => resolveTide(map, snap, waiting, seed).log.some((e) => e.kind === "tribute");
+    const asked = onTheWay(captainOf(caught(), "bob", { standingParley: 1.25 }));
+    expect(SEEDS.some((s) => tribute(asked, s))).toBe(true);
+    const off = onTheWay(captainOf(caught(), "bob", { standingParley: "off" }));
+    for (const seed of SEEDS) expect(tribute(off, seed)).toBe(false);
+  });
+
+  it("defends with the standing plan of a captain who sent no orders", () => {
+    const standing: [Maneuver, Maneuver, Maneuver] = ["board", "broadside", "board"];
+    const even = onTheWay(captainOf(at(at(world(["ann", "bob"]), "ann", "sea06"), "bob", "sea06"), "bob", { standingPlan: standing }));
+    const r = SEEDS.map((s) => resolveTide(map, even, waiting, s)).find((x) => x.battles.length > 0)!;
+    expect(r).toBeDefined();
+    expect(r.battles[0]!.rounds.map((round) => round.ships.find((s) => s.shipId === "bob")!.maneuver)).toEqual(standing);
+  });
 });
 
 describe("fleets", () => {
@@ -408,7 +428,9 @@ describe("the Treasure Galleon", () => {
       wins++;
       const expected = settleGalleonBattle(outcome, ["ann", "bob"], 1);
       for (const id of ["ann", "bob"]) {
-        expect(find(r.next, id).plunderGold).toBe(expected.shares[id]!.gold);
+        // Fleet mates on one node are each other's convoy, so the prize is topped up by one mate's share.
+        const share = expected.shares[id]!.gold;
+        expect(find(r.next, id).plunderGold).toBe(share + Math.round(share * B.fleet.convoyPerMate));
         expect(who(r.next, id).legend).toBe(B.legend.coopPrize);
       }
     }
@@ -421,6 +443,121 @@ describe("the Treasure Galleon", () => {
       const r = resolveTide(map, solo, [order("ann", { intent: "hunt", huntFilter: "merchants", plan: COUNTER })], seed);
       expect(r.npcs[0]!.status).not.toBe("taken");
     }
+  });
+});
+
+describe("income bonuses on prizes (engine/income.ts)", () => {
+  const hunt = [order("ann", { intent: "hunt", huntFilter: "merchants" })];
+  const prey = (fleets: Record<string, string> = {}, bobAt = "sea08") =>
+    withNpcs(at(at(world(["ann", "bob"], fleets), "ann", "sea06"), "bob", bobAt), trader("npc-t1-m1", "sea06"));
+  const orders = [...hunt, order("bob")];
+  const takenSeed = SEEDS.find((s) => resolveTide(map, prey(), orders, s).npcs[0]!.status === "taken")!;
+  const plain = resolveTide(map, prey(), orders, takenSeed);
+  const prize = find(plain.next, "ann").plunderGold;
+  const next = (snap: TideSnapshot) => resolveTide(map, snap, orders, takenSeed);
+
+  it("starts from a prize worth having", () => {
+    expect(prize).toBeGreaterThan(50);
+    expect(plain.log.some((e) => e.kind === "bonus")).toBe(false);
+  });
+
+  it("adds 50% to a merchant prize with a stored Tide of Shore Leave, and spends that Tide", () => {
+    const r = next(captainOf(prey(), "ann", { shoreLeaveTides: 2 }));
+    expect(find(r.next, "ann").plunderGold).toBe(prize + Math.round(prize * B.catchUp.shoreLeaveBonus));
+    expect(who(r.next, "ann")).toMatchObject({ shoreLeaveTides: 1, shoreLeaveUsedTide: 1 });
+    const line = r.log.find((e) => e.kind === "bonus")!;
+    expect(line).toMatchObject({ captainId: "ann", visibility: "private" });
+    expect(line.text).toContain("Shore Leave");
+    expect(r.gazette.headlines.join(" ")).not.toContain("Shore Leave");   // a private line, not a headline
+  });
+
+  it("does not spend a second stored Tide when one was already spent on a sale earlier in this Tide", () => {
+    const r = next(captainOf(prey(), "ann", { shoreLeaveTides: 1, shoreLeaveUsedTide: 1 }));
+    expect(find(r.next, "ann").plunderGold).toBe(prize + Math.round(prize * B.catchUp.shoreLeaveBonus));
+    expect(who(r.next, "ann")).toMatchObject({ shoreLeaveTides: 1, shoreLeaveUsedTide: 1 });
+  });
+
+  it("adds 20% for Fair Winds, set when the Tide opened", () => {
+    const r = next(captainOf(prey(), "ann", { fairWinds: true }));
+    expect(find(r.next, "ann").plunderGold).toBe(prize + Math.round(prize * B.catchUp.fairWindsBonus));
+  });
+
+  it("adds 10% for each fleet mate who ends the Tide on the same or an adjacent node, and nothing for one further away", () => {
+    const f = { ann: "f1", bob: "f1" };
+    const near = next(prey(f, map.neighbours("sea06")[0]!));
+    expect(find(near.next, "ann").plunderGold).toBe(prize + Math.round(prize * B.fleet.convoyPerMate));
+    const far = [...hopsFrom(map, "sea06")].find(([, hops]) => hops === 2)![0];
+    expect(find(next(prey(f, far)).next, "ann").plunderGold).toBe(prize);
+  });
+
+  it("judges the convoy where the mates ended the Tide, not where they began it", () => {
+    // Bob starts two hops away and sails to the node next to Ann's.
+    const away = [...hopsFrom(map, "sea06")].find(([, hops]) => hops === 2)![0];
+    const closing = [...orders, order("bob", { course: shortestPath(map, away, "sea06").slice(0, 1) })];
+    const r = resolveTide(map, prey({ ann: "f1", bob: "f1" }, away), closing, takenSeed);
+    expect(find(r.next, "ann").plunderGold).toBe(prize + Math.round(prize * B.fleet.convoyPerMate));
+  });
+
+  it("adds the bonuses together", () => {
+    const r = next(captainOf(prey({ ann: "f1", bob: "f1" }, "sea06"), "ann", { shoreLeaveTides: 1, fairWinds: true }));
+    const rate = B.catchUp.shoreLeaveBonus + B.catchUp.fairWindsBonus + B.fleet.convoyPerMate;
+    expect(find(r.next, "ann").plunderGold).toBe(prize + Math.round(prize * rate));
+  });
+
+  it("pays no bonus on loot taken from another captain, and spends no Shore Leave on it", () => {
+    const duel = at(at(world(["ann", "bob"]), "ann", "sea06"), "bob", "sea06", { plunderGold: 200 });
+    const raid = [order("ann", { intent: "hunt", huntFilter: "players" }), order("bob", { plan: ["board", "broadside", "outmaneuver"] })];
+    const seed = SEEDS.find((s) => { const b = resolveTide(map, duel, raid, s).battles[0]; return b && b.outcome !== "draw" && b.winner === 0; })!;
+    const blessed = resolveTide(map, captainOf(duel, "ann", { shoreLeaveTides: 2, fairWinds: true }), raid, seed);
+    expect(find(blessed.next, "ann").plunderGold).toBe(find(resolveTide(map, duel, raid, seed).next, "ann").plunderGold);
+    expect(who(blessed.next, "ann").shoreLeaveTides).toBe(2);
+  });
+
+  it("spends no Shore Leave on a Tide with no prize", () => {
+    const r = resolveTide(map, captainOf(at(world(["ann"]), "ann", "sea06"), "ann", { shoreLeaveTides: 2 }), [order("ann")], 1);
+    expect(who(r.next, "ann")).toMatchObject({ shoreLeaveTides: 2, shoreLeaveUsedTide: 0 });
+  });
+
+  it("does not depend on the order of captains: the same Tide gives the same result when the snapshot is shuffled", () => {
+    const snap = captainOf(prey({ ann: "f1", bob: "f1" }, "sea06"), "ann", { shoreLeaveTides: 1, fairWinds: true });
+    const shuffled = { ...snap, captains: [...snap.captains].reverse(), ships: [...snap.ships].reverse() };
+    expect(JSON.stringify(next(shuffled).next)).toBe(JSON.stringify(next(snap).next));
+  });
+});
+
+describe("Fair Winds for the Tide that opens", () => {
+  const four = (legends: number[]) => {
+    let snap = world(["ann", "bob", "cat", "dan"]);
+    legends.forEach((legend, i) => { snap = captainOf(snap, ["ann", "bob", "cat", "dan"][i]!, { legend }); });
+    return snap;
+  };
+  const present = ["ann", "bob", "cat", "dan"].map((id) => order(id));
+  const winds = (snap: TideSnapshot) => resolveTide(map, snap, present, 1).next.captains.filter((c) => c.fairWinds).map((c) => c.id);
+
+  it("goes to captains below 70% of the median Legend", () => {
+    expect(winds(four([100, 100, 100, 10]))).toEqual(["dan"]);
+    expect(winds(four([100, 100, 100, 70]))).toEqual([]);   // exactly 70% is not below
+    expect(winds(four([100, 100, 40, 10]))).toEqual(["cat", "dan"]);
+  });
+
+  it("goes to nobody while the median Legend is zero, as at the start of a season", () => {
+    expect(winds(four([0, 0, 0, 0]))).toEqual([]);
+    expect(winds(four([50, 0, 0, 0]))).toEqual([]);
+  });
+
+  it("is taken away again when a captain catches up", () => {
+    const behind = { ...four([100, 100, 100, 10]), captains: four([100, 100, 100, 10]).captains.map((c) => (c.id === "dan" ? { ...c, fairWinds: true } : c)) };
+    expect(winds(behind)).toEqual(["dan"]);
+    expect(winds({ ...behind, captains: behind.captains.map((c) => (c.id === "dan" ? { ...c, legend: 90 } : c)) })).toEqual([]);
+  });
+
+  it("does not count Ashore captains in the median", () => {
+    // Three captains far ahead are Ashore at Legend 1000, the other two sit at 100 and 40: the median of the active two is 70.
+    const snap = captainOf(captainOf(captainOf(captainOf(captainOf(world(["ann", "bob", "cat", "dan", "eve"]),
+      "ann", { legend: 1000, status: "ashore", lastOrdersTide: -10 }), "bob", { legend: 1000, status: "ashore", lastOrdersTide: -10 }),
+      "cat", { legend: 1000, status: "ashore", lastOrdersTide: -10 }), "dan", { legend: 100 }), "eve", { legend: 40 });
+    const r = resolveTide(map, snap, [order("dan"), order("eve")], 1);
+    expect(r.next.captains.filter((c) => c.fairWinds).map((c) => c.id)).toEqual(["eve"]);   // 40 is below 0.7 * 70 = 49
   });
 });
 

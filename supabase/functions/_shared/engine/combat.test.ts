@@ -145,6 +145,23 @@ describe("luck and replay", () => {
     }
   });
 
+  it("lets one ship roll a narrower luck range without changing how many numbers a battle takes", () => {
+    const cursed = [[sloop("a", ["broadside", "board", "outmaneuver"], { luck: { min: 0.8, max: 1.0 } })], [sloop("b", ["board", "board", "broadside"])]] as const;
+    const result = resolveBattle(cursed, createRng(7));
+    for (const s of result.rounds.flatMap((r) => r.ships)) {
+      if (s.shipId === "a") {
+        expect(s.luck).toBeGreaterThanOrEqual(0.8);
+        expect(s.luck).toBeLessThan(1.0);
+      } else {
+        expect(s.luck).toBeGreaterThanOrEqual(B.combat.luckMin);
+      }
+    }
+    // The same seed gives the same raw rolls, only mapped onto a different range.
+    const usual = resolveBattle(sides(), createRng(7));
+    expect(result.rounds.length).toBe(usual.rounds.length);
+    expect(result.rounds[0]!.ships[1]!.luck).toBe(usual.rounds[0]!.ships[1]!.luck);
+  });
+
   it("gives the same battle for the same seed, whatever order the ships are listed in", () => {
     const x = resolveBattle(sides(), createRng(42));
     const y = resolveBattle(sides(), createRng(42));

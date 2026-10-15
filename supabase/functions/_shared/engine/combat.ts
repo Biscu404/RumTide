@@ -17,6 +17,8 @@ export interface Combatant {
   plan: readonly Maneuver[];
   /** Breaks flagship ties on a side (section 7.5). */
   startedHunt?: boolean;
+  /** This ship's luck range, when it differs from the usual (a Cursed Coin). Either way a roll takes one number. */
+  luck?: { min: number; max: number };
 }
 
 export type BattleOutcome = "decisive" | "victory" | "draw";
@@ -109,7 +111,7 @@ export function resolveBattle(
         const maneuver = maneuverOf(c);
         const m = matchup(maneuver, enemyManeuver);
         const stale = lastManeuver.get(c.id) === maneuver;
-        const luck = rng.range(B.combat.luckMin, B.combat.luckMax);
+        const luck = rng.range(c.luck?.min ?? B.combat.luckMin, c.luck?.max ?? B.combat.luckMax);
         const damage = roundDamage(statFor(c, maneuver), m, stale, luck);
         shipRecords.push({ shipId: c.id, maneuver, matchup: m, stale, luck, damage });
         damageDealt[c.id]! += damage;

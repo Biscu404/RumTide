@@ -2,7 +2,9 @@
 // visit port and set orders, resolveTide runs, and the state is checked for impossible values.
 // No network and no database, so a 14 Tide season takes a few milliseconds.
 
-import { B, SEASON_PRESETS, holdUnits, maxHullPoints } from "@engine/balance.ts";
+import { B, SEASON_PRESETS, holdUnits, maxHullPoints, speed } from "@engine/balance.ts";
+import { OMEN_NAMES, omenList } from "@engine/explore.ts";
+import { incomeFacts, incomeRoster } from "@engine/income.ts";
 import type { GameMap } from "@engine/map.ts";
 import type { PortContext } from "@engine/port.ts";
 import { resolveTide } from "@engine/resolve.ts";
@@ -12,21 +14,37 @@ import { shipPowerRating } from "@engine/state.ts";
 import type { Battle, Orders } from "@engine/types.ts";
 import { CAREFUL } from "../sim/economy.ts";
 import { brine, totalLevels } from "../sim/trader.ts";
-import { hunterBot, traderBot, type Bot } from "./captains.ts";
+import { explorerBot, hunterBot, traderBot, type Bot } from "./captains.ts";
 
 const botRng = (seed: number) => (name: string) =>
   createRng(seed * 7919 + [...name].reduce((t, ch) => t * 31 + ch.charCodeAt(0), 7));
 
-/** The six captains of Season 0: two solo traders, a raider, a reaver and a fleet of two traders. */
-export function sixCaptains(seed: number): Bot[] {
+/**
+ * The six captains of Season 0: two solo traders, a raider, a reaver and a fleet of two traders.
+ * Bob is away for Tides 5 to 7 like the doc's solo trader; `bobAway` changes that (an empty list keeps him at his desk).
+ */
+export function sixCaptains(seed: number, bobAway: readonly number[] = [5, 6, 7]): Bot[] {
   const rng = botRng(seed);
   return [
     traderBot("ann", CAREFUL, rng("ann")),
-    traderBot("bob", CAREFUL, rng("bob"), null, [5, 6, 7]),   // away for a week, like the doc's solo trader
+    traderBot("bob", CAREFUL, rng("bob"), null, bobAway),
     hunterBot("cat", "raider", CAREFUL, rng("cat")),
     hunterBot("dan", "reaver", CAREFUL, rng("dan")),
     traderBot("eve", CAREFUL, rng("eve"), "f1"),
     traderBot("fay", CAREFUL, rng("fay"), "f1"),
+  ];
+}
+
+/** Four explorers, a raider who may come across them and a trader. Draws every exploration event and lets the Omens work. */
+export function voyage(seed: number): Bot[] {
+  const rng = botRng(seed);
+  return [
+    explorerBot("ann", CAREFUL, rng("ann")),
+    explorerBot("bob", CAREFUL, rng("bob")),
+    explorerBot("cat", CAREFUL, rng("cat")),
+    explorerBot("dan", CAREFUL, rng("dan")),
+    hunterBot("eve", "raider", CAREFUL, rng("eve")),
+    traderBot("fay", CAREFUL, rng("fay")),
   ];
 }
 
@@ -61,7 +79,10 @@ export interface CaptainSummary {
   wins: number;
   struck: number;
   merchants: number;
+  /** Stored Tides of Shore Leave at the end, the most stored at any time, and Tides in which one was spent. */
   shoreLeave: number;
+  shoreLeavePeak: number;
+  shoreLeaveSpent: number;
   status: string;
 }
 
@@ -72,6 +93,10 @@ export interface SeasonReport {
   captains: CaptainSummary[];
   battles: Battle[];
   gazettes: string[][];
+  /** How many times each exploration event came up. */
+  events: Record<string, number>;
+  /** Orders with a course longer than the ship's speed, which only a Hermit's chart allows. */
+  longCourses: number;
   /** Everything that went wrong. Empty means the season is sane. */
   problems: string[];
 }
@@ -99,6 +124,8 @@ export function checkState(map: GameMap, snap: TideSnapshot, when: string, atRes
     if (!finite(c.chestGold) || c.chestGold < 0) bad(`${id} Chest ${c.chestGold}`);
     if (!finite(c.legend) || c.legend < 0) bad(`${id} Legend ${c.legend}`);
     if (!finite(c.bounty) || c.bounty < 0) bad(`${id} bounty ${c.bounty}`);
+    if (!Array.isArray(c.omens) || JSON.stringify(c.omens) !== JSON.stringify(omenList(c.omens))
+        || c.omens.some((o) => !OMEN_NAMES[o])) bad(`${id} omens ${JSON.stringify(c.omens)}`);
     if (!snap.settings.hullsEnabled.includes(ship.hull)) bad(`${id} has a ${ship.hull} this season does not allow`);
     for (const [stat, level] of Object.entries(ship.levels)) {
       if (!Number.isInteger(level) || level < 0 || level > B.upgrade.maxLevel) bad(`${id} ${stat} level ${level}`);
@@ -126,7 +153,9 @@ export function checkState(map: GameMap, snap: TideSnapshot, when: string, atRes
 export function playSeason(seed: number, bots: Bot[] = sixCaptains(seed), map: GameMap = brine): SeasonReport {
   const preset = "season0";
   const sorted = [...bots].sort((a, b) => (a.id < b.id ? -1 : 1));
-  let snap = startSeason(map, "bots", preset, sorted.map((b) => ({ id: b.id, fleetId: b.fleetId })), seed);
+  // One season id per seed, as in the real game where every season has its own, because the Treasure
+  // Galleon's places come from the season id.
+  let snap = startSeason(map, `bots-${seed}`, preset, sorted.map((b) => ({ id: b.id, fleetId: b.fleetId })), seed);
 
   // Fleet mates set out together from one port, as friends who planned it would.
   for (const fleet of new Set(sorted.map((b) => b.fleetId).filter((f): f is string => f !== null))) {
@@ -139,14 +168,19 @@ export function playSeason(seed: number, bots: Bot[] = sixCaptains(seed), map: G
   const tides: TideSummary[] = [];
   const battles: Battle[] = [];
   const gazettes: string[][] = [];
-  const stats = new Map(sorted.map((b) => [b.id, { battles: 0, wins: 0, struck: 0, merchants: 0 }]));
+  const events: Record<string, number> = {};
+  let longCourses = 0;
+  const stats = new Map(sorted.map((b) => [b.id, { battles: 0, wins: 0, struck: 0, merchants: 0, shoreLeavePeak: 0, shoreLeaveSpent: 0 }]));
 
   for (let tide = 1; tide <= SEASON_PRESETS[preset].lengthTides; tide++) {
     const orders: Orders[] = [];
     for (const bot of sorted) {
       const view = {
         map, snap,
-        ctx: { map, tide, settings: snap.settings, boomPortId: snap.boomPortId } satisfies PortContext,
+        ctx: {
+          map, tide, settings: snap.settings, boomPortId: snap.boomPortId,
+          income: incomeFacts(map, bot.id, incomeRoster(snap)),
+        } satisfies PortContext,
         ship: snap.ships.find((s) => s.captainId === bot.id)!,
         captain: snap.captains.find((c) => c.id === bot.id)!,
       };
@@ -156,7 +190,10 @@ export function playSeason(seed: number, bots: Bot[] = sixCaptains(seed), map: G
         ships: snap.ships.map((s) => (s.captainId === bot.id ? turn.ship : s)),
         captains: snap.captains.map((c) => (c.id === bot.id ? turn.captain : c)),
       };
-      if (turn.orders && !bot.absent.includes(tide)) orders.push(turn.orders);
+      if (turn.orders && !bot.absent.includes(tide)) {
+        orders.push(turn.orders);
+        if (turn.orders.course.length > speed(turn.ship.hull, turn.ship.levels.sails)) longCourses++;
+      }
     }
     problems.push(...checkState(map, snap, `Tide ${tide} after port visits`, false));
 
@@ -198,9 +235,19 @@ export function playSeason(seed: number, bots: Bot[] = sixCaptains(seed), map: G
       }
       battles.push(battle);
     }
+    for (const e of result.log) {
+      if (e.kind !== "explore" || e.visibility !== "public") continue;
+      const event = (e.data as { event: string }).event;
+      events[event] = (events[event] ?? 0) + 1;
+    }
     for (const e of result.log) if (e.kind === "tow") {
       const id = sorted.find((b) => e.text.startsWith(`${b.id} `))?.id;
       if (id) stats.get(id)!.struck++;
+    }
+    for (const c of result.next.captains) {
+      const row = stats.get(c.id)!;
+      row.shoreLeavePeak = Math.max(row.shoreLeavePeak, c.shoreLeaveTides);
+      if (c.shoreLeaveUsedTide === tide) row.shoreLeaveSpent++;
     }
     tides.push(summary);
     gazettes.push(result.gazette.headlines);
@@ -214,5 +261,5 @@ export function playSeason(seed: number, bots: Bot[] = sixCaptains(seed), map: G
       pr: shipPowerRating(s), ...stats.get(bot.id)!, shoreLeave: c.shoreLeaveTides, status: c.status,
     };
   });
-  return { seed, final: snap, tides, captains, battles, gazettes, problems };
+  return { seed, final: snap, tides, captains, battles, gazettes, events, longCourses, problems };
 }

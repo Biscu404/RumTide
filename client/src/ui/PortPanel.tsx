@@ -5,16 +5,18 @@ import type { Good } from "@engine/types.ts";
 import { callFunction } from "../net/api.ts";
 import type { Me } from "../net/captain.ts";
 import type { PortPayload } from "../net/payloads.ts";
+import type { ShipMarker } from "../scenes/layout.ts";
+import { estimateSale, incomeView } from "./incomeModel.ts";
 import {
   GOOD_LABEL, MAX_LEVEL, STATS, buyCost, hold, maxBuy, portContext, quotes, repairQuote, sellRevenue, shipwright, upgrades,
 } from "./portModel.ts";
 
-interface Props { client: SupabaseClient; map: GameMap; me: Me; onChanged: () => Promise<void> }
+interface Props { client: SupabaseClient; map: GameMap; me: Me; ships: readonly ShipMarker[]; onChanged: () => Promise<void> }
 
 const doubloons = (n: number) => `${Math.round(n).toLocaleString()} doubloons`;
 
 /** The Port screen: trade, repairs, upgrades and the Shipwright. Every action happens at once on the server. */
-export function PortPanel({ client, map, me, onChanged }: Props) {
+export function PortPanel({ client, map, me, ships, onChanged }: Props) {
   const [units, setUnits] = useState<Record<Good, number>>({ rum: 1, spice: 1, sugar: 1 });
   const [instalment, setInstalment] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -49,6 +51,7 @@ export function PortPanel({ client, map, me, onChanged }: Props) {
   const repair = repairQuote(ctx, me);
   const wright = shipwright(me);
   const boomed = me.tide.boomPortId === ship.nodeId;
+  const income = incomeView(map, me, ships);
 
   return (
     <div class="panel-body">
@@ -63,9 +66,11 @@ export function PortPanel({ client, map, me, onChanged }: Props) {
       </p>
 
       <h3>Market</h3>
+      {income.lines.map((line, i) => <p key={i} class="notice small">{line}</p>)}
       <div class="cards">
         {quotes(map, me).map((q) => {
           const n = Math.max(1, Math.floor(units[q.good] || 1));
+          const sale = estimateSale(q, Math.min(n, q.held), ship, income.rate);
           return (
             <div class="card" key={q.good}>
               <strong>{GOOD_LABEL[q.good]}</strong> {q.note && <span class="tag">{q.note}</span>}
@@ -86,7 +91,7 @@ export function PortPanel({ client, map, me, onChanged }: Props) {
                   disabled={!open || busy || q.held === 0}
                   onClick={() => void act({ action: "sell", good: q.good, units: Math.min(n, q.held) })}
                 >
-                  Sell {Math.min(n, q.held)} for {sellRevenue(q, Math.min(n, q.held))}
+                  Sell {Math.min(n, q.held)} for {sellRevenue(q, Math.min(n, q.held))}{sale.bonus > 0 && ` (+${sale.bonus} bonus)`}
                 </button>
               </div>
             </div>

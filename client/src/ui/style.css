@@ -102,3 +102,13 @@ select {
 .replay { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
 .replay-host { width: 100%; display: flex; justify-content: center; background: #181425; }
 .replay-host canvas { display: block; image-rendering: pixelated; }
+
+/* The Legend leaderboard. Rank is a number and the marks are words, never colour alone. */
+.legend { width: 100%; border-collapse: collapse; }
+.legend th { text-align: left; color: var(--dim); font-weight: normal; padding: 2px 6px; }
+.legend td { padding: 6px; border-top: 1px solid var(--bg); vertical-align: top; }
+.legend .num { text-align: right; white-space: nowrap; }
+.legend .me td { background: var(--bg); }
+.legend .marks { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 2px; }
+.legend .tag { white-space: nowrap; }
+.legend .fleet-name { margin: 0; }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { B } from "../engine/balance.ts";
-import { portAction, resolveDueTide, startNewSeason, submitOrders } from "./handlers.ts";
+import { hopsFrom, shortestPath } from "../engine/map.ts";
+import { portAction, resolveDueTide, standingOrders, startNewSeason, submitOrders } from "./handlers.ts";
 import { ApiError } from "./store.ts";
 import { brineMap, seasonWorld, testWorld } from "./testing.ts";
 
@@ -52,6 +53,21 @@ describe("submit_orders", () => {
     expect((await failure(submitOrders(w.deps, w.user("ann"), orders(1, { course: [far] })))).status).toBe(400);
     const walk = [...brineMap.nodeIds].slice(0, 6);
     expect((await failure(submitOrders(w.deps, w.user("ann"), orders(1, { course: walk })))).status).toBe(400);
+  });
+
+  it("allows one more hop under a Hermit's chart, and only then", async () => {
+    const w = await seasonWorld();
+    const from = w.store.snapshot().ships.find((s) => s.captainId === "ann")!.nodeId;
+    const hops = hopsFrom(brineMap, from);
+    const three = shortestPath(brineMap, from, brineMap.nodeIds.find((id) => hops.get(id) === 3)!);
+    expect(three).toHaveLength(3);
+    expect((await failure(submitOrders(w.deps, w.user("ann"), orders(1, { course: three })))).status).toBe(400);
+
+    w.store.edit("s0", (snap) => { snap.captains = snap.captains.map((c) => (c.id === "ann" ? { ...c, omens: ["cartographer"] } : c)); });
+    const { orders: saved } = await submitOrders(w.deps, w.user("ann"), orders(1, { course: three }));
+    expect(saved.course).toEqual(three);
+    const four = shortestPath(brineMap, from, brineMap.nodeIds.find((id) => hops.get(id) === 4)!);
+    expect((await failure(submitOrders(w.deps, w.user("ann"), orders(1, { course: four })))).status).toBe(400);
   });
 
   it("rejects orders for the wrong Tide, from a stranger, and after the Tide is due", async () => {
@@ -155,6 +171,118 @@ describe("port_action", () => {
     const w = await seasonWorld();
     w.setNow(AT_21);
     expect((await failure(portAction(w.deps, w.user("ann"), buy("rum", 1)))).status).toBe(409);
+  });
+
+  describe("with the income bonuses", () => {
+    // Ann is docked at Saint Brine, which wants Sugar, with 10 units that cost 50 in all, so a sale is a profit.
+    const withSugar = async (captains: Parameters<typeof seasonWorld>[0] = ["ann", "bob", "cat"]) => {
+      const w = await seasonWorld(captains);
+      w.store.edit("s0", (snap) => {
+        snap.ships = snap.ships.map((x) => (x.captainId === "ann"
+          ? { ...x, nodeId: "saint_brine", docked: true, cargo: { rum: 0, sugar: 10, spice: 0 }, cargoCostBasis: { rum: 0, sugar: 50, spice: 0 } }
+          : x));
+      });
+      return w;
+    };
+    const edit = (w: Awaited<ReturnType<typeof withSugar>>, id: string, patch: Record<string, unknown>) =>
+      w.store.edit("s0", (snap) => { snap.captains = snap.captains.map((c) => (c.id === id ? { ...c, ...patch } : c)); });
+    const sell = { action: "sell", good: "sugar", units: 10 };
+
+    it("pays Shore Leave and Fair Winds on top of a sale, says so, and spends one stored Tide", async () => {
+      const w = await withSugar();
+      edit(w, "ann", { shoreLeaveTides: 2, fairWinds: true });
+      const plainWorld = await withSugar();
+      const plain = await portAction(plainWorld.deps, plainWorld.user("ann"), sell);
+      const r = await portAction(w.deps, w.user("ann"), sell);
+      const profit = plain.chestGold - B.startGold - 50;   // what the market paid, less the 50 the sugar cost
+      const extra = Math.round(profit * (B.catchUp.shoreLeaveBonus + B.catchUp.fairWindsBonus));
+      expect(r.chestGold).toBe(plain.chestGold + extra);
+      expect(r.message).toContain(`Shore Leave and Fair Winds added ${extra}`);
+      const ann = w.store.snapshot().captains.find((c) => c.id === "ann")!;
+      expect(ann).toMatchObject({ shoreLeaveTides: 1, shoreLeaveUsedTide: 1 });
+      expect(w.store.transactions[0]!.amount).toBe(r.chestGold - B.startGold);
+    });
+
+    it("pays the convoy for a fleet mate on the next node, and not for one far away", async () => {
+      const fleet = [
+        { id: "ann", userId: "user-ann", fleetId: "f1" }, { id: "bob", userId: "user-bob", fleetId: "f1" },
+        { id: "cat", userId: "user-cat" },
+      ];
+      const alone = await withSugar();
+      const base = await portAction(alone.deps, alone.user("ann"), sell);
+      const near = await withSugar(fleet);
+      near.store.edit("s0", (snap) => {
+        snap.ships = snap.ships.map((x) => (x.captainId === "bob" ? { ...x, nodeId: brineMap.neighbours("saint_brine")[0]! } : x));
+      });
+      const paid = await portAction(near.deps, near.user("ann"), sell);
+      expect(paid.chestGold).toBeGreaterThan(base.chestGold);
+      expect(paid.message).toContain("a convoy mate added");
+      const far = await withSugar(fleet);
+      far.store.edit("s0", (snap) => {
+        const away = brineMap.nodeIds.find((id) => id !== "saint_brine" && !brineMap.adjacent("saint_brine", id))!;
+        snap.ships = snap.ships.map((x) => (x.captainId === "bob" ? { ...x, nodeId: away } : x));
+      });
+      expect((await portAction(far.deps, far.user("ann"), sell)).chestGold).toBe(base.chestGold);
+    });
+
+    it("gives nothing without a bonus to pay, and keeps the plain message", async () => {
+      const w = await withSugar();
+      const r = await portAction(w.deps, w.user("ann"), sell);
+      expect(r.message).toMatch(/^Sold 10 sugar for \d+ doubloons\.$/);
+    });
+  });
+});
+
+describe("standing_orders", () => {
+  const standing = (extra: Record<string, unknown> = {}) => ({ plan: ["board", "board", "broadside"], parley: 1.5, ...extra });
+  const captainOf = (w: Awaited<ReturnType<typeof seasonWorld>>, id: string) => w.store.snapshot().captains.find((c) => c.id === id)!;
+
+  it("saves the standing plan and parley of the caller only", async () => {
+    const w = await seasonWorld();
+    const before = captainOf(w, "bob");
+    const r = await standingOrders(w.deps, w.user("ann"), standing());
+    expect(r).toEqual({ plan: ["board", "board", "broadside"], parley: 1.5 });
+    expect(captainOf(w, "ann")).toMatchObject({ standingPlan: ["board", "board", "broadside"], standingParley: 1.5 });
+    expect(captainOf(w, "bob")).toEqual(before);
+  });
+
+  it("can be changed again, and switched off", async () => {
+    const w = await seasonWorld();
+    await standingOrders(w.deps, w.user("ann"), standing());
+    await standingOrders(w.deps, w.user("ann"), standing({ plan: ["outmaneuver", "board", "outmaneuver"], parley: "off" }));
+    expect(captainOf(w, "ann")).toMatchObject({ standingPlan: ["outmaneuver", "board", "outmaneuver"], standingParley: "off" });
+  });
+
+  it("refuses a port action worked out before it, so the old standing orders are not written back", async () => {
+    const w = await seasonWorld();
+    const stale = (await w.store.captainView(w.user("ann")))!;
+    await standingOrders(w.deps, w.user("ann"), standing());
+    expect((await w.store.captainView(w.user("ann")))!.version).toBe(stale.version + 1);
+    const lost = await failure(w.store.applyPortChange({
+      seasonId: "s0", tide: 1, captain: stale.captain, ship: stale.ship, expectedVersion: stale.version, market: null,
+      transaction: { captainId: "ann", tide: 1, kind: "repair", amount: 0, balanceAfter: stale.captain.chestGold, data: {} },
+    }));
+    expect(lost.status).toBe(409);
+    expect(captainOf(w, "ann").standingParley).toBe(1.5);
+  });
+
+  it("rejects payloads that are the wrong shape, with a 400", async () => {
+    const w = await seasonWorld();
+    for (const bad of [
+      null, {}, standing({ plan: ["board", "board"] }), standing({ plan: ["board", "board", "plunder"] }),
+      standing({ parley: 2 }), standing({ gold: 9999 }), { plan: ["board", "board", "board"] }, standing({ plan: "board" }),
+    ]) {
+      expect((await failure(standingOrders(w.deps, w.user("ann"), bad))).status).toBe(400);
+    }
+    expect(captainOf(w, "ann").standingParley).toBe("off");
+  });
+
+  it("is closed to strangers and once the Tide is due", async () => {
+    const w = await seasonWorld();
+    expect((await failure(standingOrders(w.deps, "user-nobody", standing()))).status).toBe(404);
+    w.setNow(AT_21);
+    expect((await failure(standingOrders(w.deps, w.user("ann"), standing()))).status).toBe(409);
+    expect(captainOf(w, "ann").standingParley).toBe("off");
   });
 });
 

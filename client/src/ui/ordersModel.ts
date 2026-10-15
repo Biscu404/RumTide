@@ -1,5 +1,6 @@
 import { speed } from "@engine/balance.ts";
 import { matchup } from "@engine/combat.ts";
+import { courseLimit } from "@engine/explore.ts";
 import { courseError } from "@engine/movement.ts";
 import { hopsFrom, shortestPath, type GameMap } from "@engine/map.ts";
 import type { Intent, Maneuver, Orders, Ship } from "@engine/types.ts";
@@ -13,7 +14,7 @@ export const INTENTS: readonly { id: Intent; label: string; help: string }[] = [
   { id: "trade", label: "Trade Run", help: "Does not start fights. Normal escape chance." },
   { id: "quiet", label: "Sail Quietly", help: "Better escape chance. Cannot hunt or explore." },
   { id: "hunt", label: "Hunt", help: "Starts fights with whatever matches your filter." },
-  { id: "explore", label: "Explore", help: "Draws an event if you end on an island or wreck." },
+  { id: "explore", label: "Explore", help: "Draws an event if you sail to an island or a wreck and do not fight on the way." },
   { id: "escort", label: "Escort", help: "Copies a fleet mate's course and joins any battle they are in." },
 ];
 
@@ -114,7 +115,7 @@ export function toPayload(
   } catch {
     return { ok: false, reason: "There is no route to that place." };
   }
-  const problem = courseError(map, ship.nodeId, course, shipSpeed(ship));
+  const problem = courseError(map, ship.nodeId, course, courseLimit(ship, me.captain));
   if (problem !== null) return { ok: false, reason: problem };
 
   const payload: SubmitPayload = {

@@ -110,6 +110,59 @@ describe("buying and selling", () => {
     expect(loss.captain.legend).toBe(captain.legend);
   });
 
+  describe("with the income bonuses (engine/income.ts)", () => {
+    const held = (basis = 100): { ship: Ship; captain: Captain } => {
+      const { ship, captain } = start("saint_brine");
+      return { ship: { ...ship, cargo: { ...ship.cargo, sugar: 10 }, cargoCostBasis: { ...ship.cargoCostBasis, sugar: basis } }, captain };
+    };
+    const sell = (basis: number, captainPatch: Partial<Captain>, ctx: PortContext, units = 10, from = held(basis)) =>
+      sellGood(from.ship, { ...from.captain, ...captainPatch }, rowOf("saint_brine", "sugar"), "sugar", units, ctx);
+
+    it("earns no bonus when the context carries no income facts, as for a lone sim trader", () => {
+      const r = sell(100, { shoreLeaveTides: 3, fairWinds: true }, ctxAt());
+      expect(r.bonus).toBeNull();
+      expect(r.captain.chestGold).toBe(B.startGold + r.gold);
+      expect(r.captain.shoreLeaveTides).toBe(3);
+    });
+
+    it("tops a profit up by the bonus: gold, Legend and the extra shown separately from what the buyer paid", () => {
+      const plain = sell(100, {}, ctxAt());
+      const r = sell(100, { fairWinds: true }, ctxAt(1, { income: { convoyMates: 1 } }));
+      const extra = Math.round(r.profit * (B.catchUp.fairWindsBonus + B.fleet.convoyPerMate));
+      expect(r.gold).toBe(plain.gold);                        // what the market paid is unchanged
+      expect(r.bonus).toMatchObject({ extra, fairWinds: true, convoyMates: 1 });
+      expect(r.captain.chestGold).toBe(B.startGold + r.gold + extra);
+      expect(r.captain.legend).toBeCloseTo((r.profit + extra) * B.legend.perGoldProfit);   // the bonus counts as profit banked
+    });
+
+    it("spends a stored Tide of Shore Leave on the first profitable sale, and every sale of that Tide gets it", () => {
+      const ctx = ctxAt(4, { income: { convoyMates: 0 } });
+      const first = sell(100, { shoreLeaveTides: 2 }, ctx, 5);
+      expect(first.bonus!.extra).toBe(Math.round(first.profit * B.catchUp.shoreLeaveBonus));
+      expect(first.captain).toMatchObject({ shoreLeaveTides: 1, shoreLeaveUsedTide: 4 });
+      const second = sellGood(first.ship, first.captain, first.row, "sugar", 5, ctx);
+      expect(second.bonus!.extra).toBe(Math.round(second.profit * B.catchUp.shoreLeaveBonus));
+      expect(second.captain).toMatchObject({ shoreLeaveTides: 1, shoreLeaveUsedTide: 4 });   // not spent twice in one Tide
+    });
+
+    it("gives nothing on a sale at a loss and does not spend Shore Leave on it", () => {
+      const ctx = ctxAt(4, { income: { convoyMates: 2 } });
+      const r = sell(10_000, { shoreLeaveTides: 1, fairWinds: true }, ctx);
+      expect(r.profit).toBeLessThan(0);
+      expect(r.bonus).toBeNull();
+      expect(r.captain.chestGold).toBe(B.startGold + r.gold);
+      expect(r.captain).toMatchObject({ shoreLeaveTides: 1, shoreLeaveUsedTide: 0 });
+    });
+
+    it("never pays a bonus on buying", () => {
+      const { ship, captain } = start("port_regal", 1000);
+      const bought = buyGood(ship, { ...captain, shoreLeaveTides: 1, fairWinds: true }, rowOf("port_regal", "sugar"), "sugar", 10,
+        ctxAt(1, { income: { convoyMates: 2 } }));
+      expect(bought.bonus).toBeNull();
+      expect(bought.captain).toMatchObject({ chestGold: 1000 - bought.gold, shoreLeaveTides: 1 });
+    });
+  });
+
   it("charges buyers the normal price even after sellers have pushed the price down", () => {
     const { ship, captain } = start("port_regal", 1000);
     const dumped: MarketRow = { ...rowOf("port_regal", "sugar"), drift: 0.7 };

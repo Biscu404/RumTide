@@ -7,6 +7,8 @@ export type Good = "rum" | "sugar" | "spice";
 export type HullId = "sloop" | "brigantine" | "frigate";
 export type Maneuver = "broadside" | "outmaneuver" | "board";
 export type Intent = "trade" | "quiet" | "hunt" | "explore" | "escort";
+/** What an exploration event leaves behind (section 10.1): Castaway, Cursed Coin, Mermaid's Song, Hermit Cartographer. */
+export type Omen = "castaway" | "cursedCoin" | "mermaid" | "cartographer";
 
 // Only the NPCs Season 0 needs (section 16.1). Navy Patrol and Sea Serpent appear from week 3,
 // after Season 0 ends (section 4.6).
@@ -30,7 +32,13 @@ export interface Captain {
   legend: number; chestGold: number; bounty: number;
   shieldUntilTide: number | null; fleetId: string | null;
   standingPlan: [Maneuver, Maneuver, Maneuver]; standingParley: "off" | 1.25 | 1.5;
-  shoreLeaveTides: number; lastOrdersTide: number; status: "active" | "ashore";
+  /** Stored Tides of Shore Leave, and the Tide in which one was last spent (0 for never), see engine/income.ts. */
+  shoreLeaveTides: number; shoreLeaveUsedTide: number;
+  /** Below 70% of the median Legend as this Tide opened (section 12.4). Set by the resolver. */
+  fairWinds: boolean;
+  /** Effects of exploration events that are still to come, sorted, see engine/explore.ts. */
+  omens: Omen[];
+  lastOrdersTide: number; status: "active" | "ashore";
 }
 
 export interface Ship {

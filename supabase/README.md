@@ -22,7 +22,7 @@ logic of each function in `functions/_shared/api`. See `docs/DECISIONS.md` (Day 
 ```bash
 supabase link --project-ref <ref>
 supabase db push
-supabase functions deploy submit_orders port_action fleet_action resolve_tide admin
+supabase functions deploy submit_orders port_action fleet_action standing_orders resolve_tide admin
 supabase secrets set CRON_SECRET=<long random string> DISCORD_WEBHOOK_URL=<webhook> SITE_URL=<game url>
 ```
 

@@ -15,7 +15,9 @@ export function captainFromRow(row: Row): Captain {
     fleetId: row.fleet_id ? String(row.fleet_id) : null,
     standingPlan: row.standing_plan as Captain["standingPlan"],
     standingParley: row.standing_parley as Captain["standingParley"],
-    shoreLeaveTides: Number(row.shore_leave_tides), lastOrdersTide: Number(row.last_orders_tide),
+    shoreLeaveTides: Number(row.shore_leave_tides), shoreLeaveUsedTide: Number(row.shore_leave_used_tide ?? 0),
+    fairWinds: Boolean(row.fair_winds), omens: Array.isArray(row.omens) ? (row.omens as Captain["omens"]) : [],
+    lastOrdersTide: Number(row.last_orders_tide),
     status: row.status as Captain["status"],
   };
 }

@@ -60,6 +60,28 @@ export const B = {
 
   legend: { perGoldProfit: 0.1, npcWin: 10, pvpWin: 25, coopPrize: 40,
             weeklyAward: 30, mostWantedMult: 1.5 },
+
+  // Section 10.1: the exploration deck. Gold amounts are before the Boom. `weights` are relative draw
+  // chances on an island and on a wreck; a 0 means the event never comes up there.
+  explore: {
+    mawRewardMult: 1.5,   // the Maw multiplies event rewards (gold and rum), once it is open
+    buriedChest:  { min: 80, max: 160 },
+    castaway:     { crewBonus: 0.10 },                          // Crew for the next battle
+    monkeyThief:  { plunderLost: 0.10 },
+    turtleSoup:   { hullRepaired: 0.30 },                       // of the maximum hull
+    rumCache:     { units: 5 },
+    cursedCoin:   { gold: 120, luckMin: 0.8, luckMax: 1.0 },    // the luck range of the next battle
+    oldWreck:     { gold: 60 },
+    reefScrape:   { hullLost: 0.15 },                           // of the maximum hull, never below 1 point
+    hermit:       { extraHops: 1 },                             // never more hops than a Tide has steps
+    mermaid:      { escapeMult: 1.2 },                          // on the escape chance, next Tide only
+    // Where the deck leans: [island, wreck].
+    weights: {
+      buriedChest: [3, 2], castaway: [3, 1], monkeyThief: [2, 1], turtleSoup: [3, 1],
+      rumCache: [2, 3], cursedCoin: [1, 3], messageInBottle: [2, 2], oldWreck: [0, 5],
+      reefScrape: [1, 3], hermit: [3, 0], mermaid: [2, 2], ghostLantern: [1, 3],
+    },
+  },
 } as const;
 
 // Everything a preset fills in when a season is created: the settings (minus the preset name)
@@ -120,8 +142,9 @@ export const powerRating = (s: { hull: number; cannons: number; sails: number; c
 export const roundDamage = (stat: number, matchup: number, stale: boolean, luck: number) =>
   B.combat.k * (stat / 10) ** B.combat.exponent * matchup * (stale ? B.combat.stale : 1) * luck;
 
-export const escapeChance = (targetSails: number, hunterSails: number, quiet: boolean) =>
-  clamp((targetSails / (targetSails + hunterSails)) * (quiet ? B.escape.quietMult : 1),
+// `boost` is a Mermaid's Song (section 10.1), 1 for everyone else.
+export const escapeChance = (targetSails: number, hunterSails: number, quiet: boolean, boost = 1) =>
+  clamp((targetSails / (targetSails + hunterSails)) * (quiet ? B.escape.quietMult : 1) * boost,
         B.escape.min, B.escape.max);
 
 export const fairnessFactor = (loserPR: number, winnerSidePR: number) => {

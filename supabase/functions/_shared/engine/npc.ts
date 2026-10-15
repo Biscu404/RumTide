@@ -9,7 +9,7 @@ import { B, cargoValue, coopShare, npcPR } from "./balance.ts";
 import type { Combatant } from "./combat.ts";
 import { apportion, apportionCapped } from "./loot.ts";
 import { hopsFrom, type GameMap } from "./map.ts";
-import type { Rng } from "./rng.ts";
+import { createRng, hashSeed, type Rng } from "./rng.ts";
 import type { Maneuver, Npc, NpcKind, SeasonSettings } from "./types.ts";
 
 const MANEUVERS: readonly Maneuver[] = ["broadside", "outmaneuver", "board"];
@@ -49,13 +49,18 @@ function laneNode(map: GameMap, rng: Rng): string {
   }
 }
 
-/** A Free Waters node for the Treasure Galleon: open sea, an island or a wreck. */
-function galleonNode(map: GameMap, rng: Rng): string {
+/**
+ * Where the Treasure Galleon appears on `tide`: a Free Waters node (open sea, an island or a wreck).
+ * It comes from the season id and the Tide alone, not from the Tide's random numbers, so a Message in a
+ * Bottle (engine/explore.ts) can name the place Tides before the galleon spawns, and the galleon still
+ * turns up exactly there.
+ */
+export function galleonNodeFor(map: GameMap, seasonId: string, tide: number): string {
   const spots = map.nodeIds.filter((id) => {
     const n = map.node(id);
     return n.zone === "free" && (n.type === "sea" || n.type === "island" || n.type === "wreck");
   });
-  return rng.pick(spots);
+  return createRng(hashSeed(`${seasonId}:galleon:${tide}`)).pick(spots);
 }
 
 /** Habit shown in the bestiary: the Small Trader's favourite maneuver, or the other NPCs' fixed plan. */
@@ -82,7 +87,7 @@ export function spawnNpcs(map: GameMap, input: SpawnInput, rng: Rng): Npc[] {
     npcs.push(make(kind, `npc-t${input.tide}-m${i + 1}`, laneNode(map, rng)));
   }
   if (input.galleonTides.includes(input.tide)) {
-    npcs.push(make("galleon", `npc-t${input.tide}-galleon`, galleonNode(map, rng)));
+    npcs.push(make("galleon", `npc-t${input.tide}-galleon`, galleonNodeFor(map, input.seasonId, input.tide)));
   }
   return npcs.sort((a, b) => compareIds(a.id, b.id));
 }

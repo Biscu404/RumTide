@@ -8,6 +8,8 @@ import {
   INTENTS, MANEUVERS, PARLEYS, TRIANGLE, destinations, draftFor, fleetMates, isDirty,
   sentence, shipSpeed, toPayload, type Draft,
 } from "./ordersModel.ts";
+import { exploreHint, maxHops, omenLines } from "./exploreModel.ts";
+import { StandingOrders } from "./StandingOrders.tsx";
 
 interface Props { client: SupabaseClient; map: GameMap; me: Me; onChanged: () => Promise<void> }
 
@@ -21,10 +23,12 @@ export function OrdersPanel({ client, map, me, onChanged }: Props) {
 
   const open = me.tide.status === "open";
   const mates = fleetMates(me);
-  const where = destinations(map, me.ship.nodeId, shipSpeed(me.ship));
+  const hops = maxHops(me);
+  const where = destinations(map, me.ship.nodeId, hops);
   const set = (change: Partial<Draft>) => setDraft((d) => ({ ...d, ...change }));
   const setRound = (i: number, m: Maneuver) => set({ plan: draft.plan.map((x, j) => (j === i ? m : x)) as Draft["plan"] });
 
+  const hint = exploreHint(map, me.ship, draft);
   const built = toPayload(map, me, draft, false);
   const dirty = !built.ok || isDirty(me.orders, built.payload);
   const route = built.ok ? built.payload.course.map((id) => map.node(id).name) : [];
@@ -56,6 +60,7 @@ export function OrdersPanel({ client, map, me, onChanged }: Props) {
   return (
     <div class="panel-body">
       <p class="sentence">{sentence(map, me, draft)}</p>
+      {omenLines(me.captain.omens).map((line, i) => <p key={i} class="notice small">{line}</p>)}
       {!open && <p class="notice">The Tide is turning, so orders are closed. They open again with the next Tide.</p>}
 
       <fieldset disabled={!open || busy}>
@@ -69,7 +74,7 @@ export function OrdersPanel({ client, map, me, onChanged }: Props) {
           </select>
         </label>
         <p class="dim small">
-          Speed {shipSpeed(me.ship)}.{" "}
+          Speed {shipSpeed(me.ship)}{hops > shipSpeed(me.ship) ? `, ${hops} hops this Tide` : ""}.{" "}
           {route.length > 0 ? `Route: ${route.join(", then ")}.` : "You will not move."}
         </p>
 
@@ -82,6 +87,7 @@ export function OrdersPanel({ client, map, me, onChanged }: Props) {
           </select>
         </label>
         <p class="dim small">{INTENTS.find((i) => i.id === draft.intent)?.help}</p>
+        {hint && <p class="notice small">{hint}</p>}
         {mates.length > 0 && <p class="dim small">Your fleet mates' orders are on the Fleet tab.</p>}
 
         {draft.intent === "hunt" && (
@@ -159,6 +165,8 @@ export function OrdersPanel({ client, map, me, onChanged }: Props) {
         )}
       </div>
       <p class="dim small">Tide {me.tide.number} closes {when(me.tide.dueAt)}, or earlier if everyone is Ready.</p>
+
+      <StandingOrders client={client} me={me} onChanged={onChanged} />
     </div>
   );
 }

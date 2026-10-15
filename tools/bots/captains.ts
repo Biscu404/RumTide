@@ -6,8 +6,10 @@
 //   raider    hunts the nearest player ship it can reach, and merchants when none is near
 //   reaver    hunts merchants only
 //   convoy    two traders in one fleet, who go after the Treasure Galleon together when both can reach it
+//   explorer  sails from island to wreck to island and draws an exploration event at each (section 10.1)
 
 import { maxHullPoints, speed } from "@engine/balance.ts";
+import { courseLimit } from "@engine/explore.ts";
 import type { GameMap } from "@engine/map.ts";
 import { hopsFrom, shortestPath } from "@engine/map.ts";
 import type { PortContext } from "@engine/port.ts";
@@ -185,6 +187,44 @@ export function hunterBot(id: string, role: "raider" | "reaver", policy: TraderP
         ...base,
         orders: orders(view, { plan, intent: "hunt", huntFilter: role === "raider" ? "anyone" : "merchants", course }),
       };
+    },
+  };
+}
+
+// ---- Explorers ----
+
+/**
+ * Sails to the nearest island or wreck it is not already at and explores it, banks its finds at the
+ * nearest port once the plunder or the damage mounts, and spends its Chest on the ship. It uses the
+ * longer course a Hermit Cartographer allows, which is what makes the handlers check that rule.
+ */
+export function explorerBot(id: string, policy: TraderPolicy, rng: Rng, fleetId: string | null = null): Bot {
+  return {
+    id, role: "explorer", fleetId, absent: [],
+    play(view) {
+      const { map, snap, ctx } = view;
+      let { ship, captain, actions } = repaired(view);
+      if (atPort(map, ship)) {
+        const spent = spend(ship, captain, captain.chestGold, ctx, policy, HUNTER_UPGRADES);
+        ({ ship, captain } = spent);
+        actions = [...actions, ...spent.actions];
+      }
+      const base = { ship, captain, market: snap.market, actions };
+      const plan = freshPlan(rng);
+      const here = ship.nodeId;
+      const limit = courseLimit(ship, captain);
+      const toward = (to: string) => shortestPath(map, here, to).slice(0, limit);
+
+      const hurt = ship.plunderGold >= BANK_AT_PLUNDER || hullShare(ship) < REPAIR_BELOW_HULL;
+      if (hurt && !atPort(map, ship)) {
+        return { ...base, orders: orders(view, { plan, intent: "quiet", course: toward(nearestPort(map, here)) }) };
+      }
+
+      const spots = map.nodeIds
+        .filter((n) => (map.node(n).type === "island" || map.node(n).type === "wreck") && n !== here)
+        .map((n) => ({ id: n, hops: hopsBetween(map, here, n) }))
+        .sort((a, b) => a.hops - b.hops || (a.id < b.id ? -1 : 1));
+      return { ...base, orders: orders(view, { plan, intent: "explore", course: toward(spots[0]!.id) }) };
     },
   };
 }

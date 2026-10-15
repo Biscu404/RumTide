@@ -8,8 +8,8 @@ import type { TideSnapshot } from "../engine/season.ts";
 import type { Captain, Fleet, FleetInvite, FleetMember, MarketRow, Npc, Orders, Ship } from "../engine/types.ts";
 import {
   ApiError, type ActiveSeason, type AdminLogEntry, type ApplyTideArgs, type CaptainView, type CreateSeasonArgs,
-  type FleetChange, type FleetState, type GameStore, type PortChange, type SeasonInfo, type TideHistoryEntry,
-  type TideInfo, type TideState,
+  type FleetChange, type FleetState, type GameStore, type PortChange, type SeasonInfo, type StandingOrdersChange,
+  type TideHistoryEntry, type TideInfo, type TideState,
 } from "./store.ts";
 
 type Row = Record<string, unknown>;
@@ -102,8 +102,14 @@ export class SupabaseStore implements GameStore {
     const ship = fromRow<Ship>(unwrap(await this.db.from("ships").select("*").eq("captain_id", captain.id).single()) as Row);
     const market = (unwrap(await this.db.from("market").select("*").eq("season_id", seasonId).eq("port_id", ship.nodeId)) as Row[])
       .map((r) => fromRow<MarketRow>(r));
-    const roster = (unwrap(await this.db.from("captains").select("id, ship_name, fleet_id").eq("season_id", seasonId).order("id")) as Row[])
-      .map((r) => ({ id: String(r.id), shipName: String(r.ship_name), fleetId: (r.fleet_id as string | null) ?? null }));
+    const rosterRows = unwrap(await this.db.from("captains").select("id, ship_name, fleet_id")
+      .eq("season_id", seasonId).order("id")) as Row[];
+    const nodes = new Map((unwrap(await this.db.from("ships").select("captain_id, node_id")
+      .in("captain_id", rosterRows.map((r) => String(r.id)))) as Row[]).map((r) => [String(r.captain_id), String(r.node_id)]));
+    const roster = rosterRows.map((r) => ({
+      id: String(r.id), shipName: String(r.ship_name), fleetId: (r.fleet_id as string | null) ?? null,
+      nodeId: nodes.get(String(r.id)) ?? "",
+    }));
     const tide = await this.tideRow(seasonId, active.tide.number);
     return {
       active, boomPortId: (tide.boom_port_id as string | null) ?? null, captain, ship,
@@ -117,6 +123,10 @@ export class SupabaseStore implements GameStore {
 
   async applyPortChange(change: PortChange): Promise<void> {
     unwrap(await this.db.rpc("apply_port_change", { p_args: change }));
+  }
+
+  async saveStandingOrders(change: StandingOrdersChange): Promise<void> {
+    unwrap(await this.db.rpc("save_standing_orders", { p_args: change }));
   }
 
   async loadFleets(seasonId: string): Promise<FleetState> {

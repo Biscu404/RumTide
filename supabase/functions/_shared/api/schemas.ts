@@ -26,6 +26,13 @@ export const submitOrdersSchema = z.strictObject({
 });
 export type SubmitOrdersPayload = z.infer<typeof submitOrdersSchema>;
 
+/** The plan and parley a captain falls back on when no orders are sent (section 12.4). */
+export const standingOrdersSchema = z.strictObject({
+  plan: z.tuple([maneuver, maneuver, maneuver]),
+  parley,
+});
+export type StandingOrdersPayload = z.infer<typeof standingOrdersSchema>;
+
 const units = z.number().int().min(1).max(1000);
 
 export const portActionSchema = z.discriminatedUnion("action", [

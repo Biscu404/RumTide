@@ -9,11 +9,13 @@ import { Admin } from "./Admin.tsx";
 import { Login } from "./Login.tsx";
 import { FleetPanel } from "./FleetPanel.tsx";
 import { GazettePanel } from "./GazettePanel.tsx";
+import { LegendPanel } from "./LegendPanel.tsx";
 import { MapView } from "./MapView.tsx";
 import { OrdersPanel } from "./OrdersPanel.tsx";
 import { withFleetColours } from "./fleetModel.ts";
 import { PortPanel } from "./PortPanel.tsx";
 import { hold } from "./portModel.ts";
+import { omenNames } from "./exploreModel.ts";
 import { shipSpeed } from "./ordersModel.ts";
 
 const NO_WORLD: World = { season: null, ships: [] };
@@ -59,7 +61,7 @@ function Game({ client, session }: { client: NonNullable<typeof supabase>; sessi
   const [world, setWorld] = useState<World>(NO_WORLD);
   const [me, setMe] = useState<Me | null>(null);
   const [fleets, setFleets] = useState<FleetsState>(NO_FLEETS);
-  const [tab, setTab] = useState<"orders" | "port" | "fleet" | "gazette" | null>("orders");
+  const [tab, setTab] = useState<"orders" | "port" | "fleet" | "legend" | "gazette" | null>("orders");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [inAdmin, setInAdmin] = useState(false);
@@ -126,17 +128,29 @@ function Game({ client, session }: { client: NonNullable<typeof supabase>; sessi
             <button role="tab" aria-selected={tab === "fleet"} class={tab === "fleet" ? "tab on" : "tab"} onClick={() => setTab(tab === "fleet" ? null : "fleet")}>
               {invitations > 0 ? `Fleet (${invitations})` : "Fleet"}
             </button>
+            <button role="tab" aria-selected={tab === "legend"} class={tab === "legend" ? "tab on" : "tab"} onClick={() => setTab(tab === "legend" ? null : "legend")}>
+              Legend
+            </button>
             <button role="tab" aria-selected={tab === "gazette"} class={tab === "gazette" ? "tab on" : "tab"} onClick={() => setTab(tab === "gazette" ? null : "gazette")}>
               Gazette
             </button>
             <span class="spacer" />
             <span class="dim small stats">
               {Math.round(me.captain.chestGold).toLocaleString()} gold, hull {me.ship.hullPoints.toFixed(0)}, hold {hold(me).used}/{hold(me).capacity}, speed {shipSpeed(me.ship)}
+              {me.captain.shoreLeaveTides > 0 && `, Shore Leave ${me.captain.shoreLeaveTides}`}{me.captain.fairWinds && ", Fair Winds"}
+              {me.captain.omens.length > 0 && `, ${omenNames(me.captain.omens)}`}
             </span>
           </div>
           {tab === "orders" && <OrdersPanel key={`orders-${me.tide.number}`} client={client} map={map} me={me} onChanged={refresh} />}
-          {tab === "port" && <PortPanel client={client} map={map} me={me} onChanged={refresh} />}
+          {tab === "port" && <PortPanel client={client} map={map} me={me} ships={ships} onChanged={refresh} />}
           {tab === "fleet" && <FleetPanel client={client} map={map} me={me} state={fleets} ships={ships} onChanged={refresh} />}
+          {tab === "legend" && season && (
+            <LegendPanel
+              client={client} seasonId={season.id} myCaptainId={me.captain.id} tide={season.currentTide}
+              lengthTides={season.lengthTides} fogOfLegendTides={me.settings.fogOfLegendTides}
+              fleets={fleets.fleets} fairWinds={me.captain.fairWinds}
+            />
+          )}
           {tab === "gazette" && season && (
             <GazettePanel client={client} map={map} seasonId={season.id} seasonName={season.name} currentTide={season.currentTide} />
           )}

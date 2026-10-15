@@ -22,7 +22,7 @@ export function newCaptain(id: string, seasonId: string): Captain {
     legend: 0, chestGold: B.startGold, bounty: 0,
     shieldUntilTide: null, fleetId: null,
     standingPlan: ["broadside", "outmaneuver", "board"], standingParley: "off",
-    shoreLeaveTides: 0, lastOrdersTide: 0, status: "active",
+    shoreLeaveTides: 0, shoreLeaveUsedTide: 0, fairWinds: false, omens: [], lastOrdersTide: 0, status: "active",
   };
 }
 

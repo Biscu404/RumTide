@@ -5,8 +5,8 @@
 //
 // The order of events follows section 4.4: movement in up to 3 steps, meetings after each step,
 // encounters in step order and then node order, then exploration and docking at the end.
-// Exploration events (rule 7) and the Escort intent are not built yet (docs/DECISIONS.md), so
-// Explore and Escort ships just sail their course. Escorts still join their fleet mates' fights.
+// The Escort intent is not built yet (docs/DECISIONS.md), so Escort ships just sail their course.
+// Escorts still join their fleet mates' fights.
 
 import { B, cargoValue, maxHullPoints, speed, statValue } from "./balance.ts";
 import { resolveBattle, type BattleResult, type Combatant } from "./combat.ts";
@@ -14,6 +14,8 @@ import {
   encounterBetween, pairKey, parleyResult, rollEscape, type Encounter, type EncounterShip,
 } from "./encounter.ts";
 import { settlePvpBattle, shrinkBounty, type LootParty } from "./loot.ts";
+import { BATTLE_OMENS, TIDE_OMENS, courseLimit, explore, omenList } from "./explore.ts";
+import { describeBonus, hasFairWinds, incomeBonus, incomeFacts } from "./income.ts";
 import { hopsFrom, shortestPath, type GameMap } from "./map.ts";
 import { advanceMarket, boomPortForTide } from "./market.ts";
 import { advanceStep, courseError, type Mover } from "./movement.ts";
@@ -25,7 +27,7 @@ import { createRng } from "./rng.ts";
 import { median, type TideSnapshot } from "./season.ts";
 import { shipPowerRating } from "./state.ts";
 import type {
-  Battle, Captain, Gazette, Intent, LogEvent, Maneuver, Npc, Orders, Ship,
+  Battle, Captain, Gazette, Intent, LogEvent, Maneuver, Npc, Omen, Orders, Ship,
 } from "./types.ts";
 
 export interface TideResult {
@@ -112,7 +114,7 @@ export function resolveTide(map: GameMap, snap: TideSnapshot, orders: readonly O
   for (const id of ids) {
     const c = captain(id), s = ship(id), o = submitted.get(id);
     if (o) {
-      const problem = courseError(map, s.nodeId, o.course, speed(s.hull, s.levels.sails))
+      const problem = courseError(map, s.nodeId, o.course, courseLimit(s, c))
         ?? (isPlan(o.plan) ? null : "The battle plan needs three maneuvers")
         ?? (INTENTS.includes(o.intent) ? null : `Unknown intent ${String(o.intent)}`);
       if (problem === null) {
@@ -138,6 +140,12 @@ export function resolveTide(map: GameMap, snap: TideSnapshot, orders: readonly O
   const struck = new Set<string>();             // hull at zero: towed to port when the Tide ends
   const battleNode = new Map<string, string>(); // where a struck ship was when it fought
   const bountyAdded = new Map<string, number>();
+  const prizeGold = new Map<string, number>();  // merchant and galleon prizes won this Tide, before any bonus
+  // Omens (engine/explore.ts): the ones carried in apply to this Tide's fights and escapes, and the
+  // ones drawn at the end of the Tide wait in `granted` so they cannot help the Tide that earned them.
+  const held = new Map<string, ReadonlySet<Omen>>(ids.map((id) => [id, new Set(captain(id).omens)]));
+  const granted = new Map<string, Omen[]>();
+  const fought = new Set<string>();             // captains who fought a battle this Tide
 
   // The Legend leader is the Most Wanted (section 9 rule 7).
   const mostWanted = ids.reduce<string | null>((best, id) =>
@@ -155,18 +163,21 @@ export function resolveTide(map: GameMap, snap: TideSnapshot, orders: readonly O
       docked: map.node(pos.get(id)!).type === "port",   // no combat in a port, passing through counts
       shieldUntilTide: c.shieldUntilTide, intent: p.intent, huntFilter: p.huntFilter,
       sails: statValue(s.hull, s.levels.sails), pr: shipPowerRating(s), parley: p.parley, noQuarter: p.noQuarter,
+      escapeBoost: held.get(id)!.has("mermaid") ? B.explore.mermaid.escapeMult : 1,
     };
   };
 
   const combatant = (id: string, startedHunt: boolean): Combatant => {
     const npc = npcs.get(id);
     if (npc) return npcCombatant(npc, rng);
-    const s = ship(id);
+    const s = ship(id), omens = held.get(id)!;
     return {
       id, kind: "player", pr: shipPowerRating(s),
-      cannons: statValue(s.hull, s.levels.cannons), sails: statValue(s.hull, s.levels.sails), crew: statValue(s.hull, s.levels.crew),
+      cannons: statValue(s.hull, s.levels.cannons), sails: statValue(s.hull, s.levels.sails),
+      crew: statValue(s.hull, s.levels.crew) * (omens.has("castaway") ? 1 + B.explore.castaway.crewBonus : 1),
       hullPoints: s.hullPoints, maxHull: maxHullPoints(s.hull, s.levels.hull),
       plan: plans.get(id)!.plan, startedHunt,
+      ...(omens.has("cursedCoin") ? { luck: { min: B.explore.cursedCoin.luckMin, max: B.explore.cursedCoin.luckMax } } : {}),
     };
   };
 
@@ -186,6 +197,7 @@ export function resolveTide(map: GameMap, snap: TideSnapshot, orders: readonly O
     for (const id of [...sideA, ...sideB]) {
       engaged.add(id);
       if (npcs.has(id)) continue;
+      fought.add(id);
       ship(id).hullPoints = result.hullAfter[id]!;
       battleNode.set(id, nodeId);
       if (result.hullAfter[id]! <= 0) struck.add(id);
@@ -220,6 +232,7 @@ export function resolveTide(map: GameMap, snap: TideSnapshot, orders: readonly O
           const share = prize.shares[id]!;
           ship(id).plunderGold += share.gold;
           captain(id).legend += share.legend;
+          prizeGold.set(id, (prizeGold.get(id) ?? 0) + share.gold);
         }
         const gold = prize.taken;
         say(npc.kind === "galleon" ? "galleon" : "prize",
@@ -357,6 +370,40 @@ export function resolveTide(map: GameMap, snap: TideSnapshot, orders: readonly O
     }
   }
 
+  // ---- Bonuses on prizes (engine/income.ts) ----
+  // The convoy is judged from where every ship ended its movement, and Fair Winds was fixed when the
+  // Tide opened, so the order captains are looked at in never matters. The extra gold rides in
+  // plunder with the prize itself.
+
+  const roster = snap.captains.map((c) => ({ id: c.id, fleetId: c.fleetId, nodeId: pos.get(c.id)! }));
+  for (const id of ids) {
+    const base = prizeGold.get(id);
+    if (!base) continue;
+    const bonus = incomeBonus(captain(id), tide, base, incomeFacts(map, id, roster));
+    captains.set(id, bonus.captain);
+    if (bonus.extra <= 0) continue;
+    ship(id).plunderGold += bonus.extra;
+    say("bonus", `${describeBonus(bonus)} added ${bonus.extra} doubloons to your prize.`, id, "private");
+  }
+
+  // ---- Exploration (section 4.4 rule 7, engine/explore.ts) ----
+  // A ship that sailed to an island or a wreck with the Explore intent and did not fight draws one
+  // event, in captain id order. Staying where it already lay draws nothing, so a ship cannot farm one
+  // spot Tide after Tide. The Gazette line names no amounts, the captain's own line does.
+
+  const world = { map, seasonId: snap.seasonId, tide, settings };
+  for (const id of ids) {
+    const p = plans.get(id)!, at = pos.get(id)!;
+    const kind = map.node(at).type;
+    if (p.intent !== "explore" || engaged.has(id) || p.course.length === 0 || p.course[p.course.length - 1] !== at) continue;
+    if (kind !== "island" && kind !== "wreck") continue;
+    const found = explore(world, { ...ship(id), nodeId: at }, captain(id), rng);   // a ship's own node is only updated at the end of the Tide
+    ships.set(id, found.ship);
+    if (found.omen !== null) granted.set(id, [...(granted.get(id) ?? []), found.omen]);
+    say("explore", found.headline, id, "public", { event: found.event });
+    if (found.note !== null) say("explore", found.note, id, "private", { event: found.event });
+  }
+
   // ---- The end of the Tide: towing, docking, patching, bookkeeping ----
 
   for (const id of ids) {
@@ -379,6 +426,11 @@ export function resolveTide(map: GameMap, snap: TideSnapshot, orders: readonly O
     }
     ships.set(id, s); captains.set(id, c);
 
+    // Omens carried in are spent: Mermaid's Song and the Hermit's chart with the Tide, Castaway and
+    // Cursed Coin with the first battle. What was drawn this Tide waits for the next one.
+    const spent: readonly Omen[] = fought.has(id) ? [...TIDE_OMENS, ...BATTLE_OMENS] : TIDE_OMENS;
+    c.omens = omenList([...c.omens.filter((o) => !spent.includes(o)), ...(granted.get(id) ?? [])]);
+
     const p = plans.get(id)!;
     if (p.submitted) {
       c.lastOrdersTide = tide;
@@ -399,6 +451,8 @@ export function resolveTide(map: GameMap, snap: TideSnapshot, orders: readonly O
   const nextTide = tide + 1;
   const active = ids.filter((id) => captain(id).status === "active");
   const medianPR = median(active.map((id) => shipPowerRating(ship(id))));
+  // Fair Winds holds for the whole Tide that opens now, so it is judged once, here (section 12.4).
+  const medianLegend = median(active.map((id) => captain(id).legend));
   const boomPortId = boomPortForTide(map, nextTide, snap.boomPortId, rng);
   const nextNpcs = nextTide <= snap.lengthTides
     ? spawnNpcs(map, { seasonId: snap.seasonId, tide: nextTide, players: active.length, medianPR, galleonTides: settings.galleonTides }, rng)
@@ -406,7 +460,8 @@ export function resolveTide(map: GameMap, snap: TideSnapshot, orders: readonly O
 
   const next: TideSnapshot = {
     seasonId: snap.seasonId, settings, lengthTides: snap.lengthTides, tide: nextTide,
-    captains: ids.map(captain), ships: ids.map(ship), npcs: nextNpcs,
+    captains: ids.map((id) => ({ ...captain(id), fairWinds: hasFairWinds(captain(id).legend, medianLegend) })),
+    ships: ids.map(ship), npcs: nextNpcs,
     market: advanceMarket(snap.market), boomPortId,
   };
 
