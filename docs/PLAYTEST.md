@@ -52,7 +52,7 @@ Rank by how many players it hits and how much it spoils the Tide. The top three 
 
 ## Afterwards
 
-1. Game master, End this season. This is logged to the admin log. Nothing is deleted, but the app stops showing the Playtest, so its Gazette is not readable afterwards. Copy anything you want to keep first.
+1. Game master, End this season. This is logged to the admin log. Nothing is deleted. The app keeps the Playtest as a read only record (header says the season ended early, orders are closed, Legend and the Gazette stay open) until the next season starts, because the app shows only the latest season. Copy anything you want to keep before you start Season 0.
 2. Fix the worst three problems, one at a time, each with a test, as in `CLAUDE.md`.
 3. Read [How to play](HOW_TO_PLAY.md) against what you saw. Anything a player had to ask you about goes in.
 4. Make sure all six friends have signed up and confirmed their email. Then pick a start date, announce it with the How to play page, and start Season 0 from the Game master page with the real Tide time.
@@ -60,6 +60,5 @@ Rank by how many players it hits and how much it spoils the Tide. The top three 
 
 ## Known gaps going in
 
-* **A finished season disappears from the app.** The client only loads the active season, so after Tide 14 (or after End this season) the app shows "No season is running yet" and the final Gazette and Legend are not readable in it. The Discord message is the only record. This matters for the Season 0 finale (section 3.5, "final Legend reveal"), so check it with the group before Tide 14 or fix it first.
 * **A Tide stuck in "resolving"** is not retried by the page yet (`docs/DECISIONS.md`, Day 7).
 * **Captains are fixed when a season starts.** Someone who signs up later cannot join that season.

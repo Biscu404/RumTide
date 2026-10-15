@@ -51,6 +51,7 @@ Start one from the Game master page when no season is running. The captains are 
 signed up at that moment (or only you, to try things alone), so everyone must sign up first.
 
 End this season stops the running season early, for a playtest or a season that went wrong. Nothing is
-deleted, but the app only shows the active season, so an ended season is no longer readable there. Only
+deleted. The app shows the active season, or when none is running the most recent ended one, read only:
+orders are closed, and Legend (the final ranking) and the Gazette stay open until the next season starts. Only
 one season can be active, so a new one cannot start until the old one has ended or finished its Tides.
 `docs/PLAYTEST.md` has the whole playtest runbook.

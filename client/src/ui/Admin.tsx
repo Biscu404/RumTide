@@ -168,7 +168,7 @@ export function Admin({ client, onClose }: { client: SupabaseClient; onClose: ()
             {current.status === "resolving" && (
               <p class="dim">This Tide is being resolved right now. If it stays this way for minutes, tell the developer.</p>
             )}
-            <p class="dim small">Ending a season is for a playtest or a season that went wrong. The app stops showing it, but nothing is deleted.</p>
+            <p class="dim small">Ending a season is for a playtest or a season that went wrong. Nobody can give orders after that, but the Legend and the Gazette stay readable in the app and nothing is deleted.</p>
             <button class="secondary" disabled={busy || current.status === "resolving"} onClick={() => void endSeason(current.number, season.name)}>
               End this season
             </button>
