@@ -194,6 +194,10 @@ export class SupabaseStore implements GameStore {
     unwrap(await this.db.rpc("create_season", { p_args: args }));
   }
 
+  async endSeason(seasonId: string): Promise<void> {
+    unwrap(await this.db.from("seasons").update({ status: "ended" }).eq("id", seasonId).eq("status", "active"));
+  }
+
   async listUserIds(): Promise<string[]> {
     const { data, error } = await this.db.auth.admin.listUsers({ perPage: 1000 });
     if (error) throw new Error(`users: ${error.message}`);

@@ -338,13 +338,15 @@ export type AdminResult =
     log: AdminLogEntry[];
   }
   | { outcome: ResolveOutcome }
-  | { started: { seasonId: string; name: string; captains: number } };
+  | { started: { seasonId: string; name: string; captains: number } }
+  | { ended: { seasonId: string; name: string; tide: number } };
 
 /**
  * The game master's page. Callers must be in `admins`. `status` reads the running season, its recent
  * Tides and the admin log. `resolve` forces the open Tide now, or retries it when it has failed.
- * `start` begins a season when none is running. Each `resolve` and `start` is written to the admin log,
- * so every admin action leaves a trace.
+ * `start` begins a season when none is running. `end` stops the running season early, which is how a
+ * playtest season makes room for the real one. Each `resolve`, `start` and `end` is written to the admin
+ * log, so every admin action leaves a trace.
  */
 export async function adminRequest(deps: Deps, userId: string, body: unknown): Promise<AdminResult> {
   const p = parse(adminSchema, body);
@@ -371,6 +373,18 @@ export async function adminRequest(deps: Deps, userId: string, body: unknown): P
   if (active.tide.number !== p.tide) {
     throw new ApiError(`Tide ${active.tide.number} is the Tide now, not Tide ${p.tide}. Reload the page.`, 409);
   }
+
+  if (p.action === "end") {
+    // A Tide being resolved right now would write its result into a season nobody can see any more.
+    if (active.tide.status === "resolving") throw new ApiError("The Tide is being resolved right now. Try again in a minute.", 409);
+    await deps.store.endSeason(active.season.id);
+    await deps.store.appendAdminLog({
+      seasonId: active.season.id, at: deps.now().toISOString(), adminId: userId, action: "end", tide: p.tide,
+      outcome: "ended", detail: `${active.season.name} ended early at Tide ${p.tide} of ${active.season.lengthTides}`,
+    });
+    return { ended: { seasonId: active.season.id, name: active.season.name, tide: p.tide } };
+  }
+
   const action = active.tide.status === "failed" ? "retry" : "resolve";
   const outcome = await resolveDueTide(deps, { force: true });
   await deps.store.appendAdminLog({

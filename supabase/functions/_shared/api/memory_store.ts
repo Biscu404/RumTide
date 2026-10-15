@@ -212,6 +212,10 @@ export class MemoryStore implements GameStore {
     });
   }
 
+  async endSeason(seasonId: string): Promise<void> {
+    this.mustFind(seasonId).info.status = "ended";
+  }
+
   /** The user ids that may use the admin page. Tests add to it. */
   readonly admins = new Set<string>();
 

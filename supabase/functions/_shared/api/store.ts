@@ -142,6 +142,8 @@ export interface GameStore {
   /** Mark a resolving Tide as failed. Nothing else changes, so it can be retried. */
   failTide(seasonId: string, tide: number, message: string): Promise<void>;
   createSeason(args: CreateSeasonArgs): Promise<void>;
+  /** End the season now, whatever Tide it has reached, so a new one can start. Nothing is deleted: its Tides, battles and Gazettes stay in the database. */
+  endSeason(seasonId: string): Promise<void>;
   /** Every account that has signed up, oldest first. */
   listUserIds(): Promise<string[]>;
   /** Is this user one of the game masters (a row in `admins`)? */
@@ -168,7 +170,7 @@ export interface AdminLogEntry {
   /** ISO time. */
   at: string;
   adminId: string | null;
-  action: "resolve" | "retry" | "start";
+  action: "resolve" | "retry" | "start" | "end";
   tide: number;
   /** The status the resolver ended on, such as "resolved", "failed" or "busy". */
   outcome: string;

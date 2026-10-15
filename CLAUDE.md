@@ -6,7 +6,7 @@ The full design is in `docs/GAME_DESIGN.md`. It is long, so do not read it all a
 
 ## Current focus
 
-Building Season 0: a two week beta (14 Tides) for six friends, built by one developer. Follow section 19.1 of the design doc, one day at a time. Days 1 to 7 and client steps 1 to 7 are built (the sprites and the pixel font are still to come, see the 2026-10-15 palette entry in `docs/DECISIONS.md`). Next is client step 8, the internal playtest. Update this line when the focus changes.
+Building Season 0: a two week beta (14 Tides) for six friends, built by one developer. Follow section 19.1 of the design doc, one day at a time. Days 1 to 7 and client steps 1 to 7 are built (the sprites and the pixel font are still to come, see the 2026-10-15 palette entry in `docs/DECISIONS.md`). Client step 8, the internal playtest, is prepared: the runbook is `docs/PLAYTEST.md`, the player page is `docs/HOW_TO_PLAY.md`, and the Game master page can end a season. Next is the playtest itself (two people, 3 to 4 Tides by hand), then fixing its worst three problems and announcing the start date. Update this line when the focus changes.
 
 ## Design doc index (docs/GAME_DESIGN.md)
 

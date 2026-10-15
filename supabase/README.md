@@ -42,10 +42,15 @@ insert into admins (user_id) select id from auth.users where email = 'you@exampl
 ```
 
 Then the game header has a Game master button. From there you can see the running season, resolve the
-open Tide now, and retry a Tide that failed. Every resolve or retry is written to `admin_log` and shown
-on the page. The admin function refuses everyone else with a 403.
+open Tide now, retry a Tide that failed, start a season and end one. Every resolve, retry, start and end
+is written to `admin_log` and shown on the page. The admin function refuses everyone else with a 403.
 
-## Starting a season
+## Starting and ending a season
 
-There is no admin page button for this yet. A season is started by calling `startNewSeason`
-(`functions/_shared/api/handlers.ts`) with the captains' user ids.
+Start one from the Game master page when no season is running. The captains are every account that has
+signed up at that moment (or only you, to try things alone), so everyone must sign up first.
+
+End this season stops the running season early, for a playtest or a season that went wrong. Nothing is
+deleted, but the app only shows the active season, so an ended season is no longer readable there. Only
+one season can be active, so a new one cannot start until the old one has ended or finished its Tides.
+`docs/PLAYTEST.md` has the whole playtest runbook.

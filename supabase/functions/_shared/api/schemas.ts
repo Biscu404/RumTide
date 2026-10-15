@@ -59,6 +59,8 @@ export const adminSchema = z.discriminatedUnion("action", [
   z.strictObject({ action: z.literal("status") }),
   /** `tide` is the Tide the page shows, so a stale page cannot resolve a Tide that has moved on. */
   z.strictObject({ action: z.literal("resolve"), tide: z.number().int().min(1) }),
+  /** End the running season early (a playtest, or a season that went wrong). `tide` guards against a stale page, as for resolve. */
+  z.strictObject({ action: z.literal("end"), tide: z.number().int().min(1) }),
   /** Start a season now. `who` is everyone who has signed up, or only the caller (for trying things out). */
   z.strictObject({
     action: z.literal("start"),
