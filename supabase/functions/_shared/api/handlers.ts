@@ -15,7 +15,7 @@ import { startSeason, type NewCaptain } from "../engine/season.ts";
 import type { Gazette, MarketRow, Orders, Ship, Transaction } from "../engine/types.ts";
 import { failureMessage, gazetteMessage } from "./discord.ts";
 import { localDate, nextDueAt } from "./schedule.ts";
-import { adminSchema, portActionSchema, submitOrdersSchema } from "./schemas.ts";
+import { adminSchema, portActionSchema, submitOrdersSchema, type AdminPayload } from "./schemas.ts";
 import {
   ApiError, type AdminLogEntry, type CaptainView, type GameStore, type SeasonInfo, type TideHistoryEntry,
 } from "./store.ts";
@@ -236,12 +236,14 @@ export type AdminResult =
     tides: TideHistoryEntry[];
     log: AdminLogEntry[];
   }
-  | { outcome: ResolveOutcome };
+  | { outcome: ResolveOutcome }
+  | { started: { seasonId: string; name: string; captains: number } };
 
 /**
  * The game master's page. Callers must be in `admins`. `status` reads the running season, its recent
- * Tides and the admin log. `resolve` forces the open Tide now, or retries it when it has failed. Each
- * `resolve` is written to the admin log, so every admin action leaves a trace.
+ * Tides and the admin log. `resolve` forces the open Tide now, or retries it when it has failed.
+ * `start` begins a season when none is running. Each `resolve` and `start` is written to the admin log,
+ * so every admin action leaves a trace.
  */
 export async function adminRequest(deps: Deps, userId: string, body: unknown): Promise<AdminResult> {
   const p = parse(adminSchema, body);
@@ -259,6 +261,11 @@ export async function adminRequest(deps: Deps, userId: string, body: unknown): P
     };
   }
 
+  if (p.action === "start") {
+    if (active) throw new ApiError(`${active.season.name} is already running`, 409);
+    return await startFromAdmin(deps, userId, p);
+  }
+
   if (!active) throw new ApiError("No season is running", 404);
   if (active.tide.number !== p.tide) {
     throw new ApiError(`Tide ${active.tide.number} is the Tide now, not Tide ${p.tide}. Reload the page.`, 409);
@@ -273,6 +280,35 @@ export async function adminRequest(deps: Deps, userId: string, body: unknown): P
 }
 
 // ---- starting a season ----
+
+const DEFAULT_MAP_ID = "brine";
+const DEFAULT_TIMEZONE = "Europe/Bucharest";
+const DEFAULT_TIDE_TIME = "21:00";
+
+/** Ship names for captains who have not chosen one. Not account names: those stay private. */
+const SHIP_NAMES = [
+  "Black Gull", "Salt Widow", "Red Tern", "Grey Heron", "Iron Petrel", "Wild Skua",
+  "Sea Magpie", "Pale Kestrel", "Night Cormorant", "Crooked Albatross",
+];
+const shipNameFor = (i: number) => (i < SHIP_NAMES.length ? SHIP_NAMES[i]! : `${SHIP_NAMES[i % SHIP_NAMES.length]!} ${Math.floor(i / SHIP_NAMES.length) + 1}`);
+
+async function startFromAdmin(
+  deps: Deps, adminId: string, p: Extract<AdminPayload, { action: "start" }>,
+): Promise<AdminResult> {
+  const userIds = p.who === "me" ? [adminId] : await deps.store.listUserIds();
+  if (userIds.length === 0) throw new ApiError("Nobody has signed up yet", 409);
+  const seasonId = crypto.randomUUID();
+  await startNewSeason(deps, {
+    seasonId, name: p.name, mapId: DEFAULT_MAP_ID, preset: p.preset,
+    timezone: DEFAULT_TIMEZONE, tideTimeLocal: p.tideTimeLocal ?? DEFAULT_TIDE_TIME,
+    captains: userIds.map((userId, i) => ({ id: crypto.randomUUID(), userId, shipName: shipNameFor(i) })),
+  });
+  await deps.store.appendAdminLog({
+    seasonId, at: deps.now().toISOString(), adminId, action: "start", tide: 1, outcome: "started",
+    detail: `${userIds.length} ${userIds.length === 1 ? "captain" : "captains"}, ${p.preset}`,
+  });
+  return { started: { seasonId, name: p.name, captains: userIds.length } };
+}
 
 export interface StartSeasonInput {
   seasonId: string;

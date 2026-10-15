@@ -93,7 +93,7 @@ function Game({ client, session }: { client: NonNullable<typeof supabase>; sessi
     ?? (!season ? "No season is running yet." : null)
     ?? (!hasShip ? "You are not a captain in this season." : null);
 
-  if (inAdmin) return <Admin client={client} onClose={() => setInAdmin(false)} />;
+  if (inAdmin) return <Admin client={client} onClose={() => { setInAdmin(false); void refresh(); }} />;
 
   return (
     <div class="screen">

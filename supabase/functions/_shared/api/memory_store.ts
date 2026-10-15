@@ -173,6 +173,13 @@ export class MemoryStore implements GameStore {
   /** The user ids that may use the admin page. Tests add to it. */
   readonly admins = new Set<string>();
 
+  /** The accounts that have signed up, oldest first. Tests add to it. */
+  readonly users: string[] = [];
+
+  async listUserIds(): Promise<string[]> {
+    return [...this.users];
+  }
+
   async isAdmin(userId: string): Promise<boolean> {
     return this.admins.has(userId);
   }

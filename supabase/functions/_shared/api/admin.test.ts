@@ -74,4 +74,73 @@ describe("admin page", () => {
     expect((await page(w, "ann")).log[0]).toMatchObject({ action: "retry", tide: 1, outcome: "resolved" });
     expect(w.store.tideInfo("s0").number).toBe(2);
   });
+
+  describe("starting a season", () => {
+    const start = (w: TestWorld, who: string, extra: object = {}) =>
+      adminRequest(w.deps, w.user(who), { action: "start", name: "Test Season", preset: "season0", who: "all", ...extra });
+
+    it("refuses everyone who is not in admins", async () => {
+      const w = testWorld();
+      w.store.users.push(w.user("ann"));
+      expect((await failure(start(w, "ann"))).status).toBe(403);
+      expect(await w.store.activeSeason()).toBeNull();
+    });
+
+    it("starts a season with every account, each with a ship in a port, and logs it", async () => {
+      const w = testWorld();
+      w.store.users.push(w.user("ann"), w.user("bob"), w.user("cat"));
+      w.store.admins.add(w.user("ann"));
+      const reply = await start(w, "ann") as { started: { seasonId: string; captains: number } };
+      expect(reply.started.captains).toBe(3);
+
+      const active = (await w.store.activeSeason())!;
+      expect(active.season).toMatchObject({ id: reply.started.seasonId, name: "Test Season", lengthTides: 14, tideTimeLocal: "21:00" });
+      expect(active.tide).toMatchObject({ number: 1, status: "open" });
+      const view = (await w.store.captainView(w.user("bob")))!;
+      expect(view.ship.docked).toBe(true);
+      expect(view.captain.shipName).not.toContain("user-");
+
+      const log = (await page(w, "ann")).log;
+      expect(log[0]).toMatchObject({ action: "start", tide: 1, outcome: "started", adminId: w.user("ann") });
+    });
+
+    it("can start with only the game master aboard, and with another Tide time", async () => {
+      const w = testWorld();
+      w.store.users.push(w.user("ann"), w.user("bob"));
+      w.store.admins.add(w.user("ann"));
+      const reply = await start(w, "ann", { who: "me", preset: "full", tideTimeLocal: "09:30" }) as { started: { captains: number } };
+      expect(reply.started.captains).toBe(1);
+      expect((await w.store.activeSeason())!.season).toMatchObject({ lengthTides: 28, tideTimeLocal: "09:30" });
+      expect(await w.store.captainView(w.user("bob"))).toBeNull();
+    });
+
+    it("plays: the new season's first Tide can be resolved by the same page", async () => {
+      const w = testWorld();
+      w.store.users.push(w.user("ann"));
+      w.store.admins.add(w.user("ann"));
+      await start(w, "ann", { who: "me" });
+      const reply = await adminRequest(w.deps, w.user("ann"), { action: "resolve", tide: 1 });
+      expect(reply).toMatchObject({ outcome: { status: "resolved", tide: 1 } });
+    });
+
+    it("refuses while a season is running, and when nobody has signed up", async () => {
+      const running = await seasonWorld();
+      running.store.admins.add(running.user("ann"));
+      expect((await failure(start(running, "ann"))).status).toBe(409);
+
+      const empty = testWorld();
+      empty.store.admins.add(empty.user("ann"));
+      expect((await failure(start(empty, "ann"))).status).toBe(409);
+    });
+
+    it("refuses a bad name, preset or Tide time", async () => {
+      const w = testWorld();
+      w.store.users.push(w.user("ann"));
+      w.store.admins.add(w.user("ann"));
+      for (const bad of [{ name: "  " }, { preset: "forever" }, { tideTimeLocal: "25:00" }, { who: "nobody" }]) {
+        expect((await failure(start(w, "ann", bad))).status).toBe(400);
+      }
+      expect(await w.store.activeSeason()).toBeNull();
+    });
+  });
 });

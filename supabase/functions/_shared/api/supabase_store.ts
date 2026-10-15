@@ -166,6 +166,12 @@ export class SupabaseStore implements GameStore {
     unwrap(await this.db.rpc("create_season", { p_args: args }));
   }
 
+  async listUserIds(): Promise<string[]> {
+    const { data, error } = await this.db.auth.admin.listUsers({ perPage: 1000 });
+    if (error) throw new Error(`users: ${error.message}`);
+    return data.users.slice().sort((a, b) => a.created_at.localeCompare(b.created_at)).map((u) => u.id);
+  }
+
   async isAdmin(userId: string): Promise<boolean> {
     return unwrap(await this.db.from("admins").select("user_id").eq("user_id", userId).maybeSingle()) !== null;
   }

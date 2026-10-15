@@ -227,3 +227,11 @@ A single install and a single `npm test` cover the client, the engine tests and 
 * **The text replay is built only from the saved `Battle` record** (`gazetteModel.ts`). Each round lists what every ship chose, whether it had the edge, whether it repeated its last move, the damage it dealt, the damage each side dealt and the hull left. It adds the result, gold that changed hands and bounties put on heads. Luck rolls are left out on purpose, so the screen does not invite players to read the dice.
 * **Names come from `public_captains` and `public_npcs`.** Merchants are shown by kind, as in the Gazette text. The client still never reads `tides`, so the seed stays hidden.
 * **Not done on purpose:** the 200 fight forecast, and reading the Gazette without a ship in the season (the Gazette tab sits in the captain's desk, which needs a captain).
+
+## 2026-10-15: The game master can start a season
+
+* **Not in the plan, added so the features can be tried.** The admin function has a `start` action and the Admin page shows a "Start a season" form while no season is running. Section 19.1 had seasons started from the SQL editor or the bots only.
+* **Only an admin can start one, and only when no season is running** (409 otherwise). The one active season index in the database stays the final guard.
+* **Captains are the accounts that have signed up, or only the caller.** "Only me" is the debug mode: a one captain season to look at the screens alone. Ship names come from a fixed list, never from account emails, so nobody's email shows on the map.
+* **The map is Brine, the time zone is Europe/Bucharest, and the Tide time defaults to 21:00** (changeable in the form). The first Tide is due at the next Tide time, and the admin can always resolve it now.
+* **The start is written to the admin log** with the number of captains and the preset.

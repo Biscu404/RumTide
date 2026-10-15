@@ -13,6 +13,7 @@ interface StatusReply {
   tides: TideRow[];
   log: LogRow[];
 }
+interface StartReply { started: { seasonId: string; name: string; captains: number } }
 interface ResolveReply {
   outcome: { status: string; tide?: number; reason?: string; error?: string; seasonEnded?: boolean };
 }
@@ -36,6 +37,7 @@ function outcomeText(reply: ResolveReply["outcome"]): string {
 
 export function Admin({ client, onClose }: { client: SupabaseClient; onClose: () => void }) {
   const [status, setStatus] = useState<StatusReply | null>(null);
+  const [start, setStart] = useState({ name: "Season 0", preset: "season0", who: "all", tideTimeLocal: "21:00" });
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -71,6 +73,21 @@ export function Admin({ client, onClose }: { client: SupabaseClient; onClose: ()
     await load();
   }
 
+  async function startSeason(event: Event) {
+    event.preventDefault();
+    const who = start.who === "me" ? "only you" : "everyone who has signed up";
+    if (!window.confirm(`Start "${start.name}" now with ${who}? Tide 1 opens at once.`)) return;
+    setBusy(true);
+    setMessage(null);
+    const { data, error: failure } = await client.functions.invoke<StartReply>("admin", {
+      body: { action: "start", ...start },
+    });
+    setBusy(false);
+    if (failure) setError(await explain(failure));
+    else if (data) setMessage(`${data.started.name} started with ${data.started.captains} ${data.started.captains === 1 ? "captain" : "captains"}. Go back to the map to play.`);
+    await load();
+  }
+
   const season = status?.season;
   const current = status?.tide;
 
@@ -87,7 +104,37 @@ export function Admin({ client, onClose }: { client: SupabaseClient; onClose: ()
       <main class="admin">
         {error && <p class="notice" role="alert">{error}</p>}
         {message && <p class="notice" role="status">{message}</p>}
-        {!season && !error && <p class="dim">No season is running.</p>}
+        {!season && !error && status && (
+          <section class="admin-panel">
+            <h2>Start a season</h2>
+            <p class="dim">No season is running. Every account that has signed up becomes a captain, or choose only you to try things out alone.</p>
+            <form class="admin-form" onSubmit={(e) => void startSeason(e)}>
+              <label>
+                Name
+                <input value={start.name} maxLength={60} required onInput={(e) => setStart({ ...start, name: e.currentTarget.value })} />
+              </label>
+              <label>
+                Length
+                <select value={start.preset} onChange={(e) => setStart({ ...start, preset: e.currentTarget.value })}>
+                  <option value="season0">Season 0: 14 Tides, six friends</option>
+                  <option value="full">Full season: 28 Tides</option>
+                </select>
+              </label>
+              <label>
+                Captains
+                <select value={start.who} onChange={(e) => setStart({ ...start, who: e.currentTarget.value })}>
+                  <option value="all">Everyone who has signed up</option>
+                  <option value="me">Only me (testing)</option>
+                </select>
+              </label>
+              <label>
+                Tide time each day
+                <input type="time" value={start.tideTimeLocal} required onInput={(e) => setStart({ ...start, tideTimeLocal: e.currentTarget.value })} />
+              </label>
+              <button type="submit" disabled={busy || !start.name.trim()}>Start season now</button>
+            </form>
+          </section>
+        )}
 
         {season && current && (
           <section class="admin-panel">

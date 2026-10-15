@@ -41,5 +41,14 @@ export const adminSchema = z.discriminatedUnion("action", [
   z.strictObject({ action: z.literal("status") }),
   /** `tide` is the Tide the page shows, so a stale page cannot resolve a Tide that has moved on. */
   z.strictObject({ action: z.literal("resolve"), tide: z.number().int().min(1) }),
+  /** Start a season now. `who` is everyone who has signed up, or only the caller (for trying things out). */
+  z.strictObject({
+    action: z.literal("start"),
+    name: z.string().trim().min(1).max(60),
+    preset: z.enum(["season0", "full"]),
+    who: z.enum(["all", "me"]),
+    /** The wall clock time Tides are due, such as "21:00". */
+    tideTimeLocal: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
+  }),
 ]);
 export type AdminPayload = z.infer<typeof adminSchema>;
