@@ -7,6 +7,7 @@
 // fails with a 409 so the caller can look again.
 
 import type { FleetBook } from "../engine/fleet.ts";
+import type { IncomeRosterEntry } from "../engine/income.ts";
 import type { TideResult } from "../engine/resolve.ts";
 import type { TideSnapshot } from "../engine/season.ts";
 import type { Captain, MarketRow, Orders, Season, Ship, Tide, Transaction } from "../engine/types.ts";
@@ -51,8 +52,11 @@ export interface CaptainView {
   version: number;
   /** The market rows at the ship's node. Empty at sea. */
   market: MarketRow[];
-  /** Every captain in the season, for checking hunt, escort and invite targets. */
-  roster: { id: string; shipName: string; fleetId: string | null }[];
+  /**
+   * Every captain in the season, for checking hunt, escort and invite targets, and (with where the ship
+   * is) for the convoy bonus of engine/income.ts.
+   */
+  roster: (IncomeRosterEntry & { shipName: string })[];
 }
 
 /** The fleets of a season and the revision they were read at, which a change hands back. */
@@ -80,6 +84,14 @@ export interface PortChange {
   /** A market row that changed, as it was and as it is now. */
   market: { before: MarketRow; after: MarketRow } | null;
   transaction: Omit<Transaction, "id">;
+}
+
+export interface StandingOrdersChange {
+  seasonId: string;
+  tide: number;
+  captainId: string;
+  plan: Captain["standingPlan"];
+  parley: Captain["standingParley"];
 }
 
 export interface TideState {
@@ -112,6 +124,11 @@ export interface GameStore {
   saveOrders(seasonId: string, orders: Orders): Promise<void>;
   /** Write a port action. Throws a 409 if the Tide is not open or the captain changed since `expectedVersion`. */
   applyPortChange(change: PortChange): Promise<void>;
+  /**
+   * Replace one captain's standing plan and standing parley. Throws a 409 unless that Tide is open.
+   * It bumps the captain's `version`, so a port action worked out before it is refused rather than writing the old plan back.
+   */
+  saveStandingOrders(change: StandingOrdersChange): Promise<void>;
   loadFleets(seasonId: string): Promise<FleetState>;
   /** Replace the season's fleets. Throws a 409 unless the Tide is open and the fleets are still as they were at `expectedRev`. */
   applyFleetChange(change: FleetChange): Promise<void>;
@@ -125,6 +142,8 @@ export interface GameStore {
   /** Mark a resolving Tide as failed. Nothing else changes, so it can be retried. */
   failTide(seasonId: string, tide: number, message: string): Promise<void>;
   createSeason(args: CreateSeasonArgs): Promise<void>;
+  /** End the season now, whatever Tide it has reached, so a new one can start. Nothing is deleted: its Tides, battles and Gazettes stay in the database. */
+  endSeason(seasonId: string): Promise<void>;
   /** Every account that has signed up, oldest first. */
   listUserIds(): Promise<string[]>;
   /** Is this user one of the game masters (a row in `admins`)? */
@@ -151,7 +170,7 @@ export interface AdminLogEntry {
   /** ISO time. */
   at: string;
   adminId: string | null;
-  action: "resolve" | "retry" | "start";
+  action: "resolve" | "retry" | "start" | "end";
   tide: number;
   /** The status the resolver ended on, such as "resolved", "failed" or "busy". */
   outcome: string;

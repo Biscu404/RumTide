@@ -26,6 +26,13 @@ export const submitOrdersSchema = z.strictObject({
 });
 export type SubmitOrdersPayload = z.infer<typeof submitOrdersSchema>;
 
+/** The plan and parley a captain falls back on when no orders are sent (section 12.4). */
+export const standingOrdersSchema = z.strictObject({
+  plan: z.tuple([maneuver, maneuver, maneuver]),
+  parley,
+});
+export type StandingOrdersPayload = z.infer<typeof standingOrdersSchema>;
+
 const units = z.number().int().min(1).max(1000);
 
 export const portActionSchema = z.discriminatedUnion("action", [
@@ -52,6 +59,8 @@ export const adminSchema = z.discriminatedUnion("action", [
   z.strictObject({ action: z.literal("status") }),
   /** `tide` is the Tide the page shows, so a stale page cannot resolve a Tide that has moved on. */
   z.strictObject({ action: z.literal("resolve"), tide: z.number().int().min(1) }),
+  /** End the running season early (a playtest, or a season that went wrong). `tide` guards against a stale page, as for resolve. */
+  z.strictObject({ action: z.literal("end"), tide: z.number().int().min(1) }),
   /** Start a season now. `who` is everyone who has signed up, or only the caller (for trying things out). */
   z.strictObject({
     action: z.literal("start"),

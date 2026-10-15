@@ -1,26 +1,45 @@
+/* Every colour is a variable defined here, and every variable is an Endesga 32 colour (section 2.1).
+   palette.test.ts checks that these match UI in palette.ts and that no other hex appears below. */
 :root {
-  --bg: #0b2a4a;
-  --panel: #12385f;
-  --text: #f3ead2;
-  --dim: #9db8d4;
-  --accent: #ffd23f;
+  --bg: #181425;
+  --panel: #262b44;
+  --text: #ead4aa;
+  --dim: #8b9bb4;
+  --accent: #feae34;
+  --accent-ink: #181425;
+  --line: #3a4466;
+  --frame: #733e39;
+  --frame-deep: #3e2731;
+  --error: #f6757a;
   color-scheme: dark;
   font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  -webkit-text-size-adjust: 100%;
 }
 
 * { box-sizing: border-box; }
 
 html, body, #app { height: 100%; margin: 0; }
+@supports (height: 100dvh) {
+  html, body, #app { height: 100dvh; }
+}
 
-body { background: var(--bg); color: var(--text); }
+/* A pulled down page must not reload the game in the middle of a pan on the map. */
+body { background: var(--bg); color: var(--text); overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
 
-.screen { display: flex; flex-direction: column; height: 100%; }
+:focus-visible { outline: 3px solid var(--text); outline-offset: 2px; }
+
+/* Notches and rounded corners on phones (viewport-fit=cover in index.html). */
+.screen {
+  display: flex; flex-direction: column; height: 100%;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
 
 .bar {
-  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-  padding: 8px 16px; background: var(--panel);
+  display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap;
+  padding: 8px 16px; background: var(--panel); border-bottom: 4px solid var(--frame);
 }
 .bar .spacer { flex: 1; }
+.bar strong { min-width: 0; overflow-wrap: anywhere; }
 
 .map-host { flex: 1; min-height: 0; position: relative; overflow: hidden; touch-action: none; }
 .map-host canvas { display: block; }
@@ -38,57 +57,67 @@ body { background: var(--bg); color: var(--text); }
 .notice { margin: 0; color: var(--accent); }
 
 input {
-  padding: 10px; font: inherit; color: var(--text);
-  background: var(--bg); border: 1px solid var(--dim); border-radius: 4px;
+  min-height: 44px; padding: 10px; font: inherit; color: var(--text);
+  background: var(--bg); border: 2px solid var(--line); border-radius: 0;
 }
+input[type="checkbox"] { min-height: 0; width: 22px; height: 22px; accent-color: var(--accent); }
 
+/* Chunky pixel buttons that press down. At least 44 pixels tall, so a thumb can hit them. */
 button {
-  padding: 10px 14px; font: inherit; font-weight: bold; cursor: pointer;
-  color: #1a1206; background: var(--accent); border: 0; border-radius: 4px;
+  min-height: 44px; padding: 10px 14px; font: inherit; font-weight: bold; cursor: pointer; touch-action: manipulation;
+  color: var(--accent-ink); background: var(--accent);
+  border: 2px solid var(--frame-deep); border-radius: 0; box-shadow: 0 3px 0 var(--frame-deep);
 }
-button.secondary { color: var(--text); background: transparent; border: 1px solid var(--dim); }
+button:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 var(--frame-deep); }
+button.secondary { color: var(--text); background: transparent; border: 2px solid var(--dim); box-shadow: none; }
+button.secondary:active:not(:disabled) { transform: none; background: var(--line); }
 button:disabled { opacity: 0.5; cursor: default; }
 
 .admin { padding: 16px; display: flex; flex-direction: column; gap: 16px; overflow: auto; }
-.admin-panel { background: var(--panel); padding: 12px 16px; border-radius: 4px; }
+.admin-panel { background: var(--panel); padding: 12px 16px; border: 2px solid var(--line); }
 .admin-panel h2 { margin: 0 0 8px; font-size: 1.1em; color: var(--accent); }
 .admin-panel button { margin-top: 8px; }
 .admin-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
-.error { color: #ff8a80; }
+.error { color: var(--error); }
 
-/* The captain's desk: the Orders and Port screens under the map. */
-.dock { background: var(--panel); border-top: 2px solid var(--accent); max-height: 55vh; display: flex; flex-direction: column; }
-.tabs { display: flex; align-items: center; gap: 4px; padding: 6px 12px; flex-wrap: wrap; }
+/* The captain's desk: the Orders and Port screens under the map, on a dark wood frame. */
+.dock { background: var(--panel); border-top: 4px solid var(--frame); max-height: 55vh; display: flex; flex-direction: column; }
+@supports (height: 100dvh) {
+  .dock { max-height: 55dvh; }
+}
+.tabs { display: flex; align-items: center; gap: 4px 8px; padding: 6px 12px; flex-wrap: wrap; }
+.tablist { display: flex; gap: 4px; flex: 0 1 auto; max-width: 100%; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+.tablist::-webkit-scrollbar { display: none; }
 .tabs .spacer { flex: 1; }
-.tab { color: var(--text); background: transparent; border: 1px solid var(--dim); }
-.tab.on { color: #1a1206; background: var(--accent); border-color: var(--accent); }
+.tab { flex: 0 0 auto; color: var(--text); background: transparent; border: 2px solid var(--dim); box-shadow: none; }
+.tab.on { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
 .stats { white-space: nowrap; }
 .small { font-size: 0.85em; margin: 2px 0 8px; }
 
-.panel-body { padding: 4px 16px 16px; overflow: auto; display: flex; flex-direction: column; gap: 4px; }
+.panel-body { padding: 4px 16px 16px; overflow: auto; display: flex; flex-direction: column; gap: 4px; overscroll-behavior: contain; }
 .panel-body h2 { margin: 4px 0; font-size: 1.1em; color: var(--accent); }
 .panel-body h3 { margin: 12px 0 4px; font-size: 1em; color: var(--accent); }
 .panel-body p { margin: 4px 0; }
 .panel-body fieldset { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .panel-body label { display: flex; flex-direction: column; gap: 4px; color: var(--dim); }
 .panel-body label.check { flex-direction: row; align-items: center; gap: 8px; }
-.sentence { padding: 8px 10px; background: var(--bg); border-radius: 4px; line-height: 1.4; }
+.sentence { padding: 8px 10px; background: var(--bg); border: 2px solid var(--line); line-height: 1.4; }
 .rounds { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
-.card { background: var(--bg); padding: 10px; border-radius: 4px; display: flex; flex-direction: column; gap: 6px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); gap: 8px; }
+.card { background: var(--bg); padding: 10px; border: 2px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
 .card input[type="number"] { width: 6em; }
-.tag { color: var(--accent); font-size: 0.8em; border: 1px solid var(--accent); border-radius: 3px; padding: 0 4px; }
+.tag { color: var(--accent); font-size: 0.8em; border: 1px solid var(--accent); padding: 0 4px; }
 
 select {
-  padding: 10px; font: inherit; color: var(--text);
-  background: var(--bg); border: 1px solid var(--dim); border-radius: 4px;
+  min-height: 44px; padding: 10px; font: inherit; color: var(--text); touch-action: manipulation;
+  background: var(--bg); border: 2px solid var(--line); border-radius: 0;
 }
 
 .lines { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; line-height: 1.4; }
-.battle { background: var(--bg); border-radius: 4px; padding: 8px 10px; margin-bottom: 6px; }
-.battle summary { cursor: pointer; }
+.battle { background: var(--bg); border: 2px solid var(--line); padding: 8px 10px; margin-bottom: 6px; }
+.battle summary { cursor: pointer; min-height: 32px; display: flex; align-items: center; }
 .battle .card { background: var(--panel); margin-top: 6px; }
 
 .admin-form { display: flex; flex-direction: column; gap: 8px; max-width: 420px; }
@@ -96,9 +125,39 @@ select {
 
 /* Fleets: the sail colour is always shown with the fleet's name, never alone. */
 .fleet-name { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.swatch { display: inline-block; width: 14px; height: 14px; border-radius: 2px; border: 1px solid var(--text); }
+.swatch { display: inline-block; width: 14px; height: 14px; border: 1px solid var(--text); }
 
 /* The battle replay: a 320 by 180 canvas that the page scales by whole numbers only. */
 .replay { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
-.replay-host { width: 100%; display: flex; justify-content: center; background: #181425; }
+.replay-host { width: 100%; display: flex; justify-content: center; background: var(--bg); }
 .replay-host canvas { display: block; image-rendering: pixelated; }
+
+/* The Legend leaderboard. Rank is a number and the marks are words, never colour alone. */
+.legend { width: 100%; border-collapse: collapse; }
+.legend th { text-align: left; color: var(--dim); font-weight: normal; padding: 2px 6px; }
+.legend td { padding: 6px; border-top: 1px solid var(--line); vertical-align: top; }
+.legend .num { text-align: right; white-space: nowrap; }
+.legend .me td { background: var(--bg); }
+.legend .marks { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 2px; }
+.legend .tag { white-space: nowrap; }
+.legend .fleet-name { margin: 0; }
+
+/* Phones: a tighter top bar, a desk that leaves the map room, and one maneuver picker per line. */
+@media (max-width: 640px) {
+  .bar { padding: 6px 10px; gap: 6px 8px; }
+  .bar button { min-height: 40px; padding: 6px 10px; }
+  .tabs { padding: 6px 10px; }
+  .stats { flex: 1 0 100%; white-space: normal; order: 3; }
+  .tabs .spacer { display: none; }
+  .dock { max-height: 50vh; }
+  .panel-body { padding: 4px 10px 16px; }
+  .rounds { grid-template-columns: minmax(0, 1fr); }
+  .actions button { flex: 1 1 140px; }
+  .legend { font-size: 0.9em; }
+  .login { margin-top: 6vh; }
+}
+@media (max-width: 640px) {
+  @supports (height: 100dvh) {
+    .dock { max-height: 50dvh; }
+  }
+}

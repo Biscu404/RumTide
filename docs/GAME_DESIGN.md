@@ -186,7 +186,7 @@ Calm Seas halves PvP loot, so Season 0 has only 7 Tides of full PvP. That is eno
 | Fleet of 2 | 7 | Tide 14 | about 4,700 |
 | Fleet of 3 | 7 | Tide 13 | about 5,500 |
 
-The longest stretch without an upgrade is about 1 Tide for every captain type, and a solo trader who misses Tides 5 to 7 still reaches the Brigantine on Tide 10 and earns about 85% of what an unbroken captain earns. Fleets of 2 or 3 could afford a Frigate on Tides 13 and 14, so leave the Frigate out of Season 0 and let them keep buying upgrades. If you want a finale carrot, build it and enable it for fleets only.
+The longest stretch without an upgrade is about 1 Tide for every captain type, and a solo trader who misses Tides 5 to 7 still reaches the Brigantine on Tide 10 and earns about 85% of what an unbroken captain earns (the engine's bot trader gets about 77% with Shore Leave at +50%, see docs/DECISIONS.md). Fleets of 2 or 3 could afford a Frigate on Tides 13 and 14, so leave the Frigate out of Season 0 and let them keep buying upgrades. If you want a finale carrot, build it and enable it for fleets only.
 
 Season 0 pacing (solo trader and fleet of 3, averages):
 
@@ -271,7 +271,7 @@ Each Tide resolves like this. These rules go into the engine exactly as written.
 4. **Encounters.** A meeting becomes an encounter only if at least one ship is Hunting and its target filter matches the other ship, and the other ship is not protected (docked, or under a shield).
 5. **Escape roll.** The hunted ship tries to slip away (formula in section 14). If it escapes, both continue.
 6. **Battle.** Otherwise the ships fight (section 7). Everyone in an encounter stops moving for the rest of the Tide. Fleet mates on the same node who are Hunting or Escorting join their side.
-7. **Exploration.** A ship that ends its course on an island or wreck with the Explore intent, and did not fight, draws an event.
+7. **Exploration.** A ship that sails to an island or wreck with the Explore intent, ends its course there and did not fight, draws an event. A ship that already lies there and does not move draws nothing, so one spot cannot be farmed Tide after Tide.
 8. **Docking.** A ship that ends on a port docks: its plunder is banked, its hull is repaired (for a fee), and it can trade next session.
 9. **Order.** Encounters resolve in step order, then by node id, using the Tide's stored random seed, so any Tide can be replayed exactly.
 
@@ -282,7 +282,7 @@ Each Tide resolves like this. These rules go into the engine exactly as written.
 | Trade Run | Default. Does not start fights. Normal escape chance. |
 | Sail Quietly | Better escape chance. Cannot hunt or explore. |
 | Hunt | Starts fights with whatever matches your filter: merchants only, players only, anyone, or one named captain. |
-| Explore | Draws an event if you end on an island or wreck. |
+| Explore | Draws an event if you sail to an island or wreck and do not fight on the way. |
 | Escort | Copies a fleet mate's course and joins any battle they are in. |
 
 ## 4.6 NPC ships
@@ -385,7 +385,7 @@ What the simulation says, in plain words:
 * **Co op pays:** over 28 Tides a solo trader earns about 10,400 doubloons, a fleet of two about 16,600 each (1.6 times), a fleet of three about 19,600 each (1.9 times). The simulation pays every fleet the full weekly galleon prize; real two ship fleets will sometimes only win half, so expect them a little lower.
 * **Power stays close enough:** the biggest gap between a fleet member and a solo captain is about 1.6 times PR (Tides 20 to 22), and it narrows again as solo captains reach their Frigate. Wealth and Legend diverge much more than power, which is the point: co op makes you richer and more famous, not unbeatable.
 * **Raiders are viable:** a captain who mostly hunts merchants ends the season at about 90% of a trader's earnings with more variance, before counting PvP loot and bounties.
-* **Missing days is not fatal:** a captain who missed Tides 6 to 8 ends the season at about 93% of an unbroken solo captain's earnings, thanks to Shore Leave (section 12).
+* **Missing days is not fatal:** a captain who missed Tides 6 to 8 ends the season at about 93% of an unbroken solo captain's earnings, thanks to Shore Leave (section 12). The engine's bot trader gets about 77% at +50% (docs/DECISIONS.md), because standing orders pull a ship off its trade loop.
 
 # 6. Economy
 
@@ -538,7 +538,7 @@ The orders screen runs the shared engine 200 times in the browser to show a fore
 
 ## 8.2 How combined effort multiplies results
 
-1. **Convoy bonus.** +10% to trade profit and prizes for each fleet mate who ends the Tide on the same or an adjacent node.
+1. **Convoy bonus.** +10% to trade profit and prizes for each fleet mate who ends the Tide on the same or an adjacent node. "Prizes" are merchant and galleon prizes; PvP loot, tribute and bounties only move gold between captains and get no bonus. For a sale the mates are judged where they are now, for a prize where they ended the Tide's movement.
 2. **Fleet bonus in battle.** +10% damage per extra fleet ship in the fight, up to +30%.
 3. **Superlinear prizes.** Co op prizes pay `base * boom * N ** 1.5` in total, split evenly. Each captain's share compared with going alone:
 
@@ -595,7 +595,7 @@ The rules:
 
 ## 10.1 Exploration events (MVP deck of 12)
 
-Drawn when a ship ends on an island or wreck with the Explore intent. Weights shift by node type; the Maw multiplies rewards by 1.5.
+Drawn when a ship sails to an island or wreck with the Explore intent (section 4.4 rule 7). Weights shift by node type; the Maw multiplies rewards by 1.5. An event that could do nothing for the ship (a repair at full hull, a rum cache with a full Hold, a longer course for a ship already at the Tide's limit, a bottle with no galleon still two Tides away) is left out of the draw. The numbers are in `balance.ts` under `explore`.
 
 | Event | Effect |
 |-|-|
@@ -690,8 +690,9 @@ Notifications fire only for things that matter (R2.2). On iPhones, web push work
 ## 12.4 Catch up for missed Tides
 
 * **Standing orders.** If you do not submit orders, your ship repeats a safe default: stay docked if in port; if at sea, sail Quietly to the nearest port. Your standing battle plan defends you.
-* **Shore Leave.** Each Tide you miss stores one Tide of +50% income, up to 3, used automatically when you return. This is WoW's rested bonus framing (R3.2): coming back is rewarded, nobody is punished for having a life.
-* **Fair Winds.** Captains below 70% of the median Legend get +20% income.
+* **Shore Leave.** Each Tide you miss stores one Tide of +50% income, up to 3, used automatically when you return. This is WoW's rested bonus framing (R3.2): coming back is rewarded, nobody is punished for having a life. "Income" is the profit on goods sold and merchant and galleon prizes. A stored Tide is spent on the first Tide you bank any of that, and every sale profit and prize in that Tide pays +50%; a Tide with no income spends nothing.
+* **Fair Winds.** Captains below 70% of the median Legend get +20% income. It is judged once, when a Tide opens, so it holds for the whole Tide.
+* **The bonuses add together** (1 + 0.5 + 0.2 + 0.1 per fleet mate), they never multiply.
 * **Late joiners.** A friend who joins mid season starts with doubloons equal to 60% of the median lifetime earnings and one hull below the median, so they can contribute to a fleet immediately.
 * **Nothing decays.** No crew wages, no food, no rotting cargo. The Pixel Piracy lesson (R1.6).
 * **Caretaker.** A captain absent for 5 Tides is marked "Ashore": their ship stays docked and they drop out of the Ready count so the group can still trigger early Tides.
@@ -926,6 +927,7 @@ type Good = "rum" | "sugar" | "spice";
 type HullId = "sloop" | "brigantine" | "frigate";
 type Maneuver = "broadside" | "outmaneuver" | "board";
 type Intent = "trade" | "quiet" | "hunt" | "explore" | "escort";
+type Omen = "castaway" | "cursedCoin" | "mermaid" | "cartographer";   // left behind by exploration events, section 10.1
 type NpcKind = "smallTrader" | "fatMerchant" | "galleon";   // Season 0 NPCs only, see DECISIONS.md
 
 interface Season {
@@ -946,7 +948,10 @@ interface Captain {
   legend: number; chestGold: number; bounty: number;
   shieldUntilTide: number | null; fleetId: string | null;
   standingPlan: [Maneuver, Maneuver, Maneuver]; standingParley: "off" | 1.25 | 1.5;
-  shoreLeaveTides: number; lastOrdersTide: number; status: "active" | "ashore";
+  shoreLeaveTides: number; shoreLeaveUsedTide: number;   // stored Tides, and the Tide one was last spent in (0 for never)
+  fairWinds: boolean;                                    // below 70% of the median Legend as this Tide opened
+  omens: Omen[];                                         // what exploration events left for later: "castaway" | "cursedCoin" | "mermaid" | "cartographer"
+  lastOrdersTide: number; status: "active" | "ashore";
 }
 
 interface Ship {
@@ -1007,6 +1012,7 @@ Maps are static JSON in the repo, not database rows. In Postgres each interface 
 | `port_action` | buy or sell (good, quantity), upgrade (stat), repair, shipwright (amount) | Ship is docked; enough Chest gold; hold space; level below max |
 | `fleet_action` | create (name, flag), invite (captain), accept, leave | Size cap; not already in a fleet; leaving takes effect next Tide |
 | `profile` | ship name, flag choice, parting shot | Length limits, profanity filter optional |
+| `standing_orders` | standing plan (3 maneuvers), standing parley | Tide is open; plan has 3 valid maneuvers; parley is off or one of the two thresholds |
 | `admin` | trigger Tide, adjust a balance value, post a Riddle Map, compensate | Caller is the season admin; every action logged publicly |
 
 The client never sends gold amounts it wants to have, results, positions it claims to be at, damage, or times.

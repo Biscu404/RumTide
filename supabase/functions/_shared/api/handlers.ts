@@ -4,22 +4,23 @@
 // only wire a request to one of these, which is what lets bots play a season through them.
 
 import type { ZodType, z } from "zod";
-import { speed } from "../engine/balance.ts";
+import { courseLimit } from "../engine/explore.ts";
 import type { GameMap } from "../engine/map.ts";
 import {
   FleetError, acceptInvite, createFleet, declineInvite, fleetById, inviteCaptain, leaveFleet, type FleetBook,
 } from "../engine/fleet.ts";
+import { describeBonus, incomeFacts } from "../engine/income.ts";
 import { courseError } from "../engine/movement.ts";
 import {
   PortError, buyGood, buyUpgrade, feedShipwright, repairShip, sellGood, type PortContext,
 } from "../engine/port.ts";
 import { resolveTide } from "../engine/resolve.ts";
 import { startSeason, type NewCaptain } from "../engine/season.ts";
-import type { Gazette, MarketRow, Orders, Ship, Transaction } from "../engine/types.ts";
+import type { Captain, Gazette, MarketRow, Orders, Ship, Transaction } from "../engine/types.ts";
 import { failureMessage, fleetLeaveMessage, gazetteMessage } from "./discord.ts";
 import { localDate, nextDueAt } from "./schedule.ts";
 import {
-  adminSchema, fleetActionSchema, portActionSchema, submitOrdersSchema, type AdminPayload,
+  adminSchema, fleetActionSchema, portActionSchema, standingOrdersSchema, submitOrdersSchema, type AdminPayload,
 } from "./schemas.ts";
 import {
   ApiError, type AdminLogEntry, type CaptainView, type GameStore, type SeasonInfo, type TideHistoryEntry,
@@ -70,7 +71,7 @@ export async function submitOrders(deps: Deps, userId: string, body: unknown): P
   }
 
   const map = deps.getMap(view.active.season.mapId);
-  const problem = courseError(map, ship.nodeId, p.course, speed(ship.hull, ship.levels.sails));
+  const problem = courseError(map, ship.nodeId, p.course, courseLimit(ship, captain));
   if (problem !== null) throw new ApiError(problem);
 
   const known = (id: string) => view.roster.find((r) => r.id === id);
@@ -104,8 +105,10 @@ export async function portAction(deps: Deps, userId: string, body: unknown): Pro
   const view = await openView(deps, userId);
   if (!view.ship.docked) throw new ApiError("The ship is not docked at a port");
   const { season, tide } = view.active;
+  const map = deps.getMap(season.mapId);
   const ctx: PortContext = {
-    map: deps.getMap(season.mapId), tide: tide.number, settings: season.settings, boomPortId: view.boomPortId,
+    map, tide: tide.number, settings: season.settings, boomPortId: view.boomPortId,
+    income: incomeFacts(map, view.captain.id, view.roster),
   };
   const rowFor = (good: string): MarketRow => {
     const row = view.market.find((r) => r.good === good);
@@ -123,7 +126,11 @@ export async function portAction(deps: Deps, userId: string, body: unknown): Pro
       }
       case "sell": {
         const r = sellGood(view.ship, view.captain, rowFor(p.good), p.good, p.units, ctx);
-        result = { ...r, market: r.row, kind: "sell", message: `Sold ${r.units} ${p.good} for ${r.gold} doubloons.` };
+        const why = r.bonus && r.bonus.extra > 0 ? describeBonus(r.bonus) : null;
+        result = {
+          ...r, market: r.row, kind: "sell",
+          message: `Sold ${r.units} ${p.good} for ${r.gold} doubloons${why ? `, and ${why} added ${r.bonus!.extra}` : ""}.`,
+        };
         break;
       }
       case "upgrade": {
@@ -162,6 +169,24 @@ export async function portAction(deps: Deps, userId: string, body: unknown): Pro
     transaction,
   });
   return { message: result.message, chestGold: result.captain.chestGold, ship: result.ship };
+}
+
+// ---- standing_orders (section 12.4) ----
+
+export interface StandingOrdersResult { plan: Captain["standingPlan"]; parley: Captain["standingParley"]; }
+
+/**
+ * Set the plan and parley a captain falls back on in a Tide they send no orders for. Zod has already
+ * checked the shape, and there is nothing more for the engine to check. Like orders, only while the Tide is open.
+ */
+export async function standingOrders(deps: Deps, userId: string, body: unknown): Promise<StandingOrdersResult> {
+  const p = parse(standingOrdersSchema, body);
+  const view = await openView(deps, userId);
+  await deps.store.saveStandingOrders({
+    seasonId: view.active.season.id, tide: view.active.tide.number, captainId: view.captain.id,
+    plan: p.plan, parley: p.parley,
+  });
+  return { plan: p.plan, parley: p.parley };
 }
 
 // ---- fleet_action (section 8.1) ----
@@ -313,13 +338,15 @@ export type AdminResult =
     log: AdminLogEntry[];
   }
   | { outcome: ResolveOutcome }
-  | { started: { seasonId: string; name: string; captains: number } };
+  | { started: { seasonId: string; name: string; captains: number } }
+  | { ended: { seasonId: string; name: string; tide: number } };
 
 /**
  * The game master's page. Callers must be in `admins`. `status` reads the running season, its recent
  * Tides and the admin log. `resolve` forces the open Tide now, or retries it when it has failed.
- * `start` begins a season when none is running. Each `resolve` and `start` is written to the admin log,
- * so every admin action leaves a trace.
+ * `start` begins a season when none is running. `end` stops the running season early, which is how a
+ * playtest season makes room for the real one. Each `resolve`, `start` and `end` is written to the admin
+ * log, so every admin action leaves a trace.
  */
 export async function adminRequest(deps: Deps, userId: string, body: unknown): Promise<AdminResult> {
   const p = parse(adminSchema, body);
@@ -346,6 +373,18 @@ export async function adminRequest(deps: Deps, userId: string, body: unknown): P
   if (active.tide.number !== p.tide) {
     throw new ApiError(`Tide ${active.tide.number} is the Tide now, not Tide ${p.tide}. Reload the page.`, 409);
   }
+
+  if (p.action === "end") {
+    // A Tide being resolved right now would write its result into a season nobody can see any more.
+    if (active.tide.status === "resolving") throw new ApiError("The Tide is being resolved right now. Try again in a minute.", 409);
+    await deps.store.endSeason(active.season.id);
+    await deps.store.appendAdminLog({
+      seasonId: active.season.id, at: deps.now().toISOString(), adminId: userId, action: "end", tide: p.tide,
+      outcome: "ended", detail: `${active.season.name} ended early at Tide ${p.tide} of ${active.season.lengthTides}`,
+    });
+    return { ended: { seasonId: active.season.id, name: active.season.name, tide: p.tide } };
+  }
+
   const action = active.tide.status === "failed" ? "retry" : "resolve";
   const outcome = await resolveDueTide(deps, { force: true });
   await deps.store.appendAdminLog({

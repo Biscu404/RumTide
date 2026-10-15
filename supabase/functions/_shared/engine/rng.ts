@@ -14,6 +14,13 @@ export interface Rng {
   shuffle<T>(items: readonly T[]): T[];
 }
 
+/** A 32 bit seed from a piece of text (FNV 1a), for things that must come out the same every time. */
+export function hashSeed(text: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193);
+  return h | 0;
+}
+
 export function createRng(seed: number): Rng {
   let state = seed | 0;
 

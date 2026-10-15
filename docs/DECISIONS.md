@@ -2,6 +2,124 @@
 
 What was decided, when and why. Newest first. When a design decision changes, add an entry here in the same commit.
 
+## 2026-10-15: Palette, phone layout and sound (client step 7, without the sprites)
+
+Step 7 of section 19.1 is "recolour the assets into Endesga 32, polish the phone layout, add coin and cannon sounds and the Tide jingle". Two of the three are done. The recolour is not, because there are no sprites yet: everything is still drawn shapes. See "Not done" below.
+
+**The palette is locked in code**
+* `client/src/palette.ts` holds the 32 Endesga 32 colours, checked against Lospec, and the role names of section 2.1 (`C.deepSea`, `C.gold` and so on). Phaser scenes, the replay model and the sail colours all use it. `style.css` repeats the UI roles in its `:root` block, because CSS cannot import TypeScript.
+* `palette.test.ts` is the guard. It fails if a hex or `0x` colour turns up in client code outside `palette.ts`, if `style.css` uses anything but its variables, if the CSS variables drift from `UI`, or if a fleet colour is not in the palette. It also checks that every pair of text and background colours has a contrast of at least 4.5 to 1, for small text on a phone in sunlight.
+* **Free sail colours never match a fleet colour or your own gold,** so a fleet's colour on the map always means that fleet. The map and replay colours moved onto the palette, which changes how they look but not what they say. The map's zone colours are now cyan (Crown), sand (Free) and red (the Maw), and zones are still named in words on the Orders screen.
+* The page is dark night blue and parchment text on dark wood frames, with square corners and buttons that press down. The design's "parchment panels" are not done: that is a redesign, and it is better judged on the real screens than guessed.
+
+**Phone layout**
+* **Marks grow when the map is zoomed far out** (`markerBoost` in `layout.ts`, up to 2.5 times). The whole Brine fits a 375 pixel screen only at about a third of its size, where names and ships were unreadable. Nodes, lanes, ship sprites and names are redrawn larger below a zoom of 0.8, and are unchanged above it. `WORLD_MARGIN` went from 80 to 110 so the bigger names at the edges are not cut off.
+* Buttons, selects and inputs are at least 44 pixels tall. The tab row scrolls sideways instead of wrapping, the stats line gets its own row on a phone, the desk takes at most half the screen, and the three maneuver pickers stack in one column. The page uses `100dvh` so a phone's address bar does not hide the bottom, respects the notch (`viewport-fit=cover`), and a pull down on the map does not reload the game.
+* Checked in the browser at 375 by 812 on a made up captain with real components. **Not checked on a real phone**, and the desk screens were not looked at with the live server (login is needed).
+
+**Sound** (section 2.3, "Should" in section 16.1)
+* **The sounds are made in the browser with Web Audio, not recorded.** `audio/recipes.ts` describes each sound as a few oscillator and noise voices, and `audio/sound.ts` plays them. There are no files to download or license and no new dependency. The cost is that they sound like chiptune blips, which suits the design. Real recordings can replace a recipe later without touching the callers.
+* Sounds: coin (every successful Port action), cannon, splash and the sad trombone (a ship strikes its colours), a drum roll before each round's plans are revealed, a brass hit for a round won, and the Tide jingle (a bell, a rising fanfare, then a held chord, about 3 seconds).
+* **A round is won by the side that dealt more damage,** stored on each `ReplayRound` as `winner`. It cannot be read from the hull lost, because a ship on its last hull points loses less than the blow that sank it.
+* **Nothing plays before the first tap,** because browsers forbid it. The first pointer press or key press makes the audio context. The Sound on and Sound off button in the top bar remembers its choice in localStorage (default on). Skipping to the end of a replay is silent.
+* **The jingle plays at the first tap after you open the game on a later Tide than this device last saw** (`tideNews.ts`, per season, in localStorage). A first visit is not news. This is a convenience on the device and never game state. Discord and push notifications are separate and not part of step 7.
+
+**Not done on purpose**
+* **Recolouring real assets.** It needs a CC0 pack (Pixel Frog's Treasure Hunters or Kenney's Pirate Pack, section 2.1) downloaded into the repo, and a small script that maps every pixel to the nearest palette colour, which needs a PNG library (a new dependency) or a hand written PNG reader. Both need a decision first.
+* The pixel font (section 2.2) for the same reason: a font file has to be added. Text is still the system monospace font.
+* Music loops. They are a "Should" in section 16.1 and not named in step 7.
+
+## 2026-10-15: Exploration events (the rest of client step 6)
+
+Builds the deck of 12 from section 10.1, the one part of step 6 left out of the entry below. The engine side is `engine/explore.ts`, a pure module, and every number is in `balance.ts` under `explore`.
+
+**When an event is drawn**
+* **The ship must arrive.** It sails to an island or a wreck with the Explore intent, ends its course there and did not fight. A ship that already lies on a wreck and stays draws nothing (section 4.4 rule 7 says "ends its course"; this is my reading of it, so that one spot cannot be farmed every Tide). Section 4.4 rule 7 and the Explore row of 4.5 now say so.
+* **When in the Tide:** after movement, battles and the prize bonuses, before docking, in captain id order, so a ship that fought or was towed never draws. A draw takes one random number, and the Buried Chest one more.
+* **Weights lean on the node.** `explore.weights` gives [island, wreck] for each event: the Old Wreck only on wrecks, the Hermit only on islands, Rum Cache, Cursed Coin, Reef Scrape and Ghost Lantern lean to wrecks, Castaway and Turtle Soup to islands.
+* **An event that could do nothing is left out of the draw:** Turtle Soup at full hull, Rum Cache with a full Hold, the Hermit for a ship already at three hops (a Tide has three steps), and the Bottle when no galleon is two or more Tides away.
+
+**What the events do**
+* **Gold is plunder, not Chest gold.** The Buried Chest, Cursed Coin and Old Wreck pay times the Boom, and times 1.5 in the Maw once it is open (`explore.mawRewardMult`; Season 0 has no Maw wreck). Found gold gets no Shore Leave, Fair Winds or convoy bonus (those are for trade profit and prizes), but it earns Legend when it is banked, like all plunder.
+* **Rum from a cache costs nothing,** so selling it is all profit.
+* **The Reef Scrape cannot sink a ship:** it leaves at least 1 hull point. **The Monkey Thief** rounds the loss down. **The monkey itself and the Old Wreck's trinket are not built:** they belong to cosmetics and trinkets in V2 (section 16.2), so today they are words in the log.
+* **The Gazette line names no amounts,** the captain's own log line does. Both are log kind `explore` with `data.event`. Anyone can read what happened in the Gazette ("heard a mermaid sing"), so the effects are no secret, only the numbers.
+
+**Omens** (`Captain.omens`, a sorted list with no repeats)
+* **Castaway:** +10% Crew (the stat value) in your next battle. **Cursed Coin:** your luck in your next battle runs 0.8 to 1.0 instead of 0.9 to 1.1. Both wait for a battle of any kind (a merchant, the galleon or a captain, won or lost), however many Tides that takes, and a battle spends them.
+* **Mermaid's Song:** the hunted ship's escape chance times 1.2, before the 5% to 75% limits. **The Hermit's chart:** a course may be one hop longer, never above the 3 steps of a Tide. Both last for the next Tide only, used or not.
+* **An Omen is earned for the Tide after the one that drew it,** so it cannot help the Tide that earned it. `resolveTide` reads them as a Tide opens (`held`), keeps what is still owed and adds what was drawn.
+* **One rule for the course limit** (`courseLimit` in `explore.ts`) is used by the resolver, `submit_orders` and the Orders screen, so what the screen offers is what the server accepts. A test checks every place the screen lists under a chart is accepted by the handler.
+* **Who can see them:** the captain, through their own row. `public_captains` leaves the column out.
+
+**The Message in a Bottle** needed the galleon's place to be known before the galleon spawns. `galleonNodeFor(map, seasonId, tide)` now picks it from the season id and the Tide, not from the Tide's random numbers, and `spawnNpcs` uses the same function, so the galleon turns up exactly where the bottle said.
+* **A caveat:** the season id is public and the engine ships to the browser, so a captain who reads the code could work the places out in advance. Fine for six friends. Before a larger group, derive it from a secret the server holds.
+* **It reshuffles the random numbers** after a galleon Tide, so every seeded result for those Tides differs from before. The bot seasons now give each season its own id (`bots-1`, `bots-2`, ...): with one id the galleon sat on the same node in all of them and nobody ever reached it on Tide 7.
+
+**Database:** migration `20261015000006_exploration.sql` is additive, `captains.omens jsonb` with a default of `[]` and `private.write_captain` replaced with the column added.
+
+**The bots:** `explorerBot` sails from island to wreck to island, uses a chart's longer course and banks its finds. A third roster, `voyage` (four explorers, a raider, a trader), runs next to the six captains and the brawl, in `npm run bots`, through the handlers too. Its check wants all 12 events to come up, a longer course to be used, and at least 15 events a season. `checkState` now also rejects an unsorted, repeated or unknown Omen.
+
+**What it did to the numbers** (`npm run bots`, 30 seeds)
+* **The six captains** are where they were, apart from the galleon moving: ann 243 Legend (243 before), bob 167, eve 181 (178), fay 134 (138), cat and dan 67 and 80 (71 and 82). With the old random draw put back for a test, the week away was 77%, 78% and 84% again; with the galleon in its new places it is 77%, 77% and 71%. So that is the galleon's place, not the events. `npm run sim` is unchanged (3,950 and 2,244 earned by Tide 14).
+* **A voyage draws about 44 events a season** for four explorers. **Exploring on its own pays about a tenth of trading:** the explorers average 38 Legend and a Chest of 63, the trader beside them 324 Legend. That fits the design (the events are a bonus on a voyage, and a trade route that stops on an island on its way gets one for free), but it is the number to watch in the internal playtest. If exploring turns out to be a trap, the amounts are in `explore` in `balance.ts`.
+
+**How this was checked, and what was not**
+* `npm test` (573 tests), `npm run typecheck`, `npm run sim`, `npm run bots` and `npm run build` pass. A real bug showed up in the tests and is fixed: the resolver tracks positions in its own map during a Tide, so the draw must be given the ship's arrival node, not its start.
+* The Orders screen was looked at in a browser with a throwaway page (deleted again) at phone width: the Omen lines, a three hop list under a chart, the Explore hint and the stats bar. Screenshots timed out, so it was read from the page text.
+* **Not run anywhere:** migration 20261015000006 against Postgres (the earlier PGlite script was not kept), `SupabaseStore` reading `omens`, and the whole game against a real project.
+* **Still not built from the `Should` list (section 16.1):** the Escort intent, battle previews, weekly awards, and the sounds and music.
+
+## 2026-10-15: Income bonuses, standing orders and the Legend screen (client step 6)
+
+Step 6 of section 19.1 minus the exploration events (a `Should`, built afterwards, see the entry above). It closes the open item under Day 6 below: Shore Leave, Fair Winds and the convoy bonus now pay out. Two of the rules were the game owner's call, asked on 2026-10-15.
+
+**Income bonuses** (`engine/income.ts`, pure and tested)
+* **Which income (owner's call):** the profit on goods sold, and merchant and galleon prizes. A sale at a loss earns nothing and spends nothing. PvP loot, tribute and bounties only move gold between captains, so they get no bonus, otherwise a fight would create gold.
+* **They add together:** 1 + 0.5 Shore Leave + 0.2 Fair Winds + 0.1 for each fleet mate nearby. They never multiply. The extra is rounded to a whole doubloon, and it counts as profit banked, so it earns Legend (1 per 10 doubloons).
+* **When a stored Shore Leave Tide is spent (owner's call):** on the first Tide in which the captain banks any bonus income, and then every sale profit and prize in that Tide pays the +50%. A Tide with no income spends nothing, so a trade route with a sale every second Tide does not waste it. `Captain.shoreLeaveUsedTide` records the Tide it was spent in (0 for never), so a second sale in the same Tide is paid without spending another. A Tide missed after one was spent still stores one, so the pair is neutral.
+* **Fair Winds is set once, as a Tide opens.** `resolveTide` sets `Captain.fairWinds` for the next Tide: Legend below 70% of the median Legend of the active captains, strictly below, and never while the median is 0. It holds for the whole Tide, so it does not flicker as scores move, the screen can show it as a steady buff, and the bots and the handlers agree exactly. An Ashore captain does not count in the median but can get the flag, so one who returns is helped.
+* **The convoy is judged where the mates are.** For a sale: the fleet mates' ships as they lie now (`CaptainView.roster` gained `nodeId`). For a prize: where they ended the Tide's movement, before towing. A captain who has given notice to leave is still a mate while that Tide resolves (see the Fleets entry below).
+* **Where it is applied.** `sellGood` takes it from `PortContext.income`, which is optional, so the economy sim's lone trader earns none. `resolveTide` adds a pass before docking: the extra rides in plunder with the prize and a private log line names the sources. `port_action` says it in the message: "Sold 10 sugar for 300 doubloons, and Shore Leave and Fair Winds added 90."
+* **Migration `20261015000005_income_bonus.sql` is additive:** `captains.shore_leave_used_tide` and `captains.fair_winds`, `private.write_captain` replaced with both columns added, and `save_standing_orders`.
+
+**What it did to the numbers** (`npm run bots`, 30 seeds, before and after)
+
+| Captain | Legend | Upgrade levels | Brigantine by the end |
+|-|-|-|-|
+| ann, careful solo trader | 246 to 243 | 20.1 to 20.3 | 100% to 100% |
+| bob, away for Tides 5 to 7 | 143 to 167 | 12.7 to 14.5 | 73% to 97% |
+| eve, convoy trader | 162 to 178 | 12.7 to 14.2 | 60% to 67% |
+| fay, convoy trader | 121 to 138 | 10.9 to 11.8 | 17% to 33% |
+| cat (raider), dan (reaver) | 67 and 82 to 71 and 82 | 6.7 and 8.9 to 6.9 and 9.0 | 0% |
+
+* **A week away does not reach the doc's 85% or 93% yet.** The same careful trader at his desk and away for Tides 5 to 7 (`tools/bots/away.ts`, printed by `npm run bots`): without the bonuses the away trader ends with 65% of the Legend, 68% of the levels and 76% of the Chest of the one at his desk. With Shore Leave at +50% it is 77%, 78% and 84%. Section 3.5 says about 85% and section 5.5 about 93%. The gap is bigger than the three lost Tides because the standing orders sail an away ship to the nearest port instead of along its trade loop. `balance.ts` is unchanged, +50% is the design. If you want the doc's figure, `catchUp.shoreLeaveBonus` at 0.75 gives 84%, 85% and 88%, and at 1.0 gives 91%, 91% and 81%.
+* **The solo trader rows of sections 3.5 and 5.5 do not move,** because a captain at his desk alone has no Shore Leave, is not behind the median and has no mates. `npm run sim` still gives earned by Tide 14 about 3,950 (careful) and 2,240 (casual) against the doc's 3,100, Brigantine on Tide 7 and 9 against 8, and for 28 Tides at full costs about 11,250 and 5,800 against 10,400, Brigantine on Tide 9 and 13 against 11. What moves are the missed week claims above and the fleet rows, which `tools/sim` does not model. The convoy adds 10% of a fleet captain's trade profit and prizes for each mate nearby, which is rule 1 of section 8.2 at last.
+* **The handlers still play exactly like the engine:** every bot season is played twice, directly and through the handlers, and the two end identically, now with the bonuses in.
+
+**Standing orders** (section 12.4)
+* **A new call, `standing_orders`,** with the plan (3 maneuvers) and the parley. `profile` (ship name, flag, parting shot) is not built and is not in the MVP, so this is a call of its own with its own row in section 15.4. Handler `standingOrders` over `GameStore.saveStandingOrders`, SQL `save_standing_orders`, Edge Function `supabase/functions/standing_orders` and its entry in `config.toml`.
+* **Like orders, only while the Tide is open,** and the SQL locks the open Tide row "for share" so a change cannot slip in while the Tide resolves.
+* **It bumps the captain's `version`.** A port action worked out before it fails with a 409, instead of writing the old standing plan back over the new one (`write_captain` replaces the whole row).
+* **The engine already used them** (`standingOrders` in `resolve.ts`: stay docked, or sail Quietly to the nearest port, defended by the standing plan and parley). Two tests now say so, which nothing did before.
+* **The form** is a section in the Orders tab ("Standing orders and Shore Leave") with the plan, the parley, one sentence in the same words as the Orders screen, and a note on how much Shore Leave is stored.
+
+**The Legend screen** (section 6.4)
+* **A tab with the leaderboard:** rank, captain, fleet (the name next to the colour), Legend, bounty, and the marks Most Wanted and Ashore as words. Pure model `legendModel.ts`, tested against a real season.
+* **Equal scores share a rank** (1, 2, 2, 4). While nobody has Legend yet there is no ranking, only the list in a steady order.
+* **Most Wanted** is marked with the engine's own rule (the leader, lowest id among equals).
+* **Fog of Legend** (section 9 rule 11) covers the last `fogOfLegendTides` Tides: scores show as hidden, ranks stay, and a captain still sees their own score. Season 0 has none. **It is a display rule only:** `public_captains` still carries the raw Legend, so before a season with fog (not Season 0) that view must stop showing it.
+
+**The rest of the client**
+* **The Port screen** says which bonuses are paying out, with their size from `balance.ts`, and the Sell button shows the bonus it expects: "Sell 5 for 120 (+22 bonus)". `incomeModel.ts` uses the same engine functions as the server, and a test checks the promised amount equals what `port_action` pays for every mix of bonuses. The desk's stats line shows Shore Leave and Fair Winds when they apply.
+* **Checked in a browser** with a throwaway page (deleted again) at phone width: the Legend table with and without fog, the bonus lines, the sale preview and the standing orders form.
+
+**How this was checked, and what was not**
+* `npm test`, `npm run typecheck`, `npm run sim` and `npm run bots` pass.
+* The migrations including this one, `SupabaseStore` and the row level security were run again on a throwaway in process Postgres (PGlite, not a project dependency). Six bot seasons through the real SQL end exactly as the direct seasons, with the bonuses in. New checks: `save_standing_orders` writes, bumps the version and is out of a client's reach, and a missed Tide, a sale at a loss and a profitable sale write the new columns correctly. The throwaway script had to give its fleets `fleet_members` rows, because `apply_tide_result` from the fleets migration drops fleets with no members.
+* **Not run anywhere yet:** the `standing_orders` Deno entry file, and migrations 20261015000003, 4 and 5 against a real project. The new panels were not run against a real project either.
+* **Not built then:** exploration events (a `Should`), which the entry above adds.
+
 ## 2026-10-15: ReplayScene v0 (client step 5)
 
 Section 16.1 asks for "two sprites, plans revealed round by round, damage numbers, smoke". Each battle in the Gazette now has a Watch the replay button under its text replay. The text replay stays, and says the same things in words.
@@ -31,7 +149,7 @@ Section 8.1 and 15.4 give the rules in one line each. The rules live in `engine/
 * **Fleet changes need an open Tide,** like orders and port actions, and lock the open Tide row "for share". Two changes made from one reading cannot both land: `seasons.fleet_rev` is a compare and swap (`apply_fleet_change`), and a captain whose fleet changes gets a new `version`, so a port action started earlier cannot write the old fleet back over it.
 * **Fleet mates' orders** were already readable by fleet mates through row level security. The Fleet tab now shows them as the same one sentence the Orders tab writes, plus Ready or Not Ready.
 * **Migration `20261015000003_fleets.sql` is additive:** `fleet_invites`, `seasons.fleet_rev`, a unique index on `fleet_members (captain_id)` and on fleet names, `apply_fleet_change`, and a replacement `apply_tide_result` that also takes departing captains out of their fleet when the new Tide opens. It was run on an in process Postgres (PGlite, not a project dependency) with the other migrations: the compare and swap, the unique indexes, the row level security of invitations and orders, and a real Tide with a departing captain all behaved.
-* **Not built:** Mutiny Rules (instant betrayal, `mutinyRules` stays false and unused), and the convoy bonus. The convoy bonus is an income rule and waits for the same decision as Shore Leave and Fair Winds (see the open item under Day 6 below).
+* **Not built:** Mutiny Rules (instant betrayal, `mutinyRules` stays false and unused). The convoy bonus, which waited for a decision on income, is built (see 2026-10-15, client step 6).
 * **Not run against a real project yet:** the `fleet_action` Deno entry file and the new `SupabaseStore` reads (`loadFleets`).
 
 ## 2026-10-14: Client step 1, login and MapScene
@@ -69,7 +187,7 @@ Section 15.4 and 15.5 leave these open. The logic of each function lives in `sup
 * **After Tide 14 there is no Tide 15 row.** The season is `ended` and the final standings are the last snapshot. The database shows Tide 14's NPCs and boom port, not the ones the engine prepared for a Tide that never opens.
 
 **Not built yet (open)**
-* **Shore Leave (+50%), Fair Winds (+20%) and the convoy bonus (+10% per fleet mate) are still not applied to income.** Day 5 expected them to arrive with `port_action`, but the design does not say which income they boost (sale profit, prizes, or both) or on which Tide a stored Shore Leave is spent. Stored Shore Leave rises to 3 and is never used. Needs a decision before Season 0, because Shore Leave is a Must in section 16.1.
+* **Shore Leave (+50%), Fair Winds (+20%) and the convoy bonus (+10% per fleet mate) were not applied to income when this was written.** The design did not say which income they boost or when a stored Shore Leave is spent. Decided and built on 2026-10-15, see the entry for client step 6 at the top.
 * **The 18:00 Discord reminder, the `profile` function and `fleet_action`** are not built. The reminder needs a "sent today" marker; fleets and profile are week 2.
 * **The admin function** (resolve now, retry, logs) is day 7. `resolveDueTide` already takes `force`.
 
@@ -96,7 +214,7 @@ Section 4.4, 12.4 and 15.5 leave these open. `engine/resolve.ts` (`resolveTide(m
 **Standing orders, Shore Leave, Ashore**
 * **No valid orders means standing orders:** stay in port, or at sea sail Quietly towards the nearest port as far as speed allows. Orders with a bad course or plan are replaced the same way and a private log line says why.
 * **A missed Tide stores one Tide of Shore Leave (cap 3).** A captain whose last orders were 5 Tides ago is marked Ashore. Submitting orders makes them active again.
-* **Not built yet: the income side.** Shore Leave (+50%), Fair Winds (+20%) and the convoy bonus (+10% per fleet mate) multiply income, which is earned in port actions, so they arrive with `port_action` on day 6. Until then a trader who misses Tides 5 to 7 earns about 40% less than one who does not, against the doc's 15% (section 3.5). Also not built: exploration events (rule 7) and the Escort intent's course copy (an Escort still joins fleet mates' fights). Both are `Should` in section 16.1.
+* **The income side was built later,** on 2026-10-15 (see the entry for client step 6 at the top). Until then a trader who missed Tides 5 to 7 earned about 40% less than one who did not, against the doc's 15% (section 3.5). Still not built: exploration events (rule 7) and the Escort intent's course copy (an Escort still joins fleet mates' fights). Both are `Should` in section 16.1.
 
 **Data**
 * **`Battle` gained `winner`** (0 or 1, an index into `sides`, or null for a draw), because the record did not say who won. Section 15.3 is updated.
@@ -155,7 +273,7 @@ Section 4.2, 5, 6 and 8 leave these open. The engine now does the following (`ma
 
 * **Read this as:** the documented trader sits between the two bots, so Day 4's "done when" holds. A player who plans loops will earn about 25% more than section 3.5 and reach the Brigantine a Tide early, so if the beta feels fast, raise `upgrade.growth` or `progressionCostMult` before touching income.
 * **Income comes in lumps** on two Tide legs (a sale every second Tide), where the doc tables are smooth averages. Compare running totals, not single Tides.
-* **Not modelled:** Shore Leave, Fair Winds, the convoy bonus, hunters, exploration and standing orders. They arrive with Tide resolution and the bot season (Days 5 and 6).
+* **Not modelled:** Shore Leave, Fair Winds, the convoy bonus, hunters, exploration and standing orders. The bot season models hunters and standing orders (Day 5), and the bonuses are in the engine from 2026-10-15, but the economy sim's lone trader still has none of them.
 
 **Galleon odds (section 8.2), real engine:** a lone ship never wins; two ships with random plans win 23.8% (doc 22 to 32%); three ships with random plans win 90% (doc about 80%). A pair that plays the perfect counter to the printed habit wins 100% (doc 75 to 87%), but only 5% of those are Decisive, so a pair usually takes the **half** prize. Three ships with perfect reads win 100% Decisive.
 
@@ -267,3 +385,21 @@ A single install and a single `npm test` cover the client, the engine tests and 
 * **Captains are the accounts that have signed up, or only the caller.** "Only me" is the debug mode: a one captain season to look at the screens alone. Ship names come from a fixed list, never from account emails, so nobody's email shows on the map.
 * **The map is Brine, the time zone is Europe/Bucharest, and the Tide time defaults to 21:00** (changeable in the form). The first Tide is due at the next Tide time, and the admin can always resolve it now.
 * **The start is written to the admin log** with the number of captains and the preset.
+
+## 2026-10-15: Preparing the internal playtest (client step 8)
+
+* **Step 8 is a human job, so this entry covers what can be built before it.** Two people playing 3 to 4 Tides by hand cannot be run by the engine. What was missing: a way to end the playtest season, the one page How to play, and a runbook. `docs/PLAYTEST.md` is the runbook (setup, a 4 Tide script, what to watch, a problem log, the steps after). `docs/HOW_TO_PLAY.md` is the one page for players. The three fixes of step 8 wait for the playtest, because nobody knows yet which three they are.
+* **The game master can end the running season.** Without it, the playtest season would block Season 0: a start is refused while any season is active, and the database allows only one. The new admin action `end` sets the season to `ended`, takes the Tide number like `resolve` does (a stale tab gets a 409), refuses while a Tide is `resolving`, and is written to the admin log. It needs no migration, because the store updates `seasons.status` with the service role.
+* **Ending deletes nothing, but hides the season.** The client loads only the season with status `active`, so an ended season is not readable in the app. The same is true when a season finishes at Tide 14 by itself.
+* **Known gap, to decide before Tide 14 of Season 0:** the final Gazette and the Legend reveal of the finale are not readable in the app once the season has ended. The Discord message is the only record. The fix is a read only view of the last season (the client reads the latest season whatever its status, with orders closed), which is not built.
+* **Not built on purpose:** a Discord note when the game master ends a season, a retry for a Tide stuck in `resolving`, and joining a season after it has started.
+
+## 2026-10-15: An ended season stays readable (client)
+
+* **The client shows the latest season whatever its status, so the Tide 14 finale is readable.** `loadWorld` used to ask for the season with status `active` only, so a season that finished at Tide 14, or that the game master ended, vanished and the app said "No season is running yet". It now reads seasons that are `active` or `ended` and picks the running one if there is one, otherwise the most recently created ended one (`pickSeason`). A draft is never shown. This closes the known gap recorded under 2026-10-15, Preparing the internal playtest.
+* **No migration was needed.** The read policies never look at a season's status: `seasons`, `battles`, `fleets` and `market` are readable to any signed in player, `public_tides`, `public_captains`, `public_ships` and `public_npcs` are views with no status filter, and a captain's own rows, orders of a resolved Tide and the log follow the captain, not the season. So an ended season reads exactly like a running one.
+* **Read only means the tabs go, not the data.** For an ended season the desk offers Legend and Gazette only (`deskTabs` in `seasonModel.ts`). Orders, Port and Fleet are not shown, because the server would refuse them anyway (every game function plays "the active season"). A player who had Orders open sees the Legend after a refresh. The stats line shows the final Chest only.
+* **The header says why the season is over.** A season whose last Tide resolved reads "season over after Tide 14 of 14". A season stopped before that, including one stopped during the last Tide, reads "season ended early at Tide N of 14", because it has no final Gazette. The client tells the two apart from the status of the current Tide (`public_tides`), so `SeasonInfo` now carries `status` and `tideStatus`.
+* **The Legend screen becomes the final ranking.** Once the season has ended the Fog of Legend is down whatever the Tide and the preset, so every score shows (Season 0 has no fog, a full season would have hidden the last 3 Tides). The Legend leader is named champion, with ties sharing first place, and the Most Wanted mark and the Fair Winds line are dropped, since they only matter while the season runs. This is still a display rule: `public_captains` carries the raw Legend all along, see the Fog of Legend entry.
+* **Only the latest season is shown.** Once a new season starts, the previous one is no longer in the app. A list of past seasons is the Hall of Legends, which is out of the MVP (section 16.2). The Discord message and the database keep the rest.
+* **Not built on purpose:** a read only view for an account that was not a captain in the ended season (it sees the map and the header, as it does in a running season), and a Gazette message for a season that ended before its first Tide resolved (it still says the first Gazette is printed after the first Tide).

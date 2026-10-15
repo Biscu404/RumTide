@@ -75,6 +75,76 @@ describe("admin page", () => {
     expect(w.store.tideInfo("s0").number).toBe(2);
   });
 
+  describe("ending a season early", () => {
+    const end = (w: TestWorld, who: string, tide = 1) => adminRequest(w.deps, w.user(who), { action: "end", tide });
+
+    it("refuses everyone who is not in admins", async () => {
+      const w = await seasonWorld();
+      expect((await failure(end(w, "ann"))).status).toBe(403);
+      expect(await w.store.activeSeason()).not.toBeNull();
+    });
+
+    it("ends the running season, logs it, and leaves nothing for the cron to resolve", async () => {
+      const w = await seasonWorld();
+      w.store.admins.add(w.user("ann"));
+      const reply = await end(w, "ann");
+      expect(reply).toMatchObject({ ended: { seasonId: "s0", name: "Season 0", tide: 1 } });
+      expect(w.store.seasonInfo("s0").status).toBe("ended");
+      expect(await w.store.activeSeason()).toBeNull();
+
+      w.setNow(AT_21);
+      expect(await resolveDueTide(w.deps)).toEqual({ status: "idle" });
+      expect(await adminRequest(w.deps, w.user("ann"), { action: "status" })).toEqual({ season: null, tides: [], log: [] });
+      expect(w.store.adminEntries).toEqual([
+        expect.objectContaining({ seasonId: "s0", action: "end", tide: 1, outcome: "ended", adminId: w.user("ann") }),
+      ]);
+    });
+
+    it("ends a season that has already turned some Tides", async () => {
+      const w = await seasonWorld();
+      w.store.admins.add(w.user("ann"));
+      await adminRequest(w.deps, w.user("ann"), { action: "resolve", tide: 1 });
+      await adminRequest(w.deps, w.user("ann"), { action: "resolve", tide: 2 });
+      const reply = await end(w, "ann", 3);
+      expect(reply).toMatchObject({ ended: { tide: 3 } });
+      expect(w.store.adminEntries.at(-1)).toMatchObject({ action: "end", detail: "Season 0 ended early at Tide 3 of 14" });
+    });
+
+    it("refuses a Tide other than the one the page shows, and a Tide being resolved", async () => {
+      const w = await seasonWorld();
+      w.store.admins.add(w.user("ann"));
+      expect((await failure(end(w, "ann", 2))).status).toBe(409);
+      expect(await w.store.claimTide("s0", 1)).toBe(true);
+      expect((await failure(end(w, "ann"))).status).toBe(409);
+      expect(await w.store.activeSeason()).not.toBeNull();
+      expect(w.store.adminEntries).toEqual([]);
+    });
+
+    it("ends a failed Tide's season too, and says so when nothing is running", async () => {
+      const w = await seasonWorld();
+      w.store.admins.add(w.user("ann"));
+      w.setNow(AT_21);
+      w.store.edit("s0", (snap) => { snap.ships = snap.ships.filter((s) => s.captainId !== "cat"); });
+      expect(await resolveDueTide(w.deps)).toMatchObject({ status: "failed" });
+      await end(w, "ann");
+      expect(await w.store.activeSeason()).toBeNull();
+      expect((await failure(end(w, "ann"))).status).toBe(404);
+    });
+
+    it("makes room for a new season, which is the point of it", async () => {
+      const w = testWorld();
+      w.store.users.push(w.user("ann"), w.user("bob"));
+      w.store.admins.add(w.user("ann"));
+      const start = (name: string) => adminRequest(w.deps, w.user("ann"), { action: "start", name, preset: "season0", who: "all" });
+      await start("Playtest");
+      expect((await failure(start("Season 0"))).status).toBe(409);
+      await end(w, "ann");
+      await start("Season 0");
+      expect((await w.store.activeSeason())!.season.name).toBe("Season 0");
+      expect((await w.store.captainView(w.user("bob")))!.active.season.name).toBe("Season 0");
+    });
+  });
+
   describe("starting a season", () => {
     const start = (w: TestWorld, who: string, extra: object = {}) =>
       adminRequest(w.deps, w.user(who), { action: "start", name: "Test Season", preset: "season0", who: "all", ...extra });

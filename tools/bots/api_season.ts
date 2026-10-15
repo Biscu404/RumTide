@@ -9,6 +9,7 @@
 // season.ts: the handlers add nothing and lose nothing.
 
 import { SEASON_PRESETS } from "@engine/balance.ts";
+import { incomeFacts, incomeRoster } from "@engine/income.ts";
 import type { GameMap } from "@engine/map.ts";
 import type { PortContext } from "@engine/port.ts";
 import type { TideSnapshot } from "@engine/season.ts";
@@ -36,9 +37,8 @@ export interface Backend {
   failures?(): string[];
 }
 
-export function memoryBackend(): Backend {
+export function memoryBackend(seasonId = "bots"): Backend {
   const store = new MemoryStore();
-  const seasonId = "bots";
   return {
     store, seasonId, userId: (id) => `user-${id}`,
     snapshot: async () => store.snapshot(seasonId),
@@ -75,7 +75,7 @@ function payload(o: Orders) {
 }
 
 export async function playSeasonThroughApi(
-  seed: number, bots: Bot[] = sixCaptains(seed), map: GameMap = brine, backend: Backend = memoryBackend(),
+  seed: number, bots: Bot[] = sixCaptains(seed), map: GameMap = brine, backend: Backend = memoryBackend(`bots-${seed}`),
 ): Promise<ApiSeasonReport> {
   const preset = "season0";
   const lengthTides = SEASON_PRESETS[preset].lengthTides;
@@ -114,7 +114,11 @@ export async function playSeasonThroughApi(
     for (const bot of sorted) {
       const snap = await backend.snapshot();
       const view = {
-        map, snap, ctx: { map, tide, settings: snap.settings, boomPortId: snap.boomPortId } satisfies PortContext,
+        map, snap,
+        ctx: {
+          map, tide, settings: snap.settings, boomPortId: snap.boomPortId,
+          income: incomeFacts(map, bot.id, incomeRoster(snap)),
+        } satisfies PortContext,
         ship: snap.ships.find((s) => s.captainId === bot.id)!,
         captain: snap.captains.find((c) => c.id === bot.id)!,
       };

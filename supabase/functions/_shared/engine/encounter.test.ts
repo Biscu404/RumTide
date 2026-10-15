@@ -156,6 +156,16 @@ describe("rollEscape", () => {
     expect(count("quiet")).toBeGreaterThan(count("trade") * 1.15);
   });
 
+  it("escapes 20% more often under a Mermaid's Song, and stays inside the limits", () => {
+    const stub = (x: number) => ({ ...createRng(1), next: () => x });
+    const chaser = hunter("c", "players");
+    expect(escapeChance(10, 10, false, B.explore.mermaid.escapeMult)).toBeCloseTo(0.5 * B.explore.mermaid.escapeMult);
+    expect(rollEscape(ship("h"), chaser, stub(0.55))).toBe(false);                                    // 0.55 is above 0.5
+    expect(rollEscape(ship("h", { escapeBoost: B.explore.mermaid.escapeMult }), chaser, stub(0.55))).toBe(true);   // and below 0.6
+    expect(escapeChance(1000, 1, false, B.explore.mermaid.escapeMult)).toBe(B.escape.max);
+    expect(rollEscape(ship("h", { escapeBoost: 1 }), chaser, stub(0.55))).toBe(false);
+  });
+
   it("uses exactly one random number, so a Tide stays reproducible", () => {
     const a = createRng(5), b = createRng(5);
     rollEscape(ship("h"), hunter("c", "players"), a);

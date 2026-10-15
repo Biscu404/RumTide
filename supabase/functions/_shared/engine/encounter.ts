@@ -24,6 +24,8 @@ export interface EncounterShip {
   pr: number;
   parley: Orders["parley"];
   noQuarter: boolean;
+  /** Mermaid's Song: multiplies this ship's chance to slip away. Left out means 1. */
+  escapeBoost?: number;
 }
 
 const compareIds = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
@@ -78,7 +80,7 @@ export function encounterBetween(a: EncounterShip, b: EncounterShip, tide: numbe
 /** Rule 5: the hunted ship tries to slip away. Always draws one random number. */
 export function rollEscape(hunted: EncounterShip, hunter: EncounterShip, rng: Rng): boolean {
   const roll = rng.next();
-  return roll < escapeChance(hunted.sails, hunter.sails, hunted.intent === "quiet");
+  return roll < escapeChance(hunted.sails, hunter.sails, hunted.intent === "quiet", hunted.escapeBoost);
 }
 
 export type ParleyResult =

@@ -14,6 +14,7 @@ interface StatusReply {
   log: LogRow[];
 }
 interface StartReply { started: { seasonId: string; name: string; captains: number } }
+interface EndReply { ended: { seasonId: string; name: string; tide: number } }
 interface ResolveReply {
   outcome: { status: string; tide?: number; reason?: string; error?: string; seasonEnded?: boolean };
 }
@@ -70,6 +71,20 @@ export function Admin({ client, onClose }: { client: SupabaseClient; onClose: ()
     setBusy(false);
     if (failure) setError(await explain(failure));
     else if (data) setMessage(outcomeText(data.outcome));
+    await load();
+  }
+
+  async function endSeason(tide: number, name: string) {
+    const question = `End "${name}" now at Tide ${tide}? Nobody can play it any more and it cannot be started again. You can start a new season after.`;
+    if (!window.confirm(question)) return;
+    setBusy(true);
+    setMessage(null);
+    const { data, error: failure } = await client.functions.invoke<EndReply>("admin", {
+      body: { action: "end", tide },
+    });
+    setBusy(false);
+    if (failure) setError(await explain(failure));
+    else if (data) setMessage(`${data.ended.name} ended at Tide ${data.ended.tide}. You can start a new season now.`);
     await load();
   }
 
@@ -153,6 +168,10 @@ export function Admin({ client, onClose }: { client: SupabaseClient; onClose: ()
             {current.status === "resolving" && (
               <p class="dim">This Tide is being resolved right now. If it stays this way for minutes, tell the developer.</p>
             )}
+            <p class="dim small">Ending a season is for a playtest or a season that went wrong. Nobody can give orders after that, but the Legend and the Gazette stay readable in the app and nothing is deleted.</p>
+            <button class="secondary" disabled={busy || current.status === "resolving"} onClick={() => void endSeason(current.number, season.name)}>
+              End this season
+            </button>
           </section>
         )}
 

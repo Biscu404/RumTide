@@ -2,7 +2,8 @@
 // do not replay from their seed always fail. The bands below are loose on purpose: they catch a
 // broken engine, not a balance opinion.
 
-import { SEASON_PRESETS } from "@engine/balance.ts";
+import { B, SEASON_PRESETS } from "@engine/balance.ts";
+import { EXPLORE_EVENTS } from "@engine/explore.ts";
 import type { ApiSeasonReport } from "./api_season.ts";
 import type { SeasonReport } from "./season.ts";
 
@@ -60,9 +61,29 @@ export function sixCaptainProblems(reports: readonly SeasonReport[]): string[] {
   const ann = captain(reports, "ann");
   need(ann.filter((c) => c.hull !== "sloop").length >= 0.8 * ann.length, "the careful solo trader should own a Brigantine by Tide 14 in most seasons");
   need(mean(ann.map((c) => c.levels)) >= 15, "the careful solo trader should have bought at least 15 upgrade levels");
-  need(captain(reports, "bob").every((c) => c.shoreLeave >= 1), "a captain who missed Tides 5 to 7 should have Shore Leave stored");
+  need(captain(reports, "bob").every((c) => c.shoreLeavePeak === B.catchUp.shoreLeaveCap), "a captain who missed Tides 5 to 7 should have stored the most Shore Leave");
+  need(captain(reports, "bob").every((c) => c.shoreLeaveSpent >= 1), "a captain who came back from Tides 5 to 7 should have been paid Shore Leave");
+  need(captain(reports, "ann").every((c) => c.shoreLeavePeak === 0), "a captain who never missed a Tide should have no Shore Leave");
   for (const id of ["ann", "bob", "cat", "dan", "eve", "fay"]) {
     need(mean(captain(reports, id).map((c) => c.legend)) > 0, `${id} ends with no Legend`);
+  }
+  return problems;
+}
+
+/** Four explorers among a raider and a trader: the whole deck comes up, the Omens work, and explorers get on. */
+export function voyageProblems(reports: readonly SeasonReport[]): string[] {
+  const problems: string[] = [];
+  const need = (ok: boolean, what: string) => { if (!ok) problems.push(`voyage: ${what}`); };
+  const seen = new Map<string, number>();
+  for (const r of reports) for (const [event, n] of Object.entries(r.events)) seen.set(event, (seen.get(event) ?? 0) + n);
+
+  for (const event of EXPLORE_EVENTS) need((seen.get(event) ?? 0) > 0, `${event} never came up`);
+  for (const event of seen.keys()) need((EXPLORE_EVENTS as readonly string[]).includes(event), `unknown event ${event}`);
+  need(reports.some((r) => r.longCourses > 0), "no explorer ever used a Hermit's longer course");
+  const draws = [...seen.values()].reduce((a, b) => a + b, 0) / reports.length;
+  need(draws >= 15, `only ${draws.toFixed(1)} events a season, expected a good many`);
+  for (const id of ["ann", "bob", "cat", "dan"]) {
+    need(mean(captain(reports, id).map((c) => c.legend)) > 0, `${id} the explorer ends with no Legend`);
   }
   return problems;
 }

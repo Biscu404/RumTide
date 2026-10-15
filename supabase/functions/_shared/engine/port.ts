@@ -4,6 +4,7 @@
 // Rule breaks throw a PortError whose message is safe to show the player.
 
 import { B, cargoValue, holdUnits, hullCost, maxHullPoints, upgradeCost } from "./balance.ts";
+import { incomeBonus, type IncomeBonus, type IncomeFacts } from "./income.ts";
 import type { GameMap, PortTrade } from "./map.ts";
 import { GOODS, driftAfterSelling, saleRevenue, unitPrice } from "./market.ts";
 import type { Captain, Good, HullId, MarketRow, SeasonSettings, Ship, Stat } from "./types.ts";
@@ -24,6 +25,8 @@ export interface PortContext {
   settings: Pick<SeasonSettings, "progressionCostMult" | "hullsEnabled">;
   /** The port with this week's Trade Winds boom, or null when there is none. */
   boomPortId: string | null;
+  /** What Shore Leave, Fair Winds and the convoy bonus depend on. Without it a sale earns no bonus. */
+  income?: IncomeFacts;
 }
 
 const fail = (message: string): never => { throw new PortError(message); };
@@ -77,6 +80,8 @@ export interface TradeResult {
   gold: number;
   /** Selling only: revenue minus what the cargo cost. Can be negative. */
   profit: number;
+  /** Selling only: the bonus on a profit, already in `captain`. Null when the sale earned none. */
+  bonus: IncomeBonus | null;
 }
 
 function checkRow(row: MarketRow, ship: Ship, good: Good) {
@@ -100,7 +105,7 @@ export function buyGood(ship: Ship, captain: Captain, row: MarketRow, good: Good
       cargoCostBasis: { ...ship.cargoCostBasis, [good]: ship.cargoCostBasis[good] + cost },
     },
     captain: { ...captain, chestGold: captain.chestGold - cost },
-    row, units, gold: cost, profit: 0,
+    row, units, gold: cost, profit: 0, bonus: null,
   };
 }
 
@@ -114,19 +119,22 @@ export function sellGood(ship: Ship, captain: Captain, row: MarketRow, good: Goo
   const revenue = Math.round(saleRevenue(start, units));
   const basisSold = ship.cargoCostBasis[good] * (units / held);
   const profit = revenue - basisSold;
+  // Shore Leave, Fair Winds and the convoy top up a profit, never a loss (engine/income.ts).
+  const bonus = ctx.income && profit > 0 ? incomeBonus(captain, ctx.tide, profit, ctx.income) : null;
+  const extra = bonus?.extra ?? 0;
   return {
     ship: {
       ...ship,
       cargo: { ...ship.cargo, [good]: held - units },
       cargoCostBasis: { ...ship.cargoCostBasis, [good]: held === units ? 0 : ship.cargoCostBasis[good] - basisSold },
     },
-    // Legend follows profit banked, so a sale at a loss earns nothing and costs nothing.
+    // Legend follows profit banked, so a sale at a loss earns nothing and costs nothing, and the bonus counts as profit.
     captain: {
-      ...captain, chestGold: captain.chestGold + revenue,
-      legend: captain.legend + Math.max(0, profit) * B.legend.perGoldProfit,
+      ...(bonus?.captain ?? captain), chestGold: captain.chestGold + revenue + extra,
+      legend: captain.legend + (Math.max(0, profit) + extra) * B.legend.perGoldProfit,
     },
     row: { ...row, drift: driftAfterSelling(row.drift, units), soldThisTide: row.soldThisTide + units },
-    units, gold: revenue, profit,
+    units, gold: revenue, profit, bonus,
   };
 }
 

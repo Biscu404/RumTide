@@ -14,6 +14,9 @@ import_map = "./functions/deno.json"
 [functions.fleet_action]
 import_map = "./functions/deno.json"
 
+[functions.standing_orders]
+import_map = "./functions/deno.json"
+
 [functions.admin]
 import_map = "./functions/deno.json"
 

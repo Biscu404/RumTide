@@ -4,13 +4,14 @@
 // can be played through the real handlers without a database.
 
 import { bookFromCaptains, fleetIds, settleDepartures, type FleetBook } from "../engine/fleet.ts";
+import { incomeRoster } from "../engine/income.ts";
 import type { TideResult } from "../engine/resolve.ts";
 import type { TideSnapshot } from "../engine/season.ts";
 import type { Battle, Gazette, LogEvent, Orders, Transaction } from "../engine/types.ts";
 import {
   ApiError, type ActiveSeason, type AdminLogEntry, type ApplyTideArgs, type CaptainView, type CreateSeasonArgs,
-  type FleetChange, type FleetState, type GameStore, type PortChange, type SeasonInfo, type TideHistoryEntry,
-  type TideInfo, type TideState,
+  type FleetChange, type FleetState, type GameStore, type PortChange, type SeasonInfo, type StandingOrdersChange,
+  type TideHistoryEntry, type TideInfo, type TideState,
 } from "./store.ts";
 
 interface SeasonRecord {
@@ -85,8 +86,16 @@ export class MemoryStore implements GameStore {
       active: { season: rec.info, tide: rec.tide, lastResolvedAt: rec.lastResolvedAt },
       boomPortId: rec.snapshot.boomPortId, captain, ship, version: rec.versions.get(captain.id)!,
       market: rec.snapshot.market.filter((m) => m.portId === ship.nodeId),
-      roster: rec.snapshot.captains.map((c) => ({ id: c.id, shipName: c.shipName, fleetId: c.fleetId })),
+      roster: incomeRoster(rec.snapshot).map((r) => ({ ...r, shipName: rec.snapshot.captains.find((c) => c.id === r.id)!.shipName })),
     });
+  }
+
+  async saveStandingOrders({ seasonId, tide, captainId, plan, parley }: StandingOrdersChange): Promise<void> {
+    const rec = this.mustFind(seasonId);
+    this.requireOpen(rec, tide);
+    rec.snapshot.captains = rec.snapshot.captains.map((c) =>
+      (c.id === captainId ? { ...c, standingPlan: clone(plan), standingParley: parley } : c));
+    rec.versions.set(captainId, (rec.versions.get(captainId) ?? 0) + 1);
   }
 
   async saveOrders(seasonId: string, orders: Orders): Promise<void> {
@@ -201,6 +210,10 @@ export class MemoryStore implements GameStore {
       versions: new Map(snapshot.captains.map((c) => [c.id, 0])), orders: new Map(), error: null,
       fleets: bookFromCaptains(season.id, snapshot.tide, snapshot.captains), fleetRev: 0,
     });
+  }
+
+  async endSeason(seasonId: string): Promise<void> {
+    this.mustFind(seasonId).info.status = "ended";
   }
 
   /** The user ids that may use the admin page. Tests add to it. */
