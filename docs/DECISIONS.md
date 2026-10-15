@@ -2,6 +2,33 @@
 
 What was decided, when and why. Newest first. When a design decision changes, add an entry here in the same commit.
 
+## 2026-10-15: Palette, phone layout and sound (client step 7, without the sprites)
+
+Step 7 of section 19.1 is "recolour the assets into Endesga 32, polish the phone layout, add coin and cannon sounds and the Tide jingle". Two of the three are done. The recolour is not, because there are no sprites yet: everything is still drawn shapes. See "Not done" below.
+
+**The palette is locked in code**
+* `client/src/palette.ts` holds the 32 Endesga 32 colours, checked against Lospec, and the role names of section 2.1 (`C.deepSea`, `C.gold` and so on). Phaser scenes, the replay model and the sail colours all use it. `style.css` repeats the UI roles in its `:root` block, because CSS cannot import TypeScript.
+* `palette.test.ts` is the guard. It fails if a hex or `0x` colour turns up in client code outside `palette.ts`, if `style.css` uses anything but its variables, if the CSS variables drift from `UI`, or if a fleet colour is not in the palette. It also checks that every pair of text and background colours has a contrast of at least 4.5 to 1, for small text on a phone in sunlight.
+* **Free sail colours never match a fleet colour or your own gold,** so a fleet's colour on the map always means that fleet. The map and replay colours moved onto the palette, which changes how they look but not what they say. The map's zone colours are now cyan (Crown), sand (Free) and red (the Maw), and zones are still named in words on the Orders screen.
+* The page is dark night blue and parchment text on dark wood frames, with square corners and buttons that press down. The design's "parchment panels" are not done: that is a redesign, and it is better judged on the real screens than guessed.
+
+**Phone layout**
+* **Marks grow when the map is zoomed far out** (`markerBoost` in `layout.ts`, up to 2.5 times). The whole Brine fits a 375 pixel screen only at about a third of its size, where names and ships were unreadable. Nodes, lanes, ship sprites and names are redrawn larger below a zoom of 0.8, and are unchanged above it. `WORLD_MARGIN` went from 80 to 110 so the bigger names at the edges are not cut off.
+* Buttons, selects and inputs are at least 44 pixels tall. The tab row scrolls sideways instead of wrapping, the stats line gets its own row on a phone, the desk takes at most half the screen, and the three maneuver pickers stack in one column. The page uses `100dvh` so a phone's address bar does not hide the bottom, respects the notch (`viewport-fit=cover`), and a pull down on the map does not reload the game.
+* Checked in the browser at 375 by 812 on a made up captain with real components. **Not checked on a real phone**, and the desk screens were not looked at with the live server (login is needed).
+
+**Sound** (section 2.3, "Should" in section 16.1)
+* **The sounds are made in the browser with Web Audio, not recorded.** `audio/recipes.ts` describes each sound as a few oscillator and noise voices, and `audio/sound.ts` plays them. There are no files to download or license and no new dependency. The cost is that they sound like chiptune blips, which suits the design. Real recordings can replace a recipe later without touching the callers.
+* Sounds: coin (every successful Port action), cannon, splash and the sad trombone (a ship strikes its colours), a drum roll before each round's plans are revealed, a brass hit for a round won, and the Tide jingle (a bell, a rising fanfare, then a held chord, about 3 seconds).
+* **A round is won by the side that dealt more damage,** stored on each `ReplayRound` as `winner`. It cannot be read from the hull lost, because a ship on its last hull points loses less than the blow that sank it.
+* **Nothing plays before the first tap,** because browsers forbid it. The first pointer press or key press makes the audio context. The Sound on and Sound off button in the top bar remembers its choice in localStorage (default on). Skipping to the end of a replay is silent.
+* **The jingle plays at the first tap after you open the game on a later Tide than this device last saw** (`tideNews.ts`, per season, in localStorage). A first visit is not news. This is a convenience on the device and never game state. Discord and push notifications are separate and not part of step 7.
+
+**Not done on purpose**
+* **Recolouring real assets.** It needs a CC0 pack (Pixel Frog's Treasure Hunters or Kenney's Pirate Pack, section 2.1) downloaded into the repo, and a small script that maps every pixel to the nearest palette colour, which needs a PNG library (a new dependency) or a hand written PNG reader. Both need a decision first.
+* The pixel font (section 2.2) for the same reason: a font file has to be added. Text is still the system monospace font.
+* Music loops. They are a "Should" in section 16.1 and not named in step 7.
+
 ## 2026-10-15: Exploration events (the rest of client step 6)
 
 Builds the deck of 12 from section 10.1, the one part of step 6 left out of the entry below. The engine side is `engine/explore.ts`, a pure module, and every number is in `balance.ts` under `explore`.

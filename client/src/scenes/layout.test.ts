@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { loadMap } from "@engine/map.ts";
 import brine from "../../../supabase/functions/_shared/maps/brine.json";
-import { fitZoom, hexColour, nodePoint, placeShips, sailColour, worldSize, WORLD_MARGIN, WORLD_UNIT, type ShipMarker } from "./layout.ts";
+import {
+  MARKER_FULL_ZOOM, MAX_MARKER_BOOST, fitZoom, hexColour, markerBoost, nodePoint, placeShips, sailColour, worldSize,
+  WORLD_MARGIN, WORLD_UNIT, type ShipMarker,
+} from "./layout.ts";
 
 const map = loadMap(brine);
 
@@ -54,7 +57,27 @@ describe("hexColour", () => {
   it("reads #rrggbb and falls back to grey for anything else", () => {
     expect(hexColour("#e43b44")).toBe(0xe43b44);
     expect(hexColour("#FFFFFF")).toBe(0xffffff);
-    expect(hexColour("red")).toBe(0x9aa5b1);
-    expect(hexColour("#fff")).toBe(0x9aa5b1);
+    expect(hexColour("red")).toBe(0x8b9bb4);
+    expect(hexColour("#fff")).toBe(0x8b9bb4);
+  });
+});
+
+describe("markerBoost", () => {
+  it("leaves marks alone once the map is zoomed in enough to read", () => {
+    expect(markerBoost(1)).toBe(1);
+    expect(markerBoost(4)).toBe(1);
+    expect(markerBoost(MARKER_FULL_ZOOM)).toBe(1);
+  });
+
+  it("makes marks bigger as the map is zoomed out, up to a limit, so a phone can read them", () => {
+    expect(markerBoost(MARKER_FULL_ZOOM / 2)).toBeCloseTo(2, 10);
+    expect(markerBoost(0.01)).toBe(MAX_MARKER_BOOST);
+    expect(markerBoost(0)).toBe(MAX_MARKER_BOOST);
+    const boosts = [0.1, 0.2, 0.34, 0.5, 0.7, 1, 2].map(markerBoost);
+    expect(boosts).toEqual([...boosts].sort((a, b) => b - a));
+  });
+
+  it("keeps a mark at least about 0.7 of its size on screen at the far zoom", () => {
+    for (const zoom of [0.3, 0.4, 0.5, 0.6]) expect(markerBoost(zoom) * zoom).toBeGreaterThanOrEqual(0.65);
   });
 });

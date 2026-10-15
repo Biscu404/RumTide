@@ -1,5 +1,6 @@
 import type { GameMap } from "@engine/map.ts";
 import type { Battle, Maneuver } from "@engine/types.ts";
+import { C, rgb } from "../palette.ts";
 import { sailColour } from "../scenes/layout.ts";
 import { listOf, shipLabel, type Names } from "./gazetteModel.ts";
 import { maneuverLabel } from "./ordersModel.ts";
@@ -10,12 +11,12 @@ import { maneuverLabel } from "./ordersModel.ts";
 
 /**
  * How a maneuver looks. Shape and colour both say which it is, so the replay reads without colour
- * (section 16.1: colour blind safe maneuver icons). Endesga 32 colours.
+ * (section 16.1: colour blind safe maneuver icons).
  */
 export const MANEUVER_STYLE: Record<Maneuver, { shape: "circle" | "triangle" | "diamond"; colour: number; label: string }> = {
-  broadside: { shape: "circle", colour: 0xe43b44, label: maneuverLabel("broadside") },
-  outmaneuver: { shape: "triangle", colour: 0x0099db, label: maneuverLabel("outmaneuver") },
-  board: { shape: "diamond", colour: 0xfeae34, label: maneuverLabel("board") },
+  broadside: { shape: "circle", colour: rgb(C.danger), label: maneuverLabel("broadside") },
+  outmaneuver: { shape: "triangle", colour: rgb(C.shallows), label: maneuverLabel("outmaneuver") },
+  board: { shape: "diamond", colour: rgb(C.gold), label: maneuverLabel("board") },
 };
 
 export type Edge = "edge" | "even" | "weak";
@@ -47,6 +48,11 @@ export interface ReplayRound {
   /** Hull points each ship lost this round (never more than it had), and what it has left. */
   hullLost: Record<string, number>;
   hullAfter: Record<string, number>;
+  /**
+   * The side that dealt more damage this round, or null when it was level. Worked out from the damage
+   * dealt, not the hull lost, because a ship on its last hull points loses less than the blow that sank it.
+   */
+  winner: 0 | 1 | null;
 }
 
 export interface Replay {
@@ -75,7 +81,7 @@ export function shortName(label: string, max = 11): string {
   return first.length <= max ? first : `${first.slice(0, max - 1)}.`;
 }
 
-const NPC_SAIL = { smallTrader: 0xc0cbdc, fatMerchant: 0x8b9bb4, galleon: 0xfee761 } as const;
+const NPC_SAIL = { smallTrader: rgb(C.mist), fatMerchant: rgb(C.steel), galleon: rgb(C.goldLight) } as const;
 const compareIds = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
 const edgeOf = (matchup: number): Edge => (matchup > 1 ? "edge" : matchup < 1 ? "weak" : "even");
@@ -127,6 +133,7 @@ export function buildReplay(
       round: r.round,
       moves: r.ships.map((m) => ({ shipId: m.shipId, maneuver: m.maneuver, edge: edgeOf(m.matchup), stale: m.stale })),
       hullLost: lost, hullAfter: { ...r.hullAfter },
+      winner: r.sideDamage[0] > r.sideDamage[1] ? 0 : r.sideDamage[1] > r.sideDamage[0] ? 1 : null,
     };
   });
 

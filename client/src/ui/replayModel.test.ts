@@ -129,6 +129,29 @@ describe("buildReplay", () => {
   });
 });
 
+describe("round winners", () => {
+  it("names the side that dealt more damage, even in the round that sinks the other ship", () => {
+    // Ann's plan beats Bob's every round. Bob is down to a few hull points by the last one, so he
+    // loses less than the blow that sank him, and still Ann has won the round.
+    const battle = battleOf([[ship("ann", ANN)], [ship("bob", BOB)]]);
+    const replay = buildReplay(battle, NAMES, brineMap);
+    expect(replay.rounds.map((r) => r.winner)).toEqual(battle.rounds.map(() => 0));
+    const last = replay.rounds[replay.rounds.length - 1]!;
+    expect(last.hullLost.ann).toBeGreaterThan(last.hullLost.bob!);
+  });
+
+  it("is null when both sides dealt the same", () => {
+    const battle = battleOf([[ship("ann", ANN)], [ship("bob", BOB)]]);
+    battle.rounds.forEach((r) => { r.sideDamage = [20, 20]; });
+    expect(buildReplay(battle, NAMES, brineMap).rounds.map((r) => r.winner)).toEqual(battle.rounds.map(() => null));
+  });
+
+  it("goes to the other side when it dealt more", () => {
+    const battle = battleOf([[ship("ann", BOB)], [ship("bob", ANN)]]);   // now Bob's side has the winning plan
+    expect(buildReplay(battle, NAMES, brineMap).rounds.map((r) => r.winner)).toEqual(battle.rounds.map(() => 1));
+  });
+});
+
 describe("MANEUVER_STYLE", () => {
   it("tells the three maneuvers apart by shape as well as by colour", () => {
     const styles = Object.values(MANEUVER_STYLE);

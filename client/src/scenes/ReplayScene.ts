@@ -1,8 +1,10 @@
 import Phaser from "phaser";
+import { sound } from "../audio/sound.ts";
+import { C, rgb } from "../palette.ts";
 import { MANEUVER_STYLE, shortName, type Edge, type Replay, type ReplayRound, type ReplayShip } from "../ui/replayModel.ts";
 import { Timeline } from "./timeline.ts";
 
-// Placeholder shapes in Endesga 32 colours until the art pass (week 3). Phaser only draws here: what
+// Shapes in Endesga 32 colours until there is sprite art. Phaser only draws here: what
 // happens is decided by the Replay model, which is built from the saved battle, and the Timeline
 // that every beat is scheduled on. Every menu and button is Preact (ReplayView).
 
@@ -10,13 +12,14 @@ import { Timeline } from "./timeline.ts";
 export const REPLAY_WIDTH = 320;
 export const REPLAY_HEIGHT = 180;
 
-const SKY = [0x262b44, 0x3a4466, 0x5a6988, 0x8b9bb4];
+const SKY = [C.nightSea, C.slate, C.dusk, C.steel].map(rgb);
 const HORIZON = 96;
-const SEA = 0x124e89;
-const WAVE = 0x0099db;
+const SEA = rgb(C.deepSea);
+const WAVE = rgb(C.shallows);
 const WATERLINE = 122;
-const INK = 0x181425;
-const GOLD = "#fee761";
+const INK = rgb(C.ink);
+const GOLD = C.goldLight;
+const TEXT = C.parchment;
 const FONT = "monospace";
 
 // Cosmetic timings in milliseconds.
@@ -29,9 +32,9 @@ const AFTER_FIRE = 1300;
 const SINK = 1200;
 
 const EDGE_TEXT: Record<Edge, { text: string; colour: string }> = {
-  edge: { text: "EDGE", colour: "#63c74d" },
-  even: { text: "EVEN", colour: "#c0cbdc" },
-  weak: { text: "WEAK", colour: "#e43b44" },
+  edge: { text: "EDGE", colour: C.jungle },
+  even: { text: "EVEN", colour: C.mist },
+  weak: { text: "WEAK", colour: C.danger },
 };
 
 /** Everything drawn for one ship. */
@@ -71,6 +74,8 @@ export class ReplayScene extends Phaser.Scene {
   private waveClock = -1;
   private banner?: Phaser.GameObjects.Text;
   private bobbing = false;
+  /** True while skipping ahead, so a whole battle of sounds does not play at once. */
+  private skipping = false;
 
   constructor(replay: Replay, options: { autoplay?: boolean; onFinished?: () => void } = {}) {
     super("replay");
@@ -90,7 +95,7 @@ export class ReplayScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(SEA);
     this.drawBackdrop();
     this.waves = this.add.graphics().setDepth(1);
-    this.banner = this.text(REPLAY_WIDTH / 2, 10, "", 8, "#f3ead2").setDepth(70);
+    this.banner = this.text(REPLAY_WIDTH / 2, 10, "", 8, TEXT).setDepth(70);
     this.buildRigs();
     this.schedule();
     if (!this.autoplay) this.skip();
@@ -115,13 +120,23 @@ export class ReplayScene extends Phaser.Scene {
 
   /** Jump to how the battle ended. */
   skip(): void {
-    this.tl.advance(Math.max(0, this.tl.end - this.tl.clock));
+    this.skipping = true;
+    try {
+      this.tl.advance(Math.max(0, this.tl.end - this.tl.clock));
+    } finally {
+      this.skipping = false;
+    }
   }
 
   /** Play it from the start, even if it first opened on the last frame. */
   restart(): void {
     this.autoplay = true;
     this.scene.restart();
+  }
+
+  /** A sound that goes with a beat. Beats that are skipped over make no noise. */
+  private cue(name: Parameters<typeof sound.play>[0]): void {
+    if (!this.skipping) sound.play(name);
   }
 
   // ---- drawing ----
@@ -135,7 +150,7 @@ export class ReplayScene extends Phaser.Scene {
     const band = HORIZON / SKY.length;
     SKY.forEach((colour, i) => g.fillStyle(colour, 1).fillRect(0, i * band, REPLAY_WIDTH, band));
     g.fillStyle(SEA, 1).fillRect(0, HORIZON, REPLAY_WIDTH, REPLAY_HEIGHT - HORIZON);
-    g.fillStyle(0x3a4466, 1).fillRect(0, HORIZON, REPLAY_WIDTH, 1);
+    g.fillStyle(rgb(C.slate), 1).fillRect(0, HORIZON, REPLAY_WIDTH, 1);
   }
 
   private drawWaves(): void {
@@ -150,12 +165,12 @@ export class ReplayScene extends Phaser.Scene {
   }
 
   private drawShip(g: Phaser.GameObjects.Graphics, sail: number): void {
-    g.fillStyle(0x733e39, 1);                                     // hull
+    g.fillStyle(rgb(C.woodDark), 1);                                   // hull
     g.fillTriangle(-18, -6, 18, -6, 14, 4).fillTriangle(-18, -6, 14, 4, -14, 4);
-    g.fillStyle(0xb86f50, 1).fillRect(-18, -8, 36, 2);            // deck
+    g.fillStyle(rgb(C.wood), 1).fillRect(-18, -8, 36, 2);            // deck
     g.fillStyle(INK, 1);                                          // cannon ports
     for (const x of [-9, 0, 9]) g.fillRect(x - 1, -4, 3, 2);
-    g.fillStyle(0x3e2731, 1).fillRect(-1, -36, 2, 30);            // mast
+    g.fillStyle(rgb(C.woodDeep), 1).fillRect(-1, -36, 2, 30);            // mast
     g.fillStyle(sail, 1);
     g.fillTriangle(2, -34, 2, -10, 21, -10);                      // main sail
     g.fillTriangle(-2, -30, -2, -12, -15, -12);                   // fore sail
@@ -166,13 +181,13 @@ export class ReplayScene extends Phaser.Scene {
     const share = Math.max(0, Math.min(1, rig.hull / rig.ship.maxHull));
     rig.bar.clear();
     rig.bar.fillStyle(INK, 1).fillRect(rig.x - 16, 37, 32, 5);
-    rig.bar.fillStyle(share > 0.5 ? 0x63c74d : share > 0.25 ? 0xfeae34 : 0xe43b44, 1)
+    rig.bar.fillStyle(share > 0.5 ? rgb(C.jungle) : share > 0.25 ? rgb(C.gold) : rgb(C.danger), 1)
       .fillRect(rig.x - 15, 38, Math.round(30 * share), 3);
   }
 
   private drawIcon(g: Phaser.GameObjects.Graphics, shape: "circle" | "triangle" | "diamond", colour: number): void {
     g.clear();
-    g.fillStyle(colour, 1).lineStyle(1, 0xffffff, 1);
+    g.fillStyle(colour, 1).lineStyle(1, rgb(C.foam), 1);
     if (shape === "circle") {
       g.fillCircle(0, 0, 5).strokeCircle(0, 0, 5);
     } else if (shape === "triangle") {
@@ -196,12 +211,12 @@ export class ReplayScene extends Phaser.Scene {
       const body = this.add.graphics().setPosition(x, y).setDepth(10 + y);
       this.drawShip(body, ship.sail);
       if (ship.side === 1) body.setScale(-1, 1);
-      const name = this.text(x, 30, shortName(ship.label, crowded ? 8 : 11), 8, "#f3ead2").setDepth(50);
+      const name = this.text(x, 30, shortName(ship.label, crowded ? 8 : 11), 8, TEXT).setDepth(50);
       const bar = this.add.graphics().setDepth(50);
       const mark = this.text(x, 54, "?", 12, GOLD).setDepth(50).setVisible(false);
       const icon = this.add.graphics().setPosition(x, 52).setDepth(50).setVisible(false);
-      const move = this.text(x, 63, "", 8, "#f3ead2").setDepth(50).setVisible(false);
-      const edge = this.text(x, 71, "", 8, "#c0cbdc").setDepth(50).setVisible(false);
+      const move = this.text(x, 63, "", 8, TEXT).setDepth(50).setVisible(false);
+      const edge = this.text(x, 71, "", 8, C.mist).setDepth(50).setVisible(false);
 
       const rig: Rig = { ship, x, y, body, bar, name, mark, icon, move, edge, hull: ship.hullBefore };
       this.drawBar(rig);
@@ -252,6 +267,7 @@ export class ReplayScene extends Phaser.Scene {
     banner.setText(`Round ${round.round}`).setAlpha(0);
     this.tl.anim(250, (p) => banner.setAlpha(p));
     this.bobbing = true;
+    this.cue("drumRoll");
     for (const rig of this.rigs.values()) {
       rig.mark.setVisible(true);
       rig.icon.setVisible(false);
@@ -277,11 +293,13 @@ export class ReplayScene extends Phaser.Scene {
 
   private fire(): void {
     this.bobbing = false;
+    let n = 0;
     for (const rig of this.rigs.values()) {
+      this.tl.after(n++ * 70, () => this.cue("cannon"));  // a ragged volley, not one hit
       const dir = rig.ship.side === 0 ? 1 : -1;       // side 0 fires to the right
       const muzzle = rig.x + dir * 20;
       const flash = this.add.graphics().setDepth(60).setPosition(muzzle, rig.y - 3);
-      flash.fillStyle(0xfee761, 1).fillCircle(0, 0, 4);
+      flash.fillStyle(rgb(C.goldLight), 1).fillCircle(0, 0, 4);
       this.tl.anim(160, (p) => flash.setAlpha(1 - p).setScale(1 + p), () => flash.destroy());
       for (let k = 0; k < 6; k++) this.tl.after(k * 60, () => this.puff(muzzle, rig.y - 6, dir, k));
     }
@@ -289,7 +307,7 @@ export class ReplayScene extends Phaser.Scene {
 
   private puff(x: number, y: number, dir: number, k: number): void {
     const g = this.add.graphics().setDepth(60).setPosition(x, y);
-    g.fillStyle(0xc0cbdc, 1).fillCircle(0, 0, 1);
+    g.fillStyle(rgb(C.mist), 1).fillCircle(0, 0, 1);
     const drift = dir * (6 + k * 3), rise = 10 + k * 2;
     this.tl.anim(700, (p) => {
       g.setPosition(x + drift * p, y - rise * p).setScale(2 + 4 * p).setAlpha(0.85 * (1 - p));
@@ -298,6 +316,7 @@ export class ReplayScene extends Phaser.Scene {
 
   /** The shells land: damage numbers float up, hulls go down, ships that were hit shake. */
   private hits(round: ReplayRound): void {
+    if (round.winner !== null) this.cue("brass");
     for (const rig of this.rigs.values()) {
       const lost = round.hullLost[rig.ship.id] ?? 0;
       const from = rig.hull;
@@ -308,7 +327,7 @@ export class ReplayScene extends Phaser.Scene {
       // Over the hull, in front of the sails, where it cannot be taken for part of the name or the plan.
       const top = rig.y - 14;
       const number = this.add.text(rig.x, top, `-${Math.max(1, Math.round(lost))}`, {
-        fontFamily: FONT, fontSize: "10px", color: "#ffffff", stroke: "#a22633", strokeThickness: 3,
+        fontFamily: FONT, fontSize: "10px", color: C.foam, stroke: C.dangerDark, strokeThickness: 3,
       }).setOrigin(0.5).setDepth(65);
       this.tl.anim(900, (p) => number.setY(top - 18 * ease(p)).setAlpha(p < 0.6 ? 1 : 1 - (p - 0.6) / 0.4), () => number.destroy());
 
@@ -336,6 +355,10 @@ export class ReplayScene extends Phaser.Scene {
     this.banner!.setVisible(false);
 
     // Ships that struck their colours list and sink a little.
+    if (ending.struck.length > 0) {
+      this.cue("struck");
+      this.tl.after(SINK * 0.7, () => this.cue("splash"));
+    }
     for (const id of ending.struck) {
       const rig = this.rigs.get(id);
       if (!rig) continue;
@@ -345,7 +368,7 @@ export class ReplayScene extends Phaser.Scene {
 
     this.tl.after(SINK / 2, () => {
       const head = this.text(REPLAY_WIDTH / 2, 148, ending.headline, 14, GOLD).setDepth(70).setAlpha(0);
-      const who = this.text(REPLAY_WIDTH / 2, 164, ending.winners, 8, "#f3ead2").setDepth(70).setAlpha(0);
+      const who = this.text(REPLAY_WIDTH / 2, 164, ending.winners, 8, TEXT).setDepth(70).setAlpha(0);
       this.tl.anim(300, (p) => { head.setAlpha(p); who.setAlpha(p); });
     });
 
@@ -357,14 +380,14 @@ export class ReplayScene extends Phaser.Scene {
   /** A Parting Shot over the winner's deck (section 2.4). */
   private speak(rig: Rig, line: string): void {
     const words = this.add.text(0, 0, `"${line}"`, {
-      fontFamily: FONT, fontSize: "8px", color: "#181425", align: "center", wordWrap: { width: 120 },
+      fontFamily: FONT, fontSize: "8px", color: C.ink, align: "center", wordWrap: { width: 120 },
     }).setOrigin(0.5).setDepth(81);
     const w = Math.ceil(words.width) + 8, h = Math.ceil(words.height) + 6;
     const x = Math.min(REPLAY_WIDTH - w / 2 - 2, Math.max(w / 2 + 2, rig.x));
     const y = 3 + h / 2;                                  // at the very top, clear of the names below
     words.setPosition(x, y);
     const bubble = this.add.graphics().setDepth(80);
-    bubble.fillStyle(0xf3ead2, 1).fillRect(x - w / 2, y - h / 2, w, h);
+    bubble.fillStyle(rgb(C.parchment), 1).fillRect(x - w / 2, y - h / 2, w, h);
     bubble.fillTriangle(rig.x - 3, y + h / 2, rig.x + 3, y + h / 2, rig.x, y + h / 2 + 4);
     this.tl.anim(250, (p) => { bubble.setAlpha(p); words.setAlpha(p); });
   }

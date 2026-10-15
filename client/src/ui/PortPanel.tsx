@@ -2,6 +2,7 @@ import { useState } from "preact/hooks";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { GameMap } from "@engine/map.ts";
 import type { Good } from "@engine/types.ts";
+import { sound } from "../audio/sound.ts";
 import { callFunction } from "../net/api.ts";
 import type { Me } from "../net/captain.ts";
 import type { PortPayload } from "../net/payloads.ts";
@@ -38,6 +39,7 @@ export function PortPanel({ client, map, me, ships, onChanged }: Props) {
     setMessage(null);
     const reply = await callFunction<{ message: string }>(client, "port_action", payload);
     if (reply.ok) {
+      sound.play("coin");
       setMessage({ text: reply.data.message, bad: false });
       await onChanged();
     } else {

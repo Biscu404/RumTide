@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "preact/hooks";
 import type { Session } from "@supabase/supabase-js";
+import { sound } from "../audio/sound.ts";
 import { loadMe, type Me } from "../net/captain.ts";
 import { NO_FLEETS, loadFleets, type FleetsState } from "../net/fleets.ts";
 import { supabase } from "../net/supabase.ts";
@@ -14,6 +15,8 @@ import { MapView } from "./MapView.tsx";
 import { OrdersPanel } from "./OrdersPanel.tsx";
 import { withFleetColours } from "./fleetModel.ts";
 import { PortPanel } from "./PortPanel.tsx";
+import { SoundToggle } from "./SoundToggle.tsx";
+import { checkTideNews } from "./tideNews.ts";
 import { hold } from "./portModel.ts";
 import { omenNames } from "./exploreModel.ts";
 import { shipSpeed } from "./ordersModel.ts";
@@ -35,6 +38,8 @@ export function App() {
         <header class="bar">
           <strong>Rumtide</strong>
           <span class="dim">Preview: no server configured, see client/.env.example</span>
+          <span class="spacer" />
+          <SoundToggle />
         </header>
         <MapView map={mapById(DEFAULT_MAP_ID)} ships={PREVIEW_SHIPS} />
       </div>
@@ -85,6 +90,16 @@ function Game({ client, session }: { client: NonNullable<typeof supabase>; sessi
 
   useEffect(() => { void refresh(); }, [refresh]);
 
+  // A Tide has turned since this device was last here: the Tide jingle plays at the first tap (section 2.3).
+  const seasonId = world.season?.id;
+  const currentTide = world.season?.currentTide;
+  useEffect(() => {
+    if (seasonId === undefined || currentTide === undefined) return;
+    let storage: Storage | null = null;
+    try { storage = localStorage; } catch { /* blocked */ }
+    if (checkTideNews(storage, seasonId, currentTide)) sound.playWhenUnlocked("jingle");
+  }, [seasonId, currentTide]);
+
   let map;
   let mapError: string | null = null;
   try {
@@ -111,6 +126,7 @@ function Game({ client, session }: { client: NonNullable<typeof supabase>; sessi
         <strong>{season ? `${season.name}, Tide ${season.currentTide} of ${season.lengthTides}` : "Rumtide"}</strong>
         {status && <span class="dim" role="status">{status}</span>}
         <span class="spacer" />
+        <SoundToggle />
         <button class="secondary" disabled={loading} onClick={() => void refresh()}>Refresh</button>
         <button class="secondary" onClick={() => setInAdmin(true)}>Game master</button>
         <button class="secondary" onClick={() => void client.auth.signOut()}>Sign out</button>
@@ -118,22 +134,24 @@ function Game({ client, session }: { client: NonNullable<typeof supabase>; sessi
       <MapView map={map} ships={ships} />
       {me && (
         <section class="dock" aria-label="Captain's desk">
-          <div class="tabs" role="tablist">
-            <button role="tab" aria-selected={tab === "orders"} class={tab === "orders" ? "tab on" : "tab"} onClick={() => setTab(tab === "orders" ? null : "orders")}>
-              Orders
-            </button>
-            <button role="tab" aria-selected={tab === "port"} class={tab === "port" ? "tab on" : "tab"} onClick={() => setTab(tab === "port" ? null : "port")}>
-              {me.ship.docked ? "Port" : "Port (at sea)"}
-            </button>
-            <button role="tab" aria-selected={tab === "fleet"} class={tab === "fleet" ? "tab on" : "tab"} onClick={() => setTab(tab === "fleet" ? null : "fleet")}>
-              {invitations > 0 ? `Fleet (${invitations})` : "Fleet"}
-            </button>
-            <button role="tab" aria-selected={tab === "legend"} class={tab === "legend" ? "tab on" : "tab"} onClick={() => setTab(tab === "legend" ? null : "legend")}>
-              Legend
-            </button>
-            <button role="tab" aria-selected={tab === "gazette"} class={tab === "gazette" ? "tab on" : "tab"} onClick={() => setTab(tab === "gazette" ? null : "gazette")}>
-              Gazette
-            </button>
+          <div class="tabs">
+            <div class="tablist" role="tablist">
+              <button role="tab" aria-selected={tab === "orders"} class={tab === "orders" ? "tab on" : "tab"} onClick={() => setTab(tab === "orders" ? null : "orders")}>
+                Orders
+              </button>
+              <button role="tab" aria-selected={tab === "port"} class={tab === "port" ? "tab on" : "tab"} onClick={() => setTab(tab === "port" ? null : "port")}>
+                {me.ship.docked ? "Port" : "Port (at sea)"}
+              </button>
+              <button role="tab" aria-selected={tab === "fleet"} class={tab === "fleet" ? "tab on" : "tab"} onClick={() => setTab(tab === "fleet" ? null : "fleet")}>
+                {invitations > 0 ? `Fleet (${invitations})` : "Fleet"}
+              </button>
+              <button role="tab" aria-selected={tab === "legend"} class={tab === "legend" ? "tab on" : "tab"} onClick={() => setTab(tab === "legend" ? null : "legend")}>
+                Legend
+              </button>
+              <button role="tab" aria-selected={tab === "gazette"} class={tab === "gazette" ? "tab on" : "tab"} onClick={() => setTab(tab === "gazette" ? null : "gazette")}>
+                Gazette
+              </button>
+            </div>
             <span class="spacer" />
             <span class="dim small stats">
               {Math.round(me.captain.chestGold).toLocaleString()} gold, hull {me.ship.hullPoints.toFixed(0)}, hold {hold(me).used}/{hold(me).capacity}, speed {shipSpeed(me.ship)}
