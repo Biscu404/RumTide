@@ -2,6 +2,7 @@
 // do not replay from their seed always fail. The bands below are loose on purpose: they catch a
 // broken engine, not a balance opinion.
 
+import { SEASON_PRESETS } from "@engine/balance.ts";
 import type { ApiSeasonReport } from "./api_season.ts";
 import type { SeasonReport } from "./season.ts";
 
@@ -32,7 +33,7 @@ export function commonProblems(label: string, reports: readonly SeasonReport[], 
   for (const r of reports) {
     for (const p of r.problems.slice(0, 5)) problems.push(`${label} seed ${r.seed}: ${p}`);
     if (r.problems.length > 5) problems.push(`${label} seed ${r.seed}: and ${r.problems.length - 5} more`);
-    if (r.tides.length !== 14) problems.push(`${label} seed ${r.seed}: only ${r.tides.length} Tides were played`);
+    if (r.tides.length !== SEASON_PRESETS.season0.lengthTides) problems.push(`${label} seed ${r.seed}: only ${r.tides.length} Tides were played`);
   }
   // The same seed must give the same season, down to the last doubloon.
   for (const r of reports.slice(0, 3)) {

@@ -2,12 +2,14 @@
 // then checks it against the rules. The client never sends gold, positions, damage or times.
 
 import { z } from "zod";
+import { B } from "../engine/balance.ts";
 
 const maneuver = z.enum(["broadside", "outmaneuver", "board"]);
 const good = z.enum(["rum", "sugar", "spice"]);
 const stat = z.enum(["hull", "cannons", "sails", "crew", "hold"]);
 const id = z.string().min(1).max(64);
-const parley = z.union([z.literal("off"), z.literal(1.25), z.literal(1.5)]);
+const [lowParley, highParley] = B.parley.thresholds;
+const parley = z.union([z.literal("off"), z.literal(lowParley), z.literal(highParley)]);
 
 export const submitOrdersSchema = z.strictObject({
   tide: z.number().int().min(1),

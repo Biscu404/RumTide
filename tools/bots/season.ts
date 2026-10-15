@@ -2,7 +2,7 @@
 // visit port and set orders, resolveTide runs, and the state is checked for impossible values.
 // No network and no database, so a 14 Tide season takes a few milliseconds.
 
-import { SEASON_PRESETS, holdUnits, maxHullPoints } from "@engine/balance.ts";
+import { B, SEASON_PRESETS, holdUnits, maxHullPoints } from "@engine/balance.ts";
 import type { GameMap } from "@engine/map.ts";
 import type { PortContext } from "@engine/port.ts";
 import { resolveTide } from "@engine/resolve.ts";
@@ -101,7 +101,7 @@ export function checkState(map: GameMap, snap: TideSnapshot, when: string, atRes
     if (!finite(c.bounty) || c.bounty < 0) bad(`${id} bounty ${c.bounty}`);
     if (!snap.settings.hullsEnabled.includes(ship.hull)) bad(`${id} has a ${ship.hull} this season does not allow`);
     for (const [stat, level] of Object.entries(ship.levels)) {
-      if (!Number.isInteger(level) || level < 0 || level > 10) bad(`${id} ${stat} level ${level}`);
+      if (!Number.isInteger(level) || level < 0 || level > B.upgrade.maxLevel) bad(`${id} ${stat} level ${level}`);
     }
     let units = 0;
     for (const [good, n] of Object.entries(ship.cargo)) {

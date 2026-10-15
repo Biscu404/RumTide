@@ -13,6 +13,7 @@ export const B = {
   upgrade: { baseCost: 60, growth: 1.35, statPerLevel: 0.12, maxLevel: 10 },
   baseStat: 10,     // Cannons, Sails and Crew on a level 0 sloop
   baseHull: 100,    // Hull points on a level 0 sloop
+  hullPerPR: 10,    // Hull points that count as one point of PR; an NPC's hull is this times its PR
   hulls: {
     sloop:      { mult: 1.0,  hold: 10, speed: 2, cost: 0 },
     brigantine: { mult: 1.35, hold: 16, speed: 2, cost: 600 },
@@ -105,7 +106,7 @@ export const holdUnits = (hull: HullId, level: number) =>
 export const cargoValue = (units: number, tide: number) => units * B.npc.prizeUnitValue * boom(tide);
 
 export const npcPR = (kind: "smallTrader" | "fatMerchant" | "galleon", medianCaptainPR: number) =>
-  B.npc[kind].prVsMedian * medianCaptainPR;  // NPC stats all equal PR, hull = 10 * PR
+  B.npc[kind].prVsMedian * medianCaptainPR;  // NPC stats all equal PR, hull = hullPerPR * PR
 
 // Co op prizes pay base * boom * N ** 1.5 in total, split evenly. This is one captain's share.
 export const coopShare = (basePrize: number, tide: number, captains: number) =>
@@ -113,7 +114,7 @@ export const coopShare = (basePrize: number, tide: number, captains: number) =>
 
 // A fresh sloop has PR 10.
 export const powerRating = (s: { hull: number; cannons: number; sails: number; crew: number }) =>
-  (s.hull / 10 + s.cannons + s.sails + s.crew) / 4;
+  (s.hull / B.hullPerPR + s.cannons + s.sails + s.crew) / 4;
 
 export const roundDamage = (stat: number, matchup: number, stale: boolean, luck: number) =>
   B.combat.k * (stat / 10) ** B.combat.exponent * matchup * (stale ? B.combat.stale : 1) * luck;

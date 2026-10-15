@@ -96,9 +96,9 @@ export function npcPlan(npc: Pick<Npc, "kind" | "habit">, rng: Rng): [Maneuver, 
   return [pick(), pick(), pick()];
 }
 
-/** An NPC as a battle sees it: every stat equals its PR and its hull is 10 times that (section 14). */
+/** An NPC as a battle sees it: every stat equals its PR and its hull is B.hullPerPR times that (section 14). */
 export function npcCombatant(npc: Npc, rng: Rng): Combatant {
-  const hull = 10 * npc.pr;
+  const hull = B.hullPerPR * npc.pr;
   return {
     id: npc.id, kind: "npc", pr: npc.pr, cannons: npc.pr, sails: npc.pr, crew: npc.pr,
     hullPoints: hull, maxHull: hull, plan: npcPlan(npc, rng),
