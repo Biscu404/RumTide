@@ -190,6 +190,32 @@ describe("a round, step by step (P2.2, GAMEPLAY 8.3)", () => {
     expect(r.rounds[0]!.ships[1]).toMatchObject({ rule: 0, abilities: [] });
   });
 
+  it("uses up the abilities a Chooser fired, and shows the choosers who has already jettisoned (P2.3)", () => {
+    const views: RoundView[] = [];
+    const caster: Chooser = (view) => {
+      if (view.side === "hunter") views.push(view);
+      const abilities = view.round === 2 ? [{ rule: 1, ability: "gunner.heated_shot" }] : [];
+      return { kind: "fight", rule: 0, abilities, helm: "hold", guns: "holdFire", jettison: view.round === 3 };
+    };
+    const r = fight(caster, idle, { abilities: ["gunner.heated_shot", "helmsman.hard_about"] });
+    expect(views.map((v) => v.ships.hunter.abilities)).toEqual([
+      ["gunner.heated_shot", "helmsman.hard_about"], ["gunner.heated_shot", "helmsman.hard_about"],
+      ["helmsman.hard_about"], ["helmsman.hard_about"], ["helmsman.hard_about"],
+    ]);
+    expect(views.map((v) => v.jettisoned.hunter)).toEqual([false, false, false, true, true]);
+    expect(views.map((v) => v.jettisoned.target)).toEqual([false, false, false, false, false]);
+    expect(r.ships[0]!.abilities).toEqual(["gunner.heated_shot", "helmsman.hard_about"]); // the record keeps round 1's state
+    expect(r.final[0]!.abilities).toEqual(["helmsman.hard_about"]);
+    expect(r.final[1]!.abilities).toEqual([]);
+  });
+
+  it("uses up an ability fired in the round the colours came down", () => {
+    const strike: Chooser = () => ({ kind: "surrender", rule: 1, abilities: [{ rule: 0, ability: "gunner.heated_shot" }] });
+    const r = fight(always("hold", "roundShot"), strike, {}, { abilities: ["gunner.heated_shot"] });
+    expect(r.outcome.kind).toBe("struckColours");
+    expect(r.final[1]!.abilities).toEqual([]);
+  });
+
   it("fires the guns at the new range, with luck from the round's own stream", () => {
     const r = fight(always("closeIn", "roundShot"), always("hold", "holdFire"));
     expect(r.rounds[0]!.rangeAfter).toBe("medium");

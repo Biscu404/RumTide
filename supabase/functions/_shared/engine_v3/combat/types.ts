@@ -1,7 +1,6 @@
 // Types for combat (GAMEPLAY 8). Pure data: no classes, no enums, JSON friendly.
 // Section numbers point at docs/GAMEPLAY.md. The rules for these shapes live next to them:
-// helm.ts and guns.ts (P2.1), boarding.ts, battle.ts and loot.ts (P2.2). Doctrine evaluation (P2.3) comes later,
-// so Doctrine and DoctrineRule are complete as shapes but nothing reads them yet.
+// helm.ts and guns.ts (P2.1), boarding.ts, battle.ts and loot.ts (P2.2), doctrine.ts (P2.3).
 
 import type { CaptainId, HullId, ShipId, Terrain, WaterId, WindKind } from "../types.ts";
 
@@ -22,6 +21,7 @@ export const GUNS_ORDERS: readonly GunsOrder[] = ["roundShot", "chainShot", "gra
 
 /** The three things a ship can lose in battle (6.3). */
 export type DamageTrack = "hull" | "rigging" | "hands";
+export const DAMAGE_TRACKS: readonly DamageTrack[] = ["hull", "rigging", "hands"];
 
 /** A battle has two sides. Fleets (P2.5) put several ships on a side. */
 export type BattleSide = "hunter" | "target";
@@ -142,6 +142,7 @@ export interface BattleOutcome {
 // ---------- Doctrines (8.8) ----------
 
 export type EnemyType = "merchant" | "navy" | "monster" | "player" | "brethren";
+export const ENEMY_TYPES: readonly EnemyType[] = ["merchant", "navy", "monster", "player", "brethren"];
 
 export type DoctrineCondition =
   | { kind: "range"; op: "is" | "atLeast" | "atMost"; range: Range }
@@ -160,7 +161,7 @@ export type DoctrineAction =
   | { kind: "fight"; helm: HelmMove; guns: GunsOrder }
   | { kind: "ability"; ability: string } // fires the crew ability, then the rules below still give the Helm move and Guns order
   | { kind: "surrender" } // Struck Colours
-  | { kind: "jettison" }; // cargo overboard becomes Flotsam; what this round's Helm and Guns are is decided in P2.3
+  | { kind: "jettison" }; // cargo overboard becomes Flotsam; the round plays Hold and Hold Fire, and the rule fires once per battle (D65)
 
 /** IF up to two conditions THEN an action. The last rule of a doctrine is Otherwise: no conditions. */
 export interface DoctrineRule {
