@@ -10,7 +10,8 @@ The game is moving to the v0.3 design in `docs/GAMEPLAY.md`, built as a new engi
 
 * Done: roadmap P0 (foundations) and P1 (engine core: map, knowledge, Watches, wind and currents, voyage plans, the Tide resolver).
 * Also done: P2.1, the helm and guns rules (`engine_v3/combat/`: `types.ts`, `helm.ts`, `guns.ts`), on branch `p2-1-helm-and-guns`, not yet merged to `main`.
-* Next: P2.2 (boarding, `runBattle`, loot), then the rest of P2 combat. Work from `docs/briefs/P2-combat.md`.
+* Also done: P2.2, boarding, `runBattle` and loot (`combat/boarding.ts`, `battle.ts`, `loot.ts`), on branch `p2-2-boarding-battle-loot`, stacked on `crew-setup` and `p2-1-helm-and-guns`, not yet merged to `main`. Rule calls D50 to D63; D57 (fairness and Cradle apply to PvP only) is waiting for Biscu to confirm.
+* Next: P2.3 (doctrine evaluation, the four templates, the ability slot, what a Jettison round plays), then the rest of P2 combat. Work from `docs/briefs/P2-combat.md`.
 * The roadmap lives in the Rumtide Roadmap tracker on claude.ai. Each task has an id such as P2.1; name branches and DECISIONS entries after it.
 
 Update this section when the focus changes.
