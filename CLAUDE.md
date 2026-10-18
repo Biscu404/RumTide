@@ -9,7 +9,8 @@ The full design is in `docs/GAME_DESIGN.md`. It is long, so do not read it all a
 The game is moving to the v0.3 design in `docs/GAMEPLAY.md`, built as a new engine in `supabase/functions/_shared/engine_v3/`. The v0.2 prototype (engine in `engine/`, server, client, bots, sim) stays as it is and keeps working until the new server and client replace it.
 
 * Done: roadmap P0 (foundations) and P1 (engine core: map, knowledge, Watches, wind and currents, voyage plans, the Tide resolver).
-* Next: P2 combat. Work from `docs/briefs/P2-combat.md`.
+* Also done: P2.1, the helm and guns rules (`engine_v3/combat/`: `types.ts`, `helm.ts`, `guns.ts`), on branch `p2-1-helm-and-guns`, not yet merged to `main`.
+* Next: P2.2 (boarding, `runBattle`, loot), then the rest of P2 combat. Work from `docs/briefs/P2-combat.md`.
 * The roadmap lives in the Rumtide Roadmap tracker on claude.ai. Each task has an id such as P2.1; name branches and DECISIONS entries after it.
 
 Update this section when the focus changes.
