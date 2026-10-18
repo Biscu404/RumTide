@@ -3,7 +3,8 @@
 import { Rng } from "../rng.ts";
 import { maxHands, maxHullPoints, maxRiggingPoints, newShip, statValue } from "../ship.ts";
 import type { HullId, Ship } from "../types.ts";
-import type { BattleShip, BattleSide } from "./types.ts";
+import type { BattleInput, Chooser } from "./battle.ts";
+import type { BattleShip, BattleSide, GunsOrder, HelmMove } from "./types.ts";
 
 /** A BattleShip for a Ship at the start of a battle. */
 export function battleShipFrom(ship: Ship, side: BattleSide, over: Partial<BattleShip> = {}): BattleShip {
@@ -19,6 +20,7 @@ export function battleShipFrom(ship: Ship, side: BattleSide, over: Partial<Battl
     maxRiggingPoints: maxRiggingPoints(ship),
     maxHands: maxHands(ship),
     helmBonus: 0,
+    boardingBonus: 0,
     charted: false,
     withCurrent: false,
     lurker: false,
@@ -66,4 +68,37 @@ export function deepFreeze<T>(value: T): T {
     for (const v of Object.values(value)) deepFreeze(v);
   }
   return value;
+}
+
+// ---------- Scripted captains for battle tests ----------
+
+/** A captain who plays the same Helm move and Guns order every round. */
+export const always = (helm: HelmMove, guns: GunsOrder, extra: { jettison?: boolean } = {}): Chooser => () => ({
+  kind: "fight", rule: 0, abilities: [], helm, guns, ...extra,
+});
+
+/** A captain who plays a script by round number, and `otherwise` in the rounds it does not name. */
+export const scripted = (plays: Record<number, [HelmMove, GunsOrder]>, otherwise: [HelmMove, GunsOrder]): Chooser => (view) => {
+  const [helm, guns] = plays[view.round] ?? otherwise;
+  return { kind: "fight", rule: 0, abilities: [], helm, guns };
+};
+
+/** A captain who plays `then` until `round`, and strikes the colours in that round. */
+export const surrendersAt = (round: number, then: Chooser): Chooser => (view) =>
+  view.round >= round ? { kind: "surrender", rule: 1, abilities: [] } : then(view);
+
+/** A battle between two ships on a given Tide seed. Open water, a Breeze, the hunter's doctrine against the target's. */
+export function battleOf(
+  hunter: BattleShip,
+  target: BattleShip,
+  choosers: { hunter: Chooser; target: Chooser },
+  over: Partial<BattleInput> = {},
+): BattleInput {
+  return {
+    tide: 5, seed: 1234, at: "dw_shallows", terrain: "open", wind: "breeze",
+    hunter, target,
+    doctrines: { hunter: "Scripted hunter", target: "Scripted target" },
+    choosers,
+    ...over,
+  };
 }

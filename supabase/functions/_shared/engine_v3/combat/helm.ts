@@ -82,7 +82,8 @@ export function helmContest(rng: Rng, a: number, b: number): ContestRoll {
   return { chance, roll, aWins: roll < chance };
 }
 
-function contestRecord(rng: Rng, kind: ContestRecord["kind"], side: BattleSide, scores: Record<BattleSide, number>): ContestRecord {
+/** One Helm contest, written down for the replay: `side` against the other ship, scored by `scores`. */
+export function contestRecord(rng: Rng, kind: ContestRecord["kind"], side: BattleSide, scores: Record<BattleSide, number>): ContestRecord {
   const c = helmContest(rng, scores[side], scores[other(side)]);
   return { kind, side, scores: { ...scores }, chance: c.chance, roll: c.roll, winner: c.aWins ? side : other(side) };
 }

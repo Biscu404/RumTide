@@ -22,13 +22,25 @@ export {
 export { newCaptain, newSeason, type NewCaptainSpec, type NewSeasonSpec } from "./season.ts";
 export { formatReplay, replayHash, canonicalJson, describeWind } from "./replay.ts";
 
-// Combat (GAMEPLAY 8). Boarding, runBattle and the rest come with P2.2 and later.
+// Combat (GAMEPLAY 8). Doctrines, the encounter, fleets and Old Shellback come with P2.3 and later.
 export * from "./combat/types.ts";
 export {
-  battleRng, isCrippled, hasLocalKnowledge, helmScore, windGauge, startingRange, helmContest, pairRow, applyPair, playableMove,
-  resolveHelm, type ContestRoll, type PairOutcome, type HelmInput, type HelmResult,
+  battleRng, isCrippled, hasLocalKnowledge, helmScore, windGauge, startingRange, helmContest, contestRecord, pairRow, applyPair,
+  playableMove, resolveHelm, type ContestRoll, type PairOutcome, type HelmInput, type HelmResult,
 } from "./combat/helm.ts";
 export {
   gunsTrack, ammoFactor, gunnery, staleNow, nextGunsMemory, fireGuns, applyDamage, recordFiring,
   type GunsContext, type GunsFactors, type GunsResult,
 } from "./combat/guns.ts";
+export {
+  boardingStrength, meleeRound, surrenders, captureCheck, grappleAttempts, cutFree, type CaptureResult, type CutFreeResult,
+} from "./combat/boarding.ts";
+export {
+  runBattle, pointsOutcome, damageShare, type AbilityFire, type RoundChoice, type LastPlay, type RoundView, type Chooser,
+  type BattleInput,
+} from "./combat/battle.ts";
+export {
+  carriedBy, cargoValue, fairnessFactor, lootMultiplier, lootShare, capturePick, settleLoot, jettison,
+  type Goods, type Carried, type Prices, type SalvagePile, type JettisonResult, type Multiplier, type CapturePick, type LootInput,
+  type LootResult,
+} from "./combat/loot.ts";

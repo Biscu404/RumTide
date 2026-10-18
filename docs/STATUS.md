@@ -1,7 +1,7 @@
 # Rumtide status
 
-**Date:** 2026-10-18. **Branch:** `crew-setup` (code clean, this file not yet committed). **Focus:** P2 combat, milestone M2 "First battle", brief `docs/briefs/P2-combat.md`.
-**In one line:** P0 and P1 are merged to `main`. P2.1 is committed but not on `main`. P2.2 to P2.6 are not started. Only the engine tests and `tools/v3` use `engine_v3`. No server, client, bot or sim does yet.
+**Date:** 2026-10-18. **Branch:** `p2-2-boarding-battle-loot` (P2.2 written and checked, not yet committed). **Focus:** P2 combat, milestone M2 "First battle", brief `docs/briefs/P2-combat.md`.
+**In one line:** P0 and P1 are merged to `main`. P2.1 is committed but not on `main`. P2.2 is written and passes every check but is not committed. P2.3 to P2.6 are not started. Only the engine tests and `tools/v3` use `engine_v3`. No server, client, bot or sim does yet.
 Authority order: `docs/DECISIONS.md`, then `docs/GAMEPLAY.md`, then `docs/GAME_DESIGN.md`.
 
 ## 1. Done
@@ -10,15 +10,16 @@ Authority order: `docs/DECISIONS.md`, then `docs/GAMEPLAY.md`, then `docs/GAME_D
 - **P1.2 to P1.9 engine core:** rng streams, map (`cradle.json` only), knowledge, Watches, wind and currents, voyage plans, Tide resolver with the `EncounterResolver` hook, golden Tide. Merged as PR #3 (`f4fff55`).
 - **P2.0:** brief written. D26 fixes the Power Rating formula, but `powerRating()` is not in `ship.ts` yet.
 - **P2.1 helm and guns** (commit `f6fcf77`, branch `p2-1-helm-and-guns`): `combat/types.ts`, `helm.ts`, `guns.ts`, `testing.ts`, with tests, and 23 rule calls D27 to D49. Verified 2026-10-18 on `crew-setup`: `npm run check` passes (typecheck clean, 53 test files, 920 tests, golden Tide unchanged). Not on `main`.
+- **P2.2 boarding, battle and loot** (branch `p2-2-boarding-battle-loot`, uncommitted): `combat/boarding.ts`, `battle.ts` (`runBattle`, with a Chooser per side), `loot.ts`, with tests, and 14 rule calls D50 to D63. No new number in `balance.ts`. Verified 2026-10-18: `npm run check` passes (typecheck clean, 56 test files, 1052 tests, golden Tide unchanged) and `npm run bots` passes. Nothing calls it from `resolveTide` yet, so `tide:demo` is unchanged.
 - **Crew setup** (`611f2fb`): 8 roles, skills, `npm run assets:check`, `npm run prose:check`, `docs/CREW.md`.
 
 ## 2. In progress
-- **P2 combat:** 1 of 6 tasks committed. The tree is clean, so nothing is half written.
+- **P2 combat:** 2 of 6 tasks written. P2.1 is committed. P2.2 is on its own branch with the changes uncommitted, so commit it before starting P2.3.
 - **Loose ends:** land P2.1 on `main` (no sign of a PR). Merge `crew-setup` separately. Create `docs/IDEAS.md`, which `CLAUDE.md` and the producer role point to.
 
 ## 3. Next (in order)
 1. **Close P2.1.** `npm run check` now passes (see section 1). What is left is Biscu's call: push it, open a PR, and confirm D35, D36 and D42. qa-tester has not reviewed it.
-2. **P2.2** (engineer): `boarding.ts`, `battle.ts` (`runBattle`), `loot.ts`. It picks up the seams left by P2.1: Board and Repel (D29), Cut Free (D37), skipping guns on an escaped round (D36), applying the Reef scrape (D44), and how Crippled is recorded (D48). Check: seven outcomes, loot table, fairness factor, cap, Cradle halving, same seed gives the same record.
+2. **P2.2 is done** (see section 1). What is left is Biscu's call on D57 and a qa-tester review. Scope was (engineer): `boarding.ts`, `battle.ts` (`runBattle`), `loot.ts`. It picks up the seams left by P2.1: Board and Repel (D29), Cut Free (D37), skipping guns on an escaped round (D36), applying the Reef scrape (D44), and how Crippled is recorded (D48). Check: seven outcomes, loot table, fairness factor, cap, Cradle halving, same seed gives the same record.
 3. **P2.3** (engineer, game-designer for templates): `doctrine.ts`, the four templates, an ability slot tested with a fake ability, and what a Jettison round does (D48).
 4. **P2.4** (engineer): `encounter.ts` with parley, escape, towing, shields and bounties. It also builds a real `BattleShip` (D49), sets `charted` and `withCurrent` (D40, D41), and adds the `Captain` and `SeasonState` fields and `powerRating()`. `combatEncounter` becomes the default resolver. Run `npm run golden:update` once. Check: `npm run tide:demo` shows real battles.
 5. **P2.5** `fleet.ts` and **P2.6** `shellback.ts` (engineer). Both after P2.4 (inferred).
@@ -30,6 +31,7 @@ Nothing blocked. Open questions that could become blockers:
 - **Biscu:** does the v0.2 internal playtest (`docs/PLAYTEST.md`) still happen now that Season 0 is the v0.3 column? No entry says.
 - **Biscu:** only default #6 of the P0.3 table is recorded as your call. The other seven are defaults. #1 and #2 start to matter at P6.3 and P5.
 - **Rule calls D28 to D49** were made during P2.1 under "simplest reading". Only D27 was your call. D35, D36 and D42 change the feel of a fight most.
+- **Rule calls D50 to D63** were made during P2.2. **D57 is marked "Biscu to confirm"**: the fairness factor and the Cradle halving apply to PvP only, and a Sunk ship gives up at most what the multiplier allows. Read literally, GAMEPLAY 8.7 would strip the loser of everything whatever the factor. D56 (Victory on points compares damage share across Hull, Rigging and Hands) and D52 (Crippled never ends a battle) also shape how fights end.
 - **GAMEPLAY 19.1 streak breaker** is unbuilt (D34) and no task owns it. It needs luck history on `Captain`.
 
 ## 5. Cut list

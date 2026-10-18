@@ -1,7 +1,7 @@
 // Types for combat (GAMEPLAY 8). Pure data: no classes, no enums, JSON friendly.
 // Section numbers point at docs/GAMEPLAY.md. The rules for these shapes live next to them:
-// helm.ts and guns.ts (P2.1). Boarding and runBattle (P2.2) and doctrine evaluation (P2.3) come later,
-// so Doctrine, DoctrineRule and BattleRecord are complete as shapes but nothing reads them yet.
+// helm.ts and guns.ts (P2.1), boarding.ts, battle.ts and loot.ts (P2.2). Doctrine evaluation (P2.3) comes later,
+// so Doctrine and DoctrineRule are complete as shapes but nothing reads them yet.
 
 import type { CaptainId, HullId, ShipId, Terrain, WaterId, WindKind } from "../types.ts";
 
@@ -56,6 +56,7 @@ export interface BattleShip {
   maxRiggingPoints: number; // 0 for a monster with no Rigging (Old Shellback, P2.6)
   maxHands: number;
   helmBonus: number; // Helmsman, skill and trait bonuses to the Helm score as a fraction, 0.1 is +10%. 0 until crew (P8)
+  boardingBonus: number; // Bosun, trait and Background bonuses to boarding strength (8.6), same unit. 0 until crew (P8)
   charted: boolean; // the battle's water was Charted for this captain when the Tide began (D12)
   withCurrent: boolean; // moving with a Strong Current (2.2), decided when the battle is set up (P2.4)
   lurker: boolean; // springs an ambush (8.1)
@@ -70,9 +71,9 @@ export interface BattleShip {
 
 // ---------- Records (the replay of a battle) ----------
 
-/** One Helm contest (8.4): `side` won with probability `chance`, by rolling `roll` below it. */
+/** One Helm contest (8.4, 8.6): `side` won with probability `chance`, by rolling `roll` below it. */
 export interface ContestRecord {
-  kind: "chase" | "shallows"; // the Close In against Open Range chase, or a big ship reaching Close in Shallows
+  kind: "chase" | "shallows" | "cutFree"; // the Close In against Open Range chase, a big ship reaching Close in Shallows, or a Grappled ship trying to get away
   side: BattleSide; // the ship whose chance this is
   scores: Record<BattleSide, number>;
   chance: number;
@@ -89,6 +90,7 @@ export interface RoundShipRecord {
   helmScore: number;
   shot: { track: DamageTrack | null; damage: number; powderUsed: number }; // what this ship's guns did
   scrape: number; // Hull lost to a Reef scrape this round
+  jettison: boolean; // the ship threw its cargo overboard this round (8.7); the loot step turns it into Flotsam
   // The ship's state after the round.
   hullPoints: number;
   riggingPoints: number;
@@ -96,7 +98,21 @@ export interface RoundShipRecord {
   powder: number;
 }
 
-/** One round. P2.2 adds the boarding melee when Grappled. */
+/** A Board order played at Close (8.5): did the ship grapple, and why. */
+export interface GrappleRecord {
+  side: BattleSide;
+  ok: boolean;
+  why: "helm" | "theyBoard" | "theyHold" | "failed"; // the first reason that let it succeed, or "failed"
+}
+
+/** The boarding melee of a Grappled round (8.6). */
+export interface MeleeRecord {
+  strength: Record<BattleSide, number>; // boarding strength going in
+  lost: Record<BattleSide, number>; // Hands each side lost
+  hands: Record<BattleSide, number>; // Hands each side has left
+}
+
+/** One round. */
 export interface RoundRecord {
   round: number; // 1 to B.combat.rounds
   rangeBefore: Range;
@@ -104,6 +120,10 @@ export interface RoundRecord {
   escaped: boolean; // the range went past Long
   row: HelmRow;
   contests: ContestRecord[]; // in the order they were rolled
+  grapples: GrappleRecord[]; // Board orders played at Close, hunter first
+  melee: MeleeRecord | null; // null unless the ships were Grappled when the guns had fired
+  crippled: BattleSide[]; // sides whose Rigging reached 0 this round (6.3)
+  struck: BattleSide[]; // sides whose doctrine said Surrender; nothing else happens in that round
   ships: RoundShipRecord[]; // hunter first
 }
 
@@ -167,7 +187,10 @@ export interface BattleRecord {
   doctrines: Record<BattleSide, string>; // the doctrine name each side used
   startRange: Range;
   gauge: BattleSide | null; // who holds the wind gauge
-  ships: BattleShip[]; // every ship as round 1 began
+  ships: BattleShip[]; // every ship as round 1 began, hunter first
   rounds: RoundRecord[];
   outcome: BattleOutcome;
+  final: BattleShip[]; // every ship as the battle ended, hunter first
+  dealt: Record<BattleSide, number>; // damage share each side dealt, the measure for Victory on points (D56)
+  jettisoned: BattleSide[]; // sides that threw their cargo overboard at some point
 }
