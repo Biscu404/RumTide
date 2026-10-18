@@ -21,3 +21,14 @@ export {
 } from "./tide.ts";
 export { newCaptain, newSeason, type NewCaptainSpec, type NewSeasonSpec } from "./season.ts";
 export { formatReplay, replayHash, canonicalJson, describeWind } from "./replay.ts";
+
+// Combat (GAMEPLAY 8). Boarding, runBattle and the rest come with P2.2 and later.
+export * from "./combat/types.ts";
+export {
+  battleRng, isCrippled, hasLocalKnowledge, helmScore, windGauge, startingRange, helmContest, pairRow, applyPair, playableMove,
+  resolveHelm, type ContestRoll, type PairOutcome, type HelmInput, type HelmResult,
+} from "./combat/helm.ts";
+export {
+  gunsTrack, ammoFactor, gunnery, staleNow, nextGunsMemory, fireGuns, applyDamage, recordFiring,
+  type GunsContext, type GunsFactors, type GunsResult,
+} from "./combat/guns.ts";

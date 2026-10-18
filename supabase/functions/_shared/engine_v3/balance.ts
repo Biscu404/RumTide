@@ -99,6 +99,8 @@ export const B = {
     },
     terrainHelm: { shallowsSloop: 1.15, localKnowledge: 1.15, withStrongCurrent: 1.15 },
     terrainGuns: { rockyLong: 0.75, fogLong: 0.5 },
+    // Helm pair table (8.4): how many range bands each row moves. A band is one step of Long, Medium, Close.
+    bands: { closeClose: 2, closeHold: 1, chase: 1, holdOpen: 1, openOpen: 2, rakeCloseIn: 1, crossFails: 1 },
     reefScrape: 10,
     kelpBoarding: 1.15,
     boarding: { killShare: 0.2, repel: 1.3, captureRatio: 0.4, captureOwnShare: 0.2 },
