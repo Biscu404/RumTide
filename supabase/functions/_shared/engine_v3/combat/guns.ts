@@ -33,6 +33,9 @@ export const ammoFactor = (order: GunsOrder, range: Range): number => {
   return ammo ? C.range[ammo.key][range] : 0;
 };
 
+/** A shot's raw damage as points on the track it hits: Grapeshot removes one Hand for every grapeDamagePerHand damage (D30). */
+export const shotPoints = (track: DamageTrack | null, raw: number): number => (track === "hands" ? raw / C.grapeDamagePerHand : raw);
+
 /** Gunnery: full strength at 60% of max Hands, in proportion below that (6.4). */
 export function gunnery(ship: BattleShip): number {
   const full = C.gunneryFullShare * ship.maxHands;
@@ -119,7 +122,7 @@ export function fireGuns(
     luck: rng.stream("guns", attacker.shipId).range(C.luckMin, C.luckMax),
   };
   const raw = Object.values(factors).reduce((product, f) => product * f, NEUTRAL);
-  const points = ammo.track === "hands" ? raw / C.grapeDamagePerHand : raw;
+  const points = shotPoints(ammo.track, raw);
   const available = defender[TRACK_FIELD[ammo.track]];
   return {
     order,

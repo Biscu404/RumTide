@@ -171,6 +171,10 @@ export function applyPair(moves: Record<BattleSide, HelmMove>, range: Range, cha
 
 // ---------- A whole Helm step ----------
 
+/** Hull a ship loses to a Reef scrape: it plays Close In or Cross Their Bow in a Reef water that is not Charted for its captain (D44). */
+export const reefScrape = (terrain: Terrain, ship: BattleShip, move: HelmMove): number =>
+  terrain === "reef" && (move === "closeIn" || move === "crossTheirBow") && !ship.charted ? C.reefScrape : 0;
+
 /** A Crippled ship cannot Open Range or Cross Their Bow (6.3); it holds instead. */
 export function playableMove(ship: BattleShip, move: HelmMove): HelmMove {
   return isCrippled(ship) && (move === "openRange" || move === "crossTheirBow") ? "hold" : move;
@@ -241,11 +245,7 @@ export function resolveHelm(input: HelmInput, rng: Rng): HelmResult {
   }
 
   // Reef: every Cross or Close In scrapes the hull, unless the water is Charted for that captain.
-  if (terrain === "reef") {
-    for (const side of BATTLE_SIDES) {
-      if ((moves[side] === "closeIn" || moves[side] === "crossTheirBow") && !ships[side].charted) scrape[side] = C.reefScrape;
-    }
-  }
+  for (const side of BATTLE_SIDES) scrape[side] = reefScrape(terrain, ships[side], moves[side]);
 
   const escaped = position < LONG;
   return { row: pair.row, moves, scores, range: escaped ? band(LONG) : band(position), escaped, gunsMod: pair.gunsMod, scrape, contests };

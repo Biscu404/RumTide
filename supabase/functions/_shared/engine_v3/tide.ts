@@ -52,6 +52,7 @@ export interface EncounterContext {
   hunter: EncounterSide & { filter: HuntFilter };
   target: EncounterSide;
   mutual: boolean; // both were hunting each other
+  joined?: { hunter: EncounterSide[]; target: EncounterSide[] }; // fleet mates of each lead who join its side if a battle is fought, in ship id order (v0.2 7.5). Absent means a one ship a side encounter
   rng: Rng;
 }
 
@@ -237,6 +238,19 @@ export function resolveTide(input: TideInput): TideResult {
     return act.from === (lane.current.flow === "ab" ? lane.a : lane.b);
   };
 
+  /**
+   * Fleet mates of `lead` in the same water at this tick who are hunting join its side (v0.2 7.5). Escorting joins as well
+   * once the Escort step exists (GAMEPLAY 3.5, 14.2). A lane has only the two ships that crossed on it, and a Harbour never
+   * has a fight, so nobody joins there.
+   */
+  const fleetMates = (lead: Sim, opponent: Sim, place: string, onLane: boolean, t: number): Sim[] => {
+    const fleet = lead.captain.fleetId;
+    if (!fleet || onLane) return [];
+    return sims.filter((m) =>
+      m !== lead && m !== opponent && !m.frozen && !m.ship.docked && m.captain.kind === "player" && m.captain.fleetId === fleet
+      && positionAt(m, t) === place && huntingFilter(m, t) !== null);
+  };
+
   const sideOf = (s: Sim, t: number, place: string, onLane: boolean): EncounterSide => ({
     ship: s.ship, captain: s.captain,
     stance: s.action?.kind === "lurk" ? "hunt" : s.stance,
@@ -251,9 +265,11 @@ export function resolveTide(input: TideInput): TideResult {
   const toTow: ShipId[] = []; // ships towed to a Harbour when the Tide ends
   const freshBounties = new Map<CaptainId, number>(); // bounties added this Tide, which only start to shrink next Tide
 
+  const pairKey = (x: Sim, y: Sim): string => (x.ship.id < y.ship.id ? `${x.ship.id}|${y.ship.id}` : `${y.ship.id}|${x.ship.id}`);
+
   const tryEncounter = (x: Sim, y: Sim, place: string, onLane: boolean, t: number) => {
     if (x.frozen || y.frozen) return;
-    const pair = x.ship.id < y.ship.id ? `${x.ship.id}|${y.ship.id}` : `${y.ship.id}|${x.ship.id}`;
+    const pair = pairKey(x, y);
     if (encountered.has(pair)) return;
     const fx = huntingFilter(x, t), fy = huntingFilter(y, t);
     const xHunts = !!fx && matches(fx, y) && !isProtected(y, x, place, onLane);
@@ -266,10 +282,19 @@ export function resolveTide(input: TideInput): TideResult {
     const filter = (hunter === x ? fx : fy) as HuntFilter;
     const archipelago = archAtPlace(place, onLane);
     const terrain = onLane ? null : (world.water[place] as MapWater).terrain;
+    const mates = { hunter: fleetMates(hunter, target, place, onLane, t), target: fleetMates(target, hunter, place, onLane, t) };
+    const joined = {
+      hunter: mates.hunter.map((m) => sideOf(m, t, place, onLane)),
+      target: mates.target.map((m) => sideOf(m, t, place, onLane)),
+    };
+    // A meeting between two fleets is one meeting: a parley or an escape settles it, and the ships that would have joined
+    // cannot start another with the other side this Tide.
+    for (const a of [hunter, ...mates.hunter]) for (const b of [target, ...mates.target]) encountered.add(pairKey(a, b));
     const outcome = resolver({
       world, state, tide, seed: input.seed, t, at: place, onLane, archipelago, terrain, wind: winds[archipelago] as Wind, mutual,
       hunter: { ...sideOf(hunter, t, place, onLane), filter },
       target: sideOf(target, t, place, onLane),
+      ...(joined.hunter.length + joined.target.length > 0 ? { joined } : {}),
       rng: rngFor(input.seed, "encounter", hunter.ship.id, target.ship.id, t),
     });
     const rec: EncounterRecord = { t, at: place, onLane, hunter: hunter.ship.id, target: target.ship.id, result: outcome.result };

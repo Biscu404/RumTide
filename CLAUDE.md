@@ -6,7 +6,7 @@ The full design is in `docs/GAME_DESIGN.md`. It is long, so do not read it all a
 
 ## Current focus
 
-* Next task: P2.5, fleets: sides, the flagship, the fleet bonus and Desperate Defence. Brief: `docs/briefs/P2-combat.md`. Task ids come from the Rumtide Roadmap tracker on claude.ai.
+* Next task: P2.6, Old Shellback: his statline, habits and the Narrows gate. Brief: `docs/briefs/P2-combat.md`. Task ids come from the Rumtide Roadmap tracker on claude.ai.
 * Done work is in `git log` and `docs/DECISIONS.md`.
 * Decisions waiting on Biscu are in `docs/STATUS.md`.
 

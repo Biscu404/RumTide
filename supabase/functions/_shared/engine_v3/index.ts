@@ -22,25 +22,27 @@ export {
 export { newCaptain, newSeason, type NewCaptainSpec, type NewSeasonSpec } from "./season.ts";
 export { formatReplay, replayHash, canonicalJson, describeWind } from "./replay.ts";
 
-// Combat (GAMEPLAY 8). Fleets and Old Shellback come with P2.5 and P2.6.
+// Combat (GAMEPLAY 8). Old Shellback comes with P2.6.
 export * from "./combat/types.ts";
 export {
   battleRng, isCrippled, hasLocalKnowledge, helmScore, windGauge, startingRange, helmContest, contestRecord, pairRow, applyPair,
-  playableMove, resolveHelm, type ContestRoll, type PairOutcome, type HelmInput, type HelmResult,
+  playableMove, reefScrape, resolveHelm, type ContestRoll, type PairOutcome, type HelmInput, type HelmResult,
 } from "./combat/helm.ts";
 export {
-  gunsTrack, ammoFactor, gunnery, staleNow, nextGunsMemory, fireGuns, applyDamage, recordFiring,
+  gunsTrack, ammoFactor, shotPoints, gunnery, staleNow, nextGunsMemory, fireGuns, applyDamage, recordFiring,
   type GunsContext, type GunsFactors, type GunsResult,
 } from "./combat/guns.ts";
 export {
-  boardingStrength, meleeRound, surrenders, captureCheck, grappleAttempts, cutFree, type CaptureResult, type CutFreeResult,
+  boardingStrength, meleeRound, lacksHands, surrenders, captureCheck, captureCheckBySide, grappleAttempts, grappleReason, cutFree,
+  type CaptureResult, type CutFreeResult,
 } from "./combat/boarding.ts";
 export {
-  runBattle, pointsOutcome, damageShare, type AbilityFire, type RoundChoice, type LastPlay, type RoundView, type Chooser,
-  type BattleInput,
+  runBattle, pointsOutcome, damageShare, sideShare, type AbilityFire, type RoundChoice, type LastPlay, type RoundView, type Chooser,
+  type BattleInput, type BattleMate,
 } from "./combat/battle.ts";
 export {
-  carriedBy, cargoValue, fairnessFactor, lootMultiplier, lootShare, capturePick, settleLoot, jettison, scale,
+  carriedBy, cargoValue, fairnessFactor, lootMultiplier, lootShare, capturePick, settleLoot, jettison, scale, sumCarried, splitCarried,
+  splitByHolding,
   type Goods, type Carried, type Prices, type SalvagePile, type JettisonResult, type Multiplier, type CapturePick, type LootInput,
   type LootResult,
 } from "./combat/loot.ts";
@@ -54,4 +56,8 @@ export {
   combatEncounter, escapeChance, parleyResult, enemyTypeOf, battleShipOf, applyBattle, towShip,
   type ParleyResult, type BattleFlags, type ApplyBattleInput, type BattleApplied,
 } from "./combat/encounter.ts";
+export {
+  fleetBonus, desperateDefence, sideBonus, pickFlagship, apportion, shareOut, shareDamage, strikeTotals, withLosses, mateHelm, mateCutFree,
+  fleetGrapples, fleetMelee, type FlagshipCandidate, type Shot, type MateHelm, type FleetMelee,
+} from "./combat/fleet.ts";
 export { describeBattle, describeCarried, type BattleWords } from "./combat/describe.ts";
