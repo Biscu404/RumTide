@@ -49,8 +49,8 @@ export function cargoValue(c: Carried, prices: Prices = {}): number {
   return CARGO_GOODS.reduce((sum, good) => sum + (c.goods[good] ?? 0) * (prices[good] ?? B.economy.basePrice), c.plunder);
 }
 
-/** A fraction of everything carried, each item rounded down. */
-function scale(c: Carried, fraction: number): Carried {
+/** A fraction of everything carried, each item rounded down. Parley tribute uses it too (P2.4). */
+export function scale(c: Carried, fraction: number): Carried {
   const goods: Goods = {};
   for (const good of CARGO_GOODS) {
     const units = Math.floor((c.goods[good] ?? 0) * fraction);

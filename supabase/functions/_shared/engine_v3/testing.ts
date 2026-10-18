@@ -1,8 +1,8 @@
 // Shared test helpers.
 
 import cradleRaw from "../maps/cradle.json";
-import { loadMap, newSeason, resolveTide } from "./index.ts";
-import type { GameMap, NewCaptainSpec, Orders, Rng, SeasonState, TideResult, Wind } from "./index.ts";
+import { loadMap, newSeason, resolveTide, stubEncounter } from "./index.ts";
+import type { EncounterResolver, GameMap, NewCaptainSpec, Orders, Rng, SeasonState, TideResult, Wind } from "./index.ts";
 
 export const world = loadMap(cradleRaw);
 export const rawCradle = (): GameMap => structuredClone(cradleRaw) as GameMap;
@@ -21,8 +21,14 @@ export function ship(state: SeasonState, captainId: string) {
   return s;
 }
 
-export function run(state: SeasonState, orders: Record<string, Orders>, opts: { seed?: number; wind?: Record<string, Wind> } = {}): TideResult {
-  return resolveTide({ state, world, orders, seed: opts.seed ?? 7, windOverride: opts.wind ?? WEST_BREEZE });
+/** Resolves a Tide. Encounters use the stand in that freezes both ships unless a resolver is given, so movement tests stay about movement. */
+export function run(
+  state: SeasonState, orders: Record<string, Orders>,
+  opts: { seed?: number; wind?: Record<string, Wind>; resolveEncounter?: EncounterResolver } = {},
+): TideResult {
+  return resolveTide({
+    state, world, orders, seed: opts.seed ?? 7, windOverride: opts.wind ?? WEST_BREEZE, resolveEncounter: opts.resolveEncounter ?? stubEncounter,
+  });
 }
 
 export const kinds = (r: TideResult) => r.replay.map((e) => e.kind);

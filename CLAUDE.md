@@ -6,7 +6,7 @@ The full design is in `docs/GAME_DESIGN.md`. It is long, so do not read it all a
 
 ## Current focus
 
-* Next task: P2.4, the encounter: parley, the escape roll, the starting range, applying a battle to the world, towing, and the Captain and Step data model additions. Brief: `docs/briefs/P2-combat.md`. Task ids come from the Rumtide Roadmap tracker on claude.ai.
+* Next task: P2.5, fleets: sides, the flagship, the fleet bonus and Desperate Defence. Brief: `docs/briefs/P2-combat.md`. Task ids come from the Rumtide Roadmap tracker on claude.ai.
 * Done work is in `git log` and `docs/DECISIONS.md`.
 * Decisions waiting on Biscu are in `docs/STATUS.md`.
 
@@ -75,7 +75,7 @@ A task is done when its own checks pass and all of this is true:
 
 * In the same commit, update `docs/DECISIONS.md` with the new rule calls, the next task line under Current focus in this file, and `docs/STATUS.md`.
 * Run `npm run check` and `npm run prose:check`.
-* Push the branch, open a pull request and give Biscu the link.
+* Push the branch and open a pull request. Biscu let Claude merge pull requests on 19 October 2026: once both checks pass, merge it, pull `main`, and give Biscu the link and what to check.
 * Never describe branch or merge state in a doc. Git and the pull request hold that.
 * Biscu never edits docs by hand, so you make every doc change.
 

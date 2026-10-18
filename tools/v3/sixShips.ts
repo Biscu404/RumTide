@@ -1,10 +1,10 @@
-// The six ship fixture: one Tide in the Cradle that exercises every Phase 1 rule at once.
+// The six ship fixture: one Tide in the Cradle that exercises every Phase 1 and encounter rule at once.
 // Used by engine_v3/golden.test.ts, `npm run tide:demo` and `npm run golden:update`.
 //
 //   Salty Gull   hunts ships carrying cargo and meets the Wet Sock head on in the lane to Driftwood
 //   Wet Sock     carries rum from Driftwood to Gullhaven and gets caught on the way
 //   Inkwell      is on Short Rations and does not know the Tarpot current, so it is becalmed short
-//   Black Gannet lies in wait at Gullhaven Reefside
+//   Black Gannet lies in wait at Gullhaven Reefside, carrying 100 doubloons and 2 rum
 //   Merry Widow  surveys, then sails into the Gannet's trap; it has a Plan B for the next Tide
 //   Old Biscuit  an NPC merchant with no orders; standing orders take it home to dock
 
@@ -40,6 +40,8 @@ export function sixShips(): { state: SeasonState; orders: Record<string, Orders>
   raise(state.captains.cap_c!.knowledge, "tp_harbour", LEVEL.charted);
   ship("cap_f").hold.sugar = 4; // a laden merchant: hold over 80% full costs it a Watch
   ship("cap_f").plunder = 30;
+  ship("cap_d").plunder = 100; // the Gannet has something to lose when the Widow beats it
+  ship("cap_d").hold.rum = 2;
 
   const orders: Record<string, Orders> = {
     cap_a: { tide: 6, planA: { steps: [{ kind: "sail", to: "dw_harbour", stance: "hunt", filter: { kind: "carryingCargo" } }] } },

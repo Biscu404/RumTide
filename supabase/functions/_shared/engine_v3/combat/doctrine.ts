@@ -137,6 +137,23 @@ export function evaluateDoctrine(doctrine: Doctrine, view: RoundView, ctx: Doctr
 /** The Chooser runBattle takes for one side (D50). */
 export const doctrineChooser = (doctrine: Doctrine, ctx: DoctrineContext): Chooser => (view) => evaluateDoctrine(doctrine, view, ctx);
 
+// ---------- Which doctrine a ship fights with (8.8) ----------
+
+/** The saved doctrine with this name, ignoring case and spaces at the ends; undefined when there is none. */
+export function findDoctrine(captain: Pick<Captain, "doctrines">, name: string | undefined): Doctrine | undefined {
+  if (typeof name !== "string" || !Array.isArray(captain.doctrines)) return undefined;
+  const want = name.trim().toLowerCase();
+  return captain.doctrines.find((d) => typeof d?.name === "string" && d.name.trim().toLowerCase() === want);
+}
+
+/**
+ * The doctrine a captain fights with: the one asked for (the step's, else the plan's), else the captain's default, else
+ * their first saved doctrine, else a fresh Brawler. It always gives one, so a missing name never stops a battle (D68).
+ */
+export function pickDoctrine(captain: Pick<Captain, "doctrines" | "defaultDoctrine">, wanted: string | undefined): Doctrine {
+  return findDoctrine(captain, wanted) ?? findDoctrine(captain, captain.defaultDoctrine) ?? captain.doctrines?.[0] ?? templateDoctrine("Brawler");
+}
+
 // ---------- Slots (8.8) ----------
 
 /** The perk that gives a captain one more doctrine slot: a Helmsman, the Navy Deserter background (granted by crew and Background). */

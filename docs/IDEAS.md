@@ -5,4 +5,5 @@
 
 ## Parked
 
-Nothing yet.
+* NPC merchants and locals should fight like Runners or Cowards, not Brawlers (D85). Helps every player who hunts a merchant. Goes into the NPC brain, Season 0 (P9).
+* The escape roll could use the Rigging left, not the Sails stat, so a Crippled ship runs worse (D77). Helps combat feel. Goes into P3 tuning, Season 0.
