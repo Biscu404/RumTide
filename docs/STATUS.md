@@ -12,8 +12,6 @@ Confirm these rule calls, all in `docs/DECISIONS.md`:
 * **D97** (P2.5): every ship of a fleet that loses a Sunk or Captured battle is towed home, and they all pay the loot together. The other reading tows only the ships at 0 Hull.
 * **D95** (P2.5): any ship at 0 Hull ends a fleet battle against its whole side, and one ship striking its colours takes its fleet out of the fight (v0.2 7.2).
 * **D91** (P2.5): the two flagships' Helm moves move the one range. A fleet mate's Helm move only sets its own rake or flank shot, though its Board and Open Range can still grapple and cut free.
-* **D76** (P2.4): parley comes before the escape roll, as GAMEPLAY 3.7 and the brief say. v0.2 rolled the escape first, so a cautious target used to get a free chance before it paid tribute.
-* **D75** (P2.4): a towed ship banks the plunder it still carries when it docks.
 * **D57** (P2.2): the fairness factor and the Cradle halving apply to PvP only, and a Sunk ship gives up at most the multiplier's share. GAMEPLAY 8.7 read literally strips the loser of everything whatever the factor.
 * **D35** (P2.1): ships only grapple when both play Close In while already at Close, or through Board. Every other shrink stops at Close.
 * **D36** (P2.1): any growth past Long ends the battle as Escaped.
