@@ -6,15 +6,9 @@ The full design is in `docs/GAME_DESIGN.md`. It is long, so do not read it all a
 
 ## Current focus
 
-The game is moving to the v0.3 design in `docs/GAMEPLAY.md`, built as a new engine in `supabase/functions/_shared/engine_v3/`. The v0.2 prototype (engine in `engine/`, server, client, bots, sim) stays as it is and keeps working until the new server and client replace it.
-
-* Done: roadmap P0 (foundations) and P1 (engine core: map, knowledge, Watches, wind and currents, voyage plans, the Tide resolver).
-* Also done: P2.1, the helm and guns rules (`engine_v3/combat/`: `types.ts`, `helm.ts`, `guns.ts`), on branch `p2-1-helm-and-guns`, not yet merged to `main`.
-* Also done: P2.2, boarding, `runBattle` and loot (`combat/boarding.ts`, `battle.ts`, `loot.ts`), on branch `p2-2-boarding-battle-loot`, stacked on `crew-setup` and `p2-1-helm-and-guns`, not yet merged to `main`. Rule calls D50 to D63; D57 (fairness and Cradle apply to PvP only) is waiting for Biscu to confirm.
-* Next: P2.3 (doctrine evaluation, the four templates, the ability slot, what a Jettison round plays), then the rest of P2 combat. Work from `docs/briefs/P2-combat.md`.
-* The roadmap lives in the Rumtide Roadmap tracker on claude.ai. Each task has an id such as P2.1; name branches and DECISIONS entries after it.
-
-Update this section when the focus changes.
+* Next task: P2.3, doctrine evaluation, the four templates, the ability slot and what a Jettison round plays. Brief: `docs/briefs/P2-combat.md`. Task ids come from the Rumtide Roadmap tracker on claude.ai.
+* Done work is in `git log` and `docs/DECISIONS.md`.
+* Decisions waiting on Biscu are in `docs/STATUS.md`.
 
 ## Version 0.3 engine rules (engine_v3)
 
@@ -73,6 +67,16 @@ Update this section when the focus changes.
 * Ask before adding a new dependency.
 * When a design decision changes, update `docs/DECISIONS.md` in the same commit.
 * Do not use dashes in prose you write (docs, comments, game text). Use commas or full stops instead.
+
+## Definition of done
+
+A task is done when its own checks pass and all of this is true:
+
+* In the same commit, update `docs/DECISIONS.md` with the new rule calls, the next task line under Current focus in this file, and `docs/STATUS.md`.
+* Run `npm run check` and `npm run prose:check`.
+* Push the branch, open a pull request and give Biscu the link.
+* Never describe branch or merge state in a doc. Git and the pull request hold that.
+* Biscu never edits docs by hand, so you make every doc change.
 
 ## Commands
 
