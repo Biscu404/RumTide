@@ -1,14 +1,31 @@
 # Rumtide: instructions for Claude Code
 
-Rumtide is a pixel art pirate game for a small group of friends. It is asynchronous: one Tide (turn) per day, browser first, built to grow from 6 players to many more.
+Rumtide is a pixel art pirate game for a small group of friends. It is asynchronous, browser first, built to grow from 6 players to many more. The v0.2 prototype runs one Tide (turn) per day; the v0.3 design moves to two Tides a day, at 13:00 and 20:00 Europe/Bucharest.
 
 The full design is in `docs/GAME_DESIGN.md`. It is long, so do not read it all at once. Read only the sections you need, using the index below. Research and sources are in `docs/RESEARCH.md`.
 
 ## Current focus
 
-Building Season 0: a two week beta (14 Tides) for six friends, built by one developer. Follow section 19.1 of the design doc, one day at a time. Days 1 to 7 and client steps 1 to 7 are built (the sprites and the pixel font are still to come, see the 2026-10-15 palette entry in `docs/DECISIONS.md`). Client step 8, the internal playtest, is prepared: the runbook is `docs/PLAYTEST.md`, the player page is `docs/HOW_TO_PLAY.md`, and the Game master page can end a season. Next is the playtest itself (two people, 3 to 4 Tides by hand), then fixing its worst three problems and announcing the start date. Update this line when the focus changes.
+The game is moving to the v0.3 design in `docs/GAMEPLAY.md`, built as a new engine in `supabase/functions/_shared/engine_v3/`. The v0.2 prototype (engine in `engine/`, server, client, bots, sim) stays as it is and keeps working until the new server and client replace it.
 
-## Design doc index (docs/GAME_DESIGN.md)
+* Done: roadmap P0 (foundations) and P1 (engine core: map, knowledge, Watches, wind and currents, voyage plans, the Tide resolver).
+* Next: P2 combat. Work from `docs/briefs/P2-combat.md`.
+* The roadmap lives in the Rumtide Roadmap tracker on claude.ai. Each task has an id such as P2.1; name branches and DECISIONS entries after it.
+
+Update this section when the focus changes.
+
+## Version 0.3 engine rules (engine_v3)
+
+* `docs/GAMEPLAY.md` is the source of truth for v0.3 gameplay. Where it disagrees with `docs/GAME_DESIGN.md`, GAMEPLAY.md wins for `engine_v3`. GAME_DESIGN.md still covers the pillars, art and audio, co op, fairness and architecture.
+* Read the 2026-10-18 entry in `docs/DECISIONS.md` before changing `engine_v3`, and add your own calls there with the task id.
+* Do not edit the v0.2 `engine/` while building v0.3, unless a task says so.
+* Randomness comes only from `rngFor(seed, ...labels)` in `engine_v3/rng.ts`. Give every new kind of roll its own labels so it never shifts anyone else's rolls.
+* Engine functions never mutate their inputs; `resolveTide` clones the state it is given. Encounters go through the `EncounterResolver` hook in `tide.ts`, so combat stays out of movement code.
+* Only erasable TypeScript in `engine_v3` (no enums, namespaces or parameter properties), so Node, Deno and the browser can all run it.
+* Maps are JSON in `supabase/functions/_shared/maps/` (`cradle.json` is v0.3) and must pass `validateMap`.
+* `engine_v3/golden/six-ships.json` is the golden Tide. If a change alters it on purpose, run `npm run golden:update`, read the diff and mention it. If it changes and you did not mean it to, you have a bug.
+
+## Design doc index (docs/GAME_DESIGN.md, v0.2)
 
 * Top of file: one page summary and the key decisions table
 * 3.5: Season 0 beta scope, pacing tables, success checks
@@ -50,7 +67,7 @@ Building Season 0: a two week beta (14 Tides) for six friends, built by one deve
 
 * Do one task at a time and keep changes small. After each task, say what you changed and what to check.
 * If a request conflicts with the design doc, say so before writing code.
-* Build only what is in the MVP table in section 16.1. New ideas go into `docs/IDEAS.md`, not into the code.
+* For v0.3 work, build only what the current brief in `docs/briefs/` asks for. New ideas go into `docs/IDEAS.md`, not into the code.
 * Ask before adding a new dependency.
 * When a design decision changes, update `docs/DECISIONS.md` in the same commit.
 * Do not use dashes in prose you write (docs, comments, game text). Use commas or full stops instead.
@@ -62,4 +79,7 @@ Building Season 0: a two week beta (14 Tides) for six friends, built by one deve
 * Check types: `npm run typecheck`
 * Build for production: `npm run build` (output in `dist/`)
 * Run the balance simulation: `npm run sim` (checks the combat table of section 7.3, a bot trader against the solo pacing of sections 3.5 and 5.5, and the galleon odds of section 8.2)
+* Check everything at once: `npm run check` (types and all tests, v0.2 and v0.3)
+* Resolve one v0.3 Tide and print it: `npm run tide:demo`
+* Rewrite the v0.3 golden Tide after an intentional rule change: `npm run golden:update`
 * Run a bot season: `npm run bots` (six scripted captains and a six raider brawl play Season 0 on the real engine over 30 seeds each, `npm run bots -- 100` for more; every season is played twice, directly and through the Edge Function handlers, and the two must end identically; fails on any impossible state, crash, non deterministic season or insane total)

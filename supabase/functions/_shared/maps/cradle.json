@@ -1,0 +1,82 @@
+{
+  "id": "cradle",
+  "version": 1,
+  "name": "The Cradle Isles",
+  "archipelagos": [
+    { "id": "cradle", "name": "The Cradle Isles" }
+  ],
+  "islands": [
+    { "id": "gullhaven", "archipelago": "cradle", "name": "Gullhaven", "tier": "city", "hidden": false },
+    { "id": "driftwood_key", "archipelago": "cradle", "name": "Driftwood Key", "tier": "village", "hidden": false },
+    { "id": "tarpot_isle", "archipelago": "cradle", "name": "Tarpot Isle", "tier": "town", "hidden": false },
+    { "id": "whisper_rock", "archipelago": "cradle", "name": "Whisper Rock", "tier": "wild", "hidden": true },
+    { "id": "hermits_reach", "archipelago": "cradle", "name": "Hermit's Reach", "tier": "wild", "hidden": true }
+  ],
+  "waters": [
+    { "id": "gh_harbour", "island": "gullhaven", "name": "Gullhaven Harbour", "terrain": "harbour", "x": 24, "y": 18 },
+    { "id": "gh_lee", "island": "gullhaven", "name": "Gullhaven Lee", "terrain": "open", "x": 18, "y": 20 },
+    { "id": "gh_reefside", "island": "gullhaven", "name": "Gullhaven Reefside", "terrain": "reef", "x": 26, "y": 26 },
+    { "id": "dw_harbour", "island": "driftwood_key", "name": "Driftwood Harbour", "terrain": "harbour", "x": 6, "y": 20 },
+    { "id": "dw_shallows", "island": "driftwood_key", "name": "Driftwood Shallows", "terrain": "shallows", "x": 8, "y": 27 },
+    { "id": "tp_harbour", "island": "tarpot_isle", "name": "Tarpot Harbour", "terrain": "harbour", "x": 16, "y": 6 },
+    { "id": "tp_kelp", "island": "tarpot_isle", "name": "Tarpot Kelp", "terrain": "kelp", "x": 10, "y": 9 },
+    { "id": "tp_channel", "island": "tarpot_isle", "name": "Tarpot Channel", "terrain": "open", "x": 22, "y": 9 },
+    { "id": "wr_fog", "island": "whisper_rock", "name": "Whisper Fog", "terrain": "fog", "x": 32, "y": 33 },
+    { "id": "wr_rocks", "island": "whisper_rock", "name": "Whisper Rocks", "terrain": "rocky", "x": 26, "y": 37 },
+    { "id": "hr_shallows", "island": "hermits_reach", "name": "Hermit's Shallows", "terrain": "shallows", "x": 14, "y": 40 },
+    { "id": "the_narrows", "island": "hermits_reach", "name": "The Narrows", "terrain": "shallows", "x": 14, "y": 48 }
+  ],
+  "lanes": [
+    { "id": "ln_gh_lee_harbour", "a": "gh_lee", "b": "gh_harbour", "current": { "strength": "none" } },
+    { "id": "ln_gh_harbour_reefside", "a": "gh_harbour", "b": "gh_reefside", "current": { "strength": "none" } },
+    { "id": "ln_gh_lee_reefside", "a": "gh_lee", "b": "gh_reefside", "current": { "strength": "mild", "flow": "ab" } },
+    { "id": "ln_dw_harbour_shallows", "a": "dw_harbour", "b": "dw_shallows", "current": { "strength": "none" } },
+    { "id": "ln_tp_harbour_kelp", "a": "tp_harbour", "b": "tp_kelp", "current": { "strength": "none" } },
+    { "id": "ln_tp_harbour_channel", "a": "tp_harbour", "b": "tp_channel", "current": { "strength": "mild", "flow": "ba" } },
+    { "id": "ln_wr_fog_rocks", "a": "wr_fog", "b": "wr_rocks", "current": { "strength": "mild", "flow": "ab" } },
+    { "id": "ln_hr_shallows_narrows", "a": "hr_shallows", "b": "the_narrows", "current": { "strength": "strong", "flow": "ba" } },
+    { "id": "ln_dw_gh", "a": "dw_harbour", "b": "gh_lee", "current": { "strength": "mild", "flow": "ab" } },
+    { "id": "ln_dw_shallows_gh_lee", "a": "dw_shallows", "b": "gh_lee", "current": { "strength": "none" } },
+    { "id": "ln_tp_kelp_dw", "a": "tp_kelp", "b": "dw_harbour", "current": { "strength": "mild", "flow": "ba" } },
+    { "id": "ln_tp_channel_gh", "a": "tp_channel", "b": "gh_harbour", "current": { "strength": "none" } },
+    { "id": "ln_gh_reefside_wr_fog", "a": "gh_reefside", "b": "wr_fog", "current": { "strength": "mild", "flow": "ab" }, "hidden": { "by": "survey" } },
+    { "id": "ln_dw_shallows_wr_rocks", "a": "dw_shallows", "b": "wr_rocks", "current": { "strength": "none" }, "hidden": { "by": "survey" } },
+    { "id": "ln_wr_rocks_hr", "a": "wr_rocks", "b": "hr_shallows", "current": { "strength": "none" }, "hidden": { "by": "unlock", "key": "narrows_clue" } },
+    { "id": "ln_dw_shallows_hr", "a": "dw_shallows", "b": "hr_shallows", "current": { "strength": "strong", "flow": "ba" }, "hidden": { "by": "unlock", "key": "narrows_clue" } }
+  ],
+  "sites": [
+    { "id": "gullhaven_town", "island": "gullhaven", "name": "Gullhaven", "kind": "settlement" },
+    { "id": "gullhaven_lighthouse", "island": "gullhaven", "name": "Grimbeard's Lighthouse", "kind": "ruins" },
+    { "id": "driftwood_village", "island": "driftwood_key", "name": "Driftwood", "kind": "settlement" },
+    { "id": "driftwood_wreck", "island": "driftwood_key", "name": "The Beached Hulk", "kind": "wreck" },
+    { "id": "tarpot_town", "island": "tarpot_isle", "name": "Tarpot", "kind": "settlement" },
+    { "id": "tarpot_tar_pits", "island": "tarpot_isle", "name": "The Tar Pits", "kind": "cave" },
+    { "id": "whisper_ruins", "island": "whisper_rock", "name": "The Whispering Ruins", "kind": "ruins", "unlocks": ["narrows_clue"] },
+    { "id": "whisper_camp", "island": "whisper_rock", "name": "Castaway Camp", "kind": "camp" },
+    { "id": "hermits_tidepools", "island": "hermits_reach", "name": "The Tidepools", "kind": "dig" },
+    { "id": "hermits_graveyard", "island": "hermits_reach", "name": "Hull Graveyard", "kind": "wreck" }
+  ],
+  "straits": [
+    { "id": "strait_narrows_rumhaven", "from": "the_narrows", "to": "rumhaven_reach", "name": "The Narrows, north passage" },
+    { "id": "strait_narrows_saltteeth", "from": "the_narrows", "to": "saltteeth_shoals", "name": "The Narrows, south passage" }
+  ],
+  "bosses": [
+    { "id": "old_shellback", "water": "the_narrows", "gates": ["strait_narrows_rumhaven", "strait_narrows_saltteeth"] }
+  ],
+  "startKnowledge": {
+    "charted": [
+      "gullhaven", "driftwood_key",
+      "gh_harbour", "gh_lee", "gh_reefside", "dw_harbour", "dw_shallows",
+      "ln_gh_lee_harbour", "ln_gh_harbour_reefside", "ln_gh_lee_reefside", "ln_dw_harbour_shallows", "ln_dw_gh", "ln_dw_shallows_gh_lee",
+      "gullhaven_town", "driftwood_village"
+    ],
+    "sketched": [
+      "cradle", "tarpot_isle",
+      "tp_harbour", "tp_kelp", "tp_channel",
+      "ln_tp_harbour_kelp", "ln_tp_harbour_channel", "ln_tp_kelp_dw", "ln_tp_channel_gh",
+      "gullhaven_lighthouse", "driftwood_wreck"
+    ],
+    "rumoured": [],
+    "visited": ["cradle"]
+  }
+}

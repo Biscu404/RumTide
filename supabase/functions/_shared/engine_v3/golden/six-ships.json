@@ -1,0 +1,329 @@
+{
+  "encounters": [
+    {
+      "at": "ln_dw_gh",
+      "hunter": "ship_cap_a",
+      "onLane": true,
+      "result": "battlePending",
+      "t": 0.75,
+      "target": "ship_cap_b"
+    },
+    {
+      "at": "gh_reefside",
+      "hunter": "ship_cap_d",
+      "onLane": false,
+      "result": "battlePending",
+      "t": 4,
+      "target": "ship_cap_e"
+    }
+  ],
+  "hash": "d52858c1",
+  "replay": [
+    {
+      "kind": "tideStart",
+      "t": 0,
+      "tide": 6,
+      "winds": {
+        "cradle": {
+          "from": 270,
+          "kind": "breeze"
+        }
+      }
+    },
+    {
+      "kind": "plan",
+      "ship": "ship_cap_a",
+      "source": "orders",
+      "steps": 1,
+      "t": 0,
+      "watches": 6
+    },
+    {
+      "kind": "plan",
+      "ship": "ship_cap_b",
+      "source": "orders",
+      "steps": 2,
+      "t": 0,
+      "watches": 6
+    },
+    {
+      "kind": "plan",
+      "ship": "ship_cap_c",
+      "source": "orders",
+      "steps": 3,
+      "t": 0,
+      "watches": 5
+    },
+    {
+      "kind": "plan",
+      "ship": "ship_cap_d",
+      "source": "orders",
+      "steps": 1,
+      "t": 0,
+      "watches": 6
+    },
+    {
+      "kind": "plan",
+      "ship": "ship_cap_e",
+      "source": "orders",
+      "steps": 3,
+      "t": 0,
+      "watches": 6
+    },
+    {
+      "kind": "plan",
+      "ship": "ship_cap_f",
+      "source": "standing",
+      "steps": 2,
+      "t": 0,
+      "watches": 5
+    },
+    {
+      "cost": 3,
+      "ends": 3,
+      "from": "gh_lee",
+      "kind": "hop",
+      "lane": "ln_dw_gh",
+      "ship": "ship_cap_a",
+      "t": 0,
+      "to": "dw_harbour"
+    },
+    {
+      "kind": "undock",
+      "ship": "ship_cap_b",
+      "t": 0,
+      "water": "dw_harbour"
+    },
+    {
+      "cost": 1,
+      "ends": 1,
+      "from": "dw_harbour",
+      "kind": "hop",
+      "lane": "ln_dw_gh",
+      "ship": "ship_cap_b",
+      "t": 0,
+      "to": "gh_lee"
+    },
+    {
+      "kind": "undock",
+      "ship": "ship_cap_c",
+      "t": 0,
+      "water": "tp_harbour"
+    },
+    {
+      "cost": 2,
+      "ends": 2,
+      "from": "tp_harbour",
+      "kind": "hop",
+      "lane": "ln_tp_harbour_kelp",
+      "ship": "ship_cap_c",
+      "t": 0,
+      "to": "tp_kelp"
+    },
+    {
+      "kind": "lurk",
+      "ship": "ship_cap_d",
+      "t": 0,
+      "water": "gh_reefside"
+    },
+    {
+      "cost": 2,
+      "ends": 2,
+      "from": "dw_shallows",
+      "kind": "hop",
+      "lane": "ln_dw_harbour_shallows",
+      "ship": "ship_cap_f",
+      "t": 0,
+      "to": "dw_harbour"
+    },
+    {
+      "a": "ship_cap_a",
+      "at": "ln_dw_gh",
+      "b": "ship_cap_b",
+      "kind": "meet",
+      "onLane": true,
+      "t": 0.75
+    },
+    {
+      "at": "ln_dw_gh",
+      "hunter": "ship_cap_a",
+      "kind": "encounter",
+      "onLane": true,
+      "result": "battlePending",
+      "t": 0.75,
+      "target": "ship_cap_b"
+    },
+    {
+      "charted": [
+        "ln_tp_harbour_kelp",
+        "tp_kelp"
+      ],
+      "kind": "arrive",
+      "ship": "ship_cap_c",
+      "t": 2,
+      "water": "tp_kelp"
+    },
+    {
+      "charted": [
+        "ln_tp_channel_gh"
+      ],
+      "kind": "survey",
+      "revealed": [],
+      "ship": "ship_cap_e",
+      "t": 2,
+      "water": "gh_harbour"
+    },
+    {
+      "charted": [],
+      "kind": "arrive",
+      "ship": "ship_cap_f",
+      "t": 2,
+      "water": "dw_harbour"
+    },
+    {
+      "kind": "stop",
+      "left": 3,
+      "needed": 4,
+      "reason": "becalmedShort",
+      "ship": "ship_cap_c",
+      "t": 2,
+      "water": "tp_kelp"
+    },
+    {
+      "kind": "undock",
+      "ship": "ship_cap_e",
+      "t": 2,
+      "water": "gh_harbour"
+    },
+    {
+      "cost": 2,
+      "ends": 4,
+      "from": "gh_harbour",
+      "kind": "hop",
+      "lane": "ln_gh_harbour_reefside",
+      "ship": "ship_cap_e",
+      "t": 2,
+      "to": "gh_reefside"
+    },
+    {
+      "banked": 30,
+      "kind": "dock",
+      "ship": "ship_cap_f",
+      "t": 3,
+      "water": "dw_harbour"
+    },
+    {
+      "charted": [],
+      "kind": "arrive",
+      "ship": "ship_cap_e",
+      "t": 4,
+      "water": "gh_reefside"
+    },
+    {
+      "a": "ship_cap_d",
+      "at": "gh_reefside",
+      "b": "ship_cap_e",
+      "kind": "meet",
+      "onLane": false,
+      "t": 4
+    },
+    {
+      "at": "gh_reefside",
+      "hunter": "ship_cap_d",
+      "kind": "encounter",
+      "onLane": false,
+      "result": "battlePending",
+      "t": 4,
+      "target": "ship_cap_e"
+    },
+    {
+      "kind": "supplies",
+      "provisionsLeft": 3,
+      "provisionsUsed": 1,
+      "ship": "ship_cap_a",
+      "shortRations": false,
+      "t": 9
+    },
+    {
+      "kind": "supplies",
+      "provisionsLeft": 3,
+      "provisionsUsed": 1,
+      "ship": "ship_cap_b",
+      "shortRations": false,
+      "t": 9
+    },
+    {
+      "kind": "supplies",
+      "provisionsLeft": 0,
+      "provisionsUsed": 0,
+      "ship": "ship_cap_c",
+      "shortRations": true,
+      "t": 9
+    },
+    {
+      "kind": "supplies",
+      "provisionsLeft": 3,
+      "provisionsUsed": 1,
+      "ship": "ship_cap_d",
+      "shortRations": false,
+      "t": 9
+    },
+    {
+      "kind": "supplies",
+      "provisionsLeft": 3,
+      "provisionsUsed": 1,
+      "ship": "ship_cap_e",
+      "shortRations": false,
+      "t": 9
+    },
+    {
+      "kind": "tideEnd",
+      "t": 9,
+      "tide": 6
+    }
+  ],
+  "ships": {
+    "ship_cap_a": {
+      "docked": false,
+      "provisions": 3,
+      "rigging": 100,
+      "shortRations": false,
+      "water": "gh_lee"
+    },
+    "ship_cap_b": {
+      "docked": false,
+      "provisions": 3,
+      "rigging": 100,
+      "shortRations": false,
+      "water": "dw_harbour"
+    },
+    "ship_cap_c": {
+      "docked": false,
+      "provisions": 0,
+      "rigging": 100,
+      "shortRations": true,
+      "water": "tp_kelp"
+    },
+    "ship_cap_d": {
+      "docked": false,
+      "provisions": 3,
+      "rigging": 100,
+      "shortRations": false,
+      "water": "gh_reefside"
+    },
+    "ship_cap_e": {
+      "docked": false,
+      "provisions": 3,
+      "rigging": 100,
+      "shortRations": false,
+      "water": "gh_reefside"
+    },
+    "ship_cap_f": {
+      "docked": true,
+      "provisions": 4,
+      "rigging": 100,
+      "shortRations": false,
+      "water": "dw_harbour"
+    }
+  }
+}
