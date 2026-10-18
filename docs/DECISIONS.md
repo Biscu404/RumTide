@@ -3,6 +3,38 @@
 What was decided, when and why. Newest first. When a design decision changes, add an entry here in the same commit.
 
 
+## 2026-10-18: Phase 2, combat (P2)
+
+Combat for the v0.3 engine, in `supabase/functions/_shared/engine_v3/combat/`. Section numbers point at GAMEPLAY.md. Where GAMEPLAY.md is ambiguous the simplest reading that fits was taken and is written here.
+
+### Helm and guns (P2.1)
+
+| Id | Decision | Why | Task |
+|-|-|-|-|
+| D27 | A ship out of Powder still fires, at half damage (`B.combat.outOfPowder`), and burns no Powder | GAMEPLAY 8.5 says "powder: 0.5 if out of Powder". The task text said "no damage"; Biscu chose the GAMEPLAY reading on 18 October 2026 | P2.1 |
+| D28 | A ship that fires burns its hull's `powderPerRound`, or whatever is left if that is less. It is out of Powder only at 0, so no Powder is ever stranded. Hold Fire, Board and Repel burn none | 8.5 never says how much a round burns; `B.hulls` already holds the number | P2.1 |
+| D29 | Board and Repel fire no guns. Board's grapple attempt and Repel's boarding bonus are P2.2 | The 8.5 table lists them as Guns orders, but they hit nothing | P2.1 |
+| D30 | Damage is rounded to whole points, then capped at what the target has left on that track, so a track never goes below 0. Grapeshot removes round(damage ÷ 3) Hands. Chain shot against a ship with no Rigging does 0 | Whole points read well in a replay; the cap keeps the records honest | P2.1 |
+| D31 | Staleness: the third round in a row with the same Guns order, and every round after it, does 20% less (`staleAfterRepeats` is 3). Any other order resets the count, Hold Fire included | 8.5 says "the same Guns order three rounds in a row"; this reads it as the round that makes three | P2.1 |
+| D32 | Hold Fire's bonus (1.5 times) applies to the next round only. It does not stack when Hold Fire is played twice, and it is lost if the next round fires nothing (Hold Fire, Board, Repel) | "Next round's guns" | P2.1 |
+| D33 | A ship's `guns` memory (last order, streak, Hold Fire charge) lives on the `BattleShip`. Both ships fire from the state they had when the round began, then the results are applied with `applyDamage` and `recordFiring`, which return new ships | 8.3 says guns fire at the same time; pure functions make that easy to test | P2.1 |
+| D34 | Every roll is drawn from a labelled child of the round's stream `rngFor(tideSeed, "battle", hunterId, targetId, round)`: `helm/chase`, `helm/shallows/<side>` and `guns/<ship id>`. Luck is one draw per firing ship. The streak breaker of 19.1 is not built: it needs per captain luck history that `Captain` does not have yet | Adding a roll never shifts another roll, as D16 asks | P2.1 |
+| D35 | The pair table only grapples when both ships play Close In while already at Close, or through the Board order (P2.2). Every other shrink stops at Close, so Close In against Hold at Close stays at Close. Close In against Close In from Long or Medium ends at Close | 8.4 says "both at Close means Grappled"; if any one band shrink from Close grappled, Board would be pointless | P2.1 |
+| D36 | Any growth past Long ends the battle as Escaped: Open against Open, Hold against Open, an Open that wins the chase, and a failed Cross against Open, all counted from where the ships are. `resolveHelm` reports `escaped: true` and leaves the range at Long. The guns of an escaped round are for `runBattle` (P2.2) to skip | 8.7: "range goes past Long" | P2.1 |
+| D37 | While Grappled the Helm table is skipped and the range stays Grappled. Cut Free belongs to boarding | 8.6 and the P2 brief give Cut Free to P2.2 | P2.1 |
+| D38 | The wind gauge goes to the strictly higher Helm score and to nobody on a tie or in a Calm. The check uses the Helm score without the gauge bonus, with terrain and Local Knowledge included. A Lurker gets the 1.2 bonus on the check only, not in later Helm scores | Equal ships must not favour the hunter (8.9) | P2.1 |
+| D39 | Starting range is Long, Medium in Fog, and a Lurker's chosen range wins over Fog. Kelp caps the start at Medium. The default Medium for a Lurker with no choice is P2.4's | 8.1 and 8.4 | P2.1 |
+| D40 | Local Knowledge means the water was Charted for this captain when the Tide began (D12) and not for the opponent. It gives 1.15 Helm and waives the Shallows contest. The Reef scrape uses "Charted for you" alone (8.4), so two Charted captains both avoid it. `BattleShip.charted` is the input; P2.4 also sets it for NPC locals in their home archipelago | 4.2 and 8.4 word the two cases differently | P2.1 |
+| D41 | "Moving with a Strong Current" is an input flag on the `BattleShip` (`withCurrent`, 1.15 Helm). P2.4 decides who counts as moving with it when it builds the battle | A water has no direction, a lane does, and the Narrows is Shallows terrain with a strong lane | P2.1 |
+| D42 | Shallows: when the range would reach Close from a wider band, every Brigantine or Frigate in the battle without Local Knowledge rolls its own Helm contest against its opponent and must win it. If any loses, the range stops at Medium. This holds even when the opponent is the one closing, and two big ships must both win. The hunter's contest is rolled first. Nothing is rolled once the ships are already at Close | 8.4: "must win a Helm contest to reach Close, even against Close In" | P2.1 |
+| D43 | Kelp: the range never goes beyond Medium, so nobody can escape by range in Kelp | 8.4 | P2.1 |
+| D44 | Reef: each ship that plays Close In or Cross Their Bow, after the Crippled rule, loses `reefScrape` Hull that round whatever the pair result, unless the water is Charted for its captain. Nothing is charged while Grappled. `resolveHelm` reports the scrape; applying it is `runBattle`'s job | 8.4 | P2.1 |
+| D45 | Crippled means Rigging at 0 with some max Rigging. A Crippled ship's Open Range and Cross Their Bow count as Hold. A monster with no Rigging at all is never Crippled, but its Helm score is 0 until P2.6 gives Old Shellback its fixed number | 6.3 | P2.1 |
+| D46 | A Helm contest between two scores of 0 is even | A÷(A+B) is undefined there; it needs two Crippled ships | P2.1 |
+| D47 | New number: `B.combat.bands`, the band count of each pair table row (1 or 2 bands). No existing number changed | The rule is no number in the combat files, and these are table values P3 may tune | P2.1 |
+| D48 | The combat types are shapes only. Otherwise is a rule with no conditions. An `ability` action lets evaluation continue below it; `surrender` and `jettison` are special actions, and what a Jettison round does for Helm and Guns is P2.3's call. `crippled` is one of the seven outcome kinds of 8.7 although it does not end a battle, and P2.2 decides how a record carries it. `RoundRecord` has no boarding melee until P2.2 | Complete as the spec allows, without guessing at P2.2 and P2.3 | P2.1 |
+| D49 | `combat/testing.ts` holds test helpers: `battleShipFrom`, `ScriptedRng` and `deepFreeze`. P2.4 needs a real builder from a `Ship` and `Captain`, and `battleShipFrom` is the starting point | Keeps P2.1 to its three files plus tests | P2.1 |
+
 ## 2026-10-18: Version 0.3 engine core (roadmap P0 and P1)
 
 The game moves to the v0.3 design in `docs/GAMEPLAY.md`: two Tides a day, archipelagos, Watches and the Wind and Current System, charting, programmed doctrines. The new engine lives in `supabase/functions/_shared/engine_v3/`, next to the v0.2 engine in `engine/`. The prototype (server, client, bots, sim) keeps running on v0.2 until the server and client move over in roadmap phases P12 and P13; then `engine_v3` replaces `engine`. Where GAMEPLAY.md and GAME_DESIGN.md disagree, GAMEPLAY.md wins for the v0.3 engine. Section numbers in this entry point at GAMEPLAY.md.

@@ -13,7 +13,9 @@
     "bots": "node --import ./tools/register.mjs tools/bots/index.ts",
     "tide:demo": "node tools/v3/tide-demo.ts",
     "golden:update": "node tools/v3/update-golden.ts",
-    "check": "npm run typecheck && npm test"
+    "check": "npm run typecheck && npm test",
+    "assets:check": "py tools/assets/check_palette.py client/public/assets",
+    "prose:check": "py tools/agents/check_prose.py docs client/src supabase"
   },
   "dependencies": {
     "phaser": "4.2.1",

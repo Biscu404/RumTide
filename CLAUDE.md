@@ -9,7 +9,8 @@ The full design is in `docs/GAME_DESIGN.md`. It is long, so do not read it all a
 The game is moving to the v0.3 design in `docs/GAMEPLAY.md`, built as a new engine in `supabase/functions/_shared/engine_v3/`. The v0.2 prototype (engine in `engine/`, server, client, bots, sim) stays as it is and keeps working until the new server and client replace it.
 
 * Done: roadmap P0 (foundations) and P1 (engine core: map, knowledge, Watches, wind and currents, voyage plans, the Tide resolver).
-* Next: P2 combat. Work from `docs/briefs/P2-combat.md`.
+* Also done: P2.1, the helm and guns rules (`engine_v3/combat/`: `types.ts`, `helm.ts`, `guns.ts`), on branch `p2-1-helm-and-guns`, not yet merged to `main`.
+* Next: P2.2 (boarding, `runBattle`, loot), then the rest of P2 combat. Work from `docs/briefs/P2-combat.md`.
 * The roadmap lives in the Rumtide Roadmap tracker on claude.ai. Each task has an id such as P2.1; name branches and DECISIONS entries after it.
 
 Update this section when the focus changes.
@@ -83,3 +84,12 @@ Update this section when the focus changes.
 * Resolve one v0.3 Tide and print it: `npm run tide:demo`
 * Rewrite the v0.3 golden Tide after an intentional rule change: `npm run golden:update`
 * Run a bot season: `npm run bots` (six scripted captains and a six raider brawl play Season 0 on the real engine over 30 seeds each, `npm run bots -- 100` for more; every season is played twice, directly and through the Edge Function handlers, and the two must end identically; fails on any impossible state, crash, non deterministic season or insane total)
+
+## Crew (specialist roles)
+
+* Eight roles live in `.claude/agents/`: producer, art-director, pixel-artist, game-designer, narrative-writer, engineer, qa-tester, sound-designer. Use the matching role for its kind of work. Details and workflows are in `docs/CREW.md`.
+* When documents disagree, the order of authority is `docs/DECISIONS.md`, then `docs/GAMEPLAY.md`, then `docs/GAME_DESIGN.md`.
+* Art follows the `rumtide-art-bible` skill (Endesga 32 only). Run `npm run assets:check` after touching assets.
+* Player facing text follows the `rumtide-lore` skill. Run `npm run prose:check` after writing text.
+* Slash commands: `/feature` runs one feature through the crew, `/gate` runs a quality gate.
+* Roles report back in under 200 words: what changed, files touched, what to check, open questions.
