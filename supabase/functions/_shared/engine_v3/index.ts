@@ -22,7 +22,7 @@ export {
 export { newCaptain, newSeason, type NewCaptainSpec, type NewSeasonSpec } from "./season.ts";
 export { formatReplay, replayHash, canonicalJson, describeWind } from "./replay.ts";
 
-// Combat (GAMEPLAY 8). Doctrines, the encounter, fleets and Old Shellback come with P2.3 and later.
+// Combat (GAMEPLAY 8). The encounter, fleets and Old Shellback come with P2.4 and later.
 export * from "./combat/types.ts";
 export {
   battleRng, isCrippled, hasLocalKnowledge, helmScore, windGauge, startingRange, helmContest, contestRecord, pairRow, applyPair,
@@ -44,3 +44,8 @@ export {
   type Goods, type Carried, type Prices, type SalvagePile, type JettisonResult, type Multiplier, type CapturePick, type LootInput,
   type LootResult,
 } from "./combat/loot.ts";
+export {
+  ABILITIES, DOCTRINE_SLOT_PERK, JETTISON_PLAY, FALLBACK_PLAY, NO_RULE, TEMPLATE_NAMES, conditionHolds, evaluateDoctrine, doctrineChooser,
+  doctrineSlots, validateDoctrine, validateDoctrines, templateDoctrine, templateDoctrines,
+  type AbilityDef, type AbilityRegistry, type DoctrineContext, type ValidateOptions, type TemplateName,
+} from "./combat/doctrine.ts";

@@ -39,7 +39,7 @@ export type RoundChoice =
       abilities: AbilityFire[];
       helm: HelmMove;
       guns: GunsOrder;
-      jettison?: boolean; // also throw the cargo overboard; the Helm move and Guns order are whatever the doctrine gave (D48)
+      jettison?: boolean; // also throw the cargo overboard; the Helm move and Guns order are whatever the Chooser gave (a doctrine plays Hold and Hold Fire, D65)
     }
   | { kind: "surrender"; rule: number; abilities: AbilityFire[] };
 
@@ -59,6 +59,7 @@ export interface RoundView {
   gauge: BattleSide | null;
   ships: Record<BattleSide, BattleShip>;
   last: Record<BattleSide, LastPlay | null>; // null before round 1
+  jettisoned: Record<BattleSide, boolean>; // the side has already thrown its cargo overboard in an earlier round (D66)
 }
 
 export type Chooser = (view: RoundView) => RoundChoice;
@@ -107,6 +108,13 @@ const withHull = (ship: BattleShip, loss: number): BattleShip => ({
 });
 
 const withHands = (ship: BattleShip, hands: number): BattleShip => ({ ...ship, abilities: [...ship.abilities], guns: { ...ship.guns }, hands });
+
+/** A ship after the abilities its doctrine fired this round: each one is used up, so "ability unused" turns false (D67). */
+const spendAbilities = (ship: BattleShip, fired: AbilityFire[]): BattleShip => ({
+  ...ship,
+  abilities: ship.abilities.filter((a) => !fired.some((f) => f.ability === a)),
+  guns: { ...ship.guns },
+});
 
 const NO_SHOT: Pick<GunsResult, "track" | "damage" | "powderUsed"> = { track: null, damage: 0, powderUsed: 0 };
 
@@ -175,11 +183,14 @@ export function runBattle(input: BattleInput): BattleRecord {
 
   for (let round = 1; round <= C.rounds && outcome === null; round++) {
     const rng = battleRng(seed, ships.hunter.shipId, ships.target.shipId, round);
-    const view = (side: BattleSide): RoundView => ({ round, side, range, terrain, wind, gauge, ships, last });
+    const spent = { hunter: jettisoned.has("hunter"), target: jettisoned.has("target") };
+    const view = (side: BattleSide): RoundView => ({ round, side, range, terrain, wind, gauge, ships, last, jettisoned: spent });
     const choices: Record<BattleSide, RoundChoice> = {
       hunter: input.choosers.hunter(view("hunter")),
       target: input.choosers.target(view("target")),
     };
+    // Abilities the doctrines fired are used up from here on. Resolving what they do is crew work (P8.4, D50).
+    ships = { hunter: spendAbilities(ships.hunter, choices.hunter.abilities), target: spendAbilities(ships.target, choices.target.abilities) };
     const scoresNow = {
       hunter: helmScore(ships.hunter, ships.target, terrain, gauge === "hunter"),
       target: helmScore(ships.target, ships.hunter, terrain, gauge === "target"),

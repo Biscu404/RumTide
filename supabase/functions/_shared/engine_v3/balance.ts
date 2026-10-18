@@ -105,7 +105,12 @@ export const B = {
     kelpBoarding: 1.15,
     boarding: { killShare: 0.2, repel: 1.3, captureRatio: 0.4, captureOwnShare: 0.2 },
     victoryMargin: 0.1,
-    doctrine: { baseSlots: 3, maxSlots: 7, savedDoctrines: 3 },
+    // Doctrines (8.8). Slots count the rules that have conditions; the Otherwise rule is always there and is free (D64).
+    // slotRanks: the Command ranks that each give +1 slot. templates: the thresholds the four beginner doctrines use.
+    doctrine: {
+      baseSlots: 3, maxSlots: 7, savedDoctrines: 3, slotRanks: [1, 4], maxConditions: 2,
+      templates: { brawlerBoardHandsPct: 50, skirmisherChainRiggingPct: 50, runnerChainRiggingPct: 50, cowardStrikesHullPct: 50 },
+    },
   },
 
   // Loot (8.7, v0.2 9). Used from P2.
