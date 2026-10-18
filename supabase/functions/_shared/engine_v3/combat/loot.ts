@@ -8,6 +8,7 @@
 import { B } from "../balance.ts";
 import { CARGO_GOODS } from "../types.ts";
 import type { Good, Ship, ShipId, WaterId } from "../types.ts";
+import { apportion } from "./fleet.ts";
 import type { OutcomeKind } from "./types.ts";
 
 const L = B.loot;
@@ -77,6 +78,42 @@ function atLeast(a: Carried, b: Carried): Carried {
     if (units > 0) goods[good] = units;
   }
   return { plunder: Math.max(a.plunder, b.plunder), goods };
+}
+
+/** Everything several ships carry, added up item by item. */
+export function sumCarried(list: readonly Carried[]): Carried {
+  const goods: Goods = {};
+  let plunder = 0;
+  for (const c of list) {
+    plunder += c.plunder;
+    for (const good of CARGO_GOODS) goods[good] = (goods[good] ?? 0) + (c.goods[good] ?? 0);
+  }
+  return cleanCarried({ plunder, goods });
+}
+
+/**
+ * Splits what was taken between the winners of a fleet battle, item by item, in whole units (GAME_DESIGN 9 rule 4).
+ * `weights` has one number per winner; the winners' parts always add up to `c`.
+ */
+export function splitCarried(c: Carried, weights: readonly number[]): Carried[] {
+  const plunder = apportion(c.plunder, weights);
+  const goods = Object.fromEntries(CARGO_GOODS.map((good) => [good, apportion(c.goods[good] ?? 0, weights)])) as Record<Good, number[]>;
+  return weights.map((_, i) => cleanCarried({ plunder: plunder[i] as number, goods: Object.fromEntries(CARGO_GOODS.map((good) => [good, goods[good][i]])) }));
+}
+
+/**
+ * Splits what a fleet gives up between its ships, item by item: each ship pays in proportion to how much of that item it
+ * carries, so no ship ever pays more than it has and the fleet pays the same share of every item.
+ */
+export function splitByHolding(c: Carried, holdings: readonly Carried[]): Carried[] {
+  const plunder = apportion(c.plunder, holdings.map((h) => h.plunder));
+  const goods = Object.fromEntries(
+    CARGO_GOODS.map((good) => [good, apportion(c.goods[good] ?? 0, holdings.map((h) => h.goods[good] ?? 0))]),
+  ) as Record<Good, number[]>;
+  return holdings.map((h, i) => cleanCarried({
+    plunder: Math.min(plunder[i] as number, h.plunder),
+    goods: Object.fromEntries(CARGO_GOODS.map((good) => [good, Math.min(goods[good][i] as number, h.goods[good] ?? 0)])),
+  }));
 }
 
 const isEmpty = (c: Carried): boolean => c.plunder <= 0 && Object.keys(c.goods).length === 0;

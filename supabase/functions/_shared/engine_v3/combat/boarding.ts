@@ -51,9 +51,12 @@ export function meleeRound(
 
 // ---------- Capture ----------
 
-/** Hands fell below 40% of the other side's, or below 20% of this ship's own max: it surrenders (8.6). */
-export const surrenders = (ship: BattleShip, hands: number, enemyHands: number): boolean =>
-  hands < C.boarding.captureRatio * enemyHands || hands < C.boarding.captureOwnShare * ship.maxHands;
+/** Hands fell below 40% of the other side's, or below 20% of the side's own max: the side surrenders (8.6). */
+export const lacksHands = (maxHands: number, hands: number, enemyHands: number): boolean =>
+  hands < C.boarding.captureRatio * enemyHands || hands < C.boarding.captureOwnShare * maxHands;
+
+/** The same test for one ship (8.6). */
+export const surrenders = (ship: BattleShip, hands: number, enemyHands: number): boolean => lacksHands(ship.maxHands, hands, enemyHands);
 
 export interface CaptureResult {
   loser: BattleSide | null; // the side that surrenders
@@ -65,9 +68,14 @@ export interface CaptureResult {
  * and equal Hands is a draw (D55). `hands` are the Hands left after the melee.
  */
 export function captureCheck(ships: Record<BattleSide, BattleShip>, hands: Record<BattleSide, number>): CaptureResult {
+  return captureCheckBySide({ hunter: ships.hunter.maxHands, target: ships.target.maxHands }, hands);
+}
+
+/** captureCheck for whole sides: a fleet is captured when its crews together fall below the line (P2.5). */
+export function captureCheckBySide(maxHands: Record<BattleSide, number>, hands: Record<BattleSide, number>): CaptureResult {
   const out = {
-    hunter: surrenders(ships.hunter, hands.hunter, hands.target),
-    target: surrenders(ships.target, hands.target, hands.hunter),
+    hunter: lacksHands(maxHands.hunter, hands.hunter, hands.target),
+    target: lacksHands(maxHands.target, hands.target, hands.hunter),
   };
   if (out.hunter && out.target) {
     if (hands.hunter === hands.target) return { loser: null, draw: true };
@@ -96,14 +104,15 @@ export function grappleAttempts(
   for (const side of BATTLE_SIDES) {
     if (orders[side] !== "board") continue;
     const them = other(side);
-    const why: GrappleRecord["why"] =
-      scores[side] >= scores[them] ? "helm"
-      : orders[them] === "board" ? "theyBoard"
-      : moves[them] === "hold" ? "theyHold"
-      : "failed";
+    const why = grappleReason(scores[side], scores[them], orders[them], moves[them]);
     attempts.push({ side, ok: why !== "failed", why });
   }
   return attempts;
+}
+
+/** Why a Board order at Close succeeds, or "failed": a Helm score at least theirs, or they also Board, or they Hold (8.5). */
+export function grappleReason(mine: number, theirs: number, theirOrder: GunsOrder, theirMove: HelmMove): GrappleRecord["why"] {
+  return mine >= theirs ? "helm" : theirOrder === "board" ? "theyBoard" : theirMove === "hold" ? "theyHold" : "failed";
 }
 
 // ---------- Cut Free ----------

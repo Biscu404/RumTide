@@ -39,6 +39,11 @@ export function testShip(side: BattleSide, hull: HullId = "sloop", over: Partial
   return battleShipFrom(newShip(`ship_${side}`, `cap_${side}`, `The ${side}`, hull, "dw_shallows", false), side, over);
 }
 
+/** A fresh level 0 ship with its own id (`ship_<id>`) on the given side: for the ships of a fleet battle. */
+export function fleetShip(id: string, side: BattleSide, hull: HullId = "sloop", over: Partial<BattleShip> = {}): BattleShip {
+  return battleShipFrom(newShip(`ship_${id}`, `cap_${id}`, `The ${id}`, hull, "dw_shallows", false), side, over);
+}
+
 /** An Rng that hands out the given numbers in order, then repeats the last one. Child streams are itself,
  *  so the order of draws is the order of calls. 0 makes every chance roll succeed, 0.99 makes it fail. */
 export class ScriptedRng extends Rng {

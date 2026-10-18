@@ -24,7 +24,7 @@ export const GUNS_ORDERS: readonly GunsOrder[] = ["roundShot", "chainShot", "gra
 export type DamageTrack = "hull" | "rigging" | "hands";
 export const DAMAGE_TRACKS: readonly DamageTrack[] = ["hull", "rigging", "hands"];
 
-/** A battle has two sides. Fleets (P2.5) put several ships on a side. */
+/** A battle has two sides. A side is one ship, or a fleet of several that fight together (P2.5). */
 export type BattleSide = "hunter" | "target";
 export const BATTLE_SIDES: readonly BattleSide[] = ["hunter", "target"];
 
@@ -76,6 +76,7 @@ export interface BattleShip {
 export interface ContestRecord {
   kind: "chase" | "shallows" | "cutFree"; // the Close In against Open Range chase, a big ship reaching Close in Shallows, or a Grappled ship trying to get away
   side: BattleSide; // the ship whose chance this is
+  ship?: ShipId; // set for a fleet mate that is not its side's flagship: it contests the enemy flagship (P2.5)
   scores: Record<BattleSide, number>;
   chance: number;
   roll: number;
@@ -102,6 +103,7 @@ export interface RoundShipRecord {
 /** A Board order played at Close (8.5): did the ship grapple, and why. */
 export interface GrappleRecord {
   side: BattleSide;
+  ship?: ShipId; // set for a fleet mate that is not its side's flagship (P2.5)
   ok: boolean;
   why: "helm" | "theyBoard" | "theyHold" | "failed"; // the first reason that let it succeed, or "failed"
 }
@@ -122,10 +124,11 @@ export interface RoundRecord {
   row: HelmRow;
   contests: ContestRecord[]; // in the order they were rolled
   grapples: GrappleRecord[]; // Board orders played at Close, hunter first
-  melee: MeleeRecord | null; // null unless the ships were Grappled when the guns had fired
+  melee: MeleeRecord | null; // null unless the ships were Grappled when the guns had fired. In a fleet battle each number is the whole side's
   crippled: BattleSide[]; // sides whose Rigging reached 0 this round (6.3)
   struck: BattleSide[]; // sides whose doctrine said Surrender; nothing else happens in that round
-  ships: RoundShipRecord[]; // hunter first
+  ships: RoundShipRecord[]; // every ship, the hunter side first and each side in ship id order
+  fleet?: FleetRoundRecord; // only in a fleet battle, where a side has more than one ship (P2.5)
 }
 
 // ---------- Outcomes (8.7) ----------
@@ -184,17 +187,45 @@ export interface BattleRecord {
   at: WaterId;
   terrain: Terrain;
   wind: WindKind;
-  hunter: ShipId; // the hunter's flagship
-  target: ShipId; // the target's flagship
-  doctrines: Record<BattleSide, string>; // the doctrine name each side used
+  hunter: ShipId; // the hunter side's flagship (its only ship, in a one ship battle)
+  target: ShipId; // the target side's flagship
+  doctrines: Record<BattleSide, string>; // the doctrine name each side's flagship used
   startRange: Range;
   gauge: BattleSide | null; // who holds the wind gauge
-  ships: BattleShip[]; // every ship as round 1 began, hunter first
+  ships: BattleShip[]; // every ship as round 1 began, the hunter side first and each side in ship id order
   rounds: RoundRecord[];
   outcome: BattleOutcome;
-  final: BattleShip[]; // every ship as the battle ended, hunter first
+  final: BattleShip[]; // every ship as the battle ended, in the same order
   dealt: Record<BattleSide, number>; // damage share each side dealt, the measure for Victory on points (D56)
-  jettisoned: BattleSide[]; // sides that threw their cargo overboard at some point
+  jettisoned: BattleSide[]; // sides with a ship that threw its cargo overboard at some point
+  fleet?: FleetRecord; // only in a fleet battle (P2.5); a one ship a side record has no such field
+}
+
+// ---------- Fleets (P2.5, GAME_DESIGN 7.5) ----------
+
+/** What one side's damage is multiplied by: the fleet bonus, and Desperate Defence for an outnumbered side of player ships. */
+export interface SideBonus {
+  ships: number; // ships on the side
+  fleet: number; // 1 plus the fleet bonus
+  desperate: number; // 1 plus Desperate Defence, 1 when the side is not outnumbered or has an NPC ship
+  total: number; // fleet times desperate
+}
+
+/** What a fleet battle adds to a BattleRecord. */
+export interface FleetRecord {
+  sides: Record<BattleSide, ShipId[]>; // every ship on each side, in ship id order
+  doctrines: Record<ShipId, string>; // the doctrine each ship fought with
+  bonus: Record<BattleSide, SideBonus>;
+  dealtBy: Record<ShipId, number>; // the damage share each ship dealt, which the loot and the bounty are split by
+  jettisoned: ShipId[]; // ships that threw their cargo overboard
+}
+
+/** What a fleet round adds to a RoundRecord. */
+export interface FleetRoundRecord {
+  damage: Record<BattleSide, Record<DamageTrack, number>>; // what each side's guns dealt, after the bonus and what the foe had left
+  taken: Record<ShipId, Record<DamageTrack, number>>; // what each ship lost to the guns, shared out by max Hull
+  crippled: ShipId[]; // ships whose Rigging reached 0 this round
+  struck: ShipId[]; // ships whose doctrine said Surrender this round; the round ends the battle when there are any
 }
 
 // ---------- What a battle did to the world (P2.4) ----------
@@ -212,12 +243,23 @@ export interface BattleLoot {
 /** The changes a finished battle made to ships, captains and the season, written down for the replay (P2.4). */
 export interface BattleAftermath {
   pvp: boolean; // both captains are players
-  winner: ShipId | null;
-  loser: ShipId | null;
-  loot: BattleLoot | null; // null when the outcome pays nothing
+  winner: ShipId | null; // the winning side's flagship
+  loser: ShipId | null; // the losing side's flagship
+  loot: BattleLoot | null; // null when the outcome pays nothing; in a fleet battle the whole side's
   wreck: SalvagePile | null; // Sunk only, when something was left to wreck
   flotsam: SalvagePile[]; // cargo thrown overboard, one pile per ship that jettisoned
   bounty: { added: number; collected: number }; // added to the winner for hunting a weaker ship or refusing parley; collected from the loser
   shieldUntil: number | null; // the loser of a PvP battle is shielded until this Tide
   towed: boolean; // the loser is towed to a Harbour at the end of the Tide
+  fleet?: FleetAftermath; // only in a fleet battle (P2.5)
+}
+
+/** Who got what in a fleet battle: loot and bounties are per ship, shields per captain. */
+export interface FleetAftermath {
+  winners: ShipId[]; // every ship on the winning side, in ship id order
+  losers: ShipId[];
+  taken: Record<ShipId, Carried>; // what each winning ship took
+  lost: Record<ShipId, Carried>; // what each losing ship gave up
+  bounties: { captain: CaptainId; added: number; collected: number }[];
+  towed: ShipId[];
 }
