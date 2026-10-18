@@ -10,7 +10,7 @@ import { GOLDEN_FILE, goldenSnapshot } from "../../../../tools/v3/sixShips.ts";
 
 const ROOT = fileURLToPath(new URL("../../../../", import.meta.url));
 
-describe("six ship golden Tide (P1.9)", () => {
+describe("six ship golden Tide (P1.9, P2.4)", () => {
   it("is identical on every run", () => {
     expect(canonicalJson(goldenSnapshot())).toBe(canonicalJson(goldenSnapshot()));
   });
@@ -35,5 +35,18 @@ describe("six ship golden Tide (P1.9)", () => {
     for (const k of ["stop", "survey", "dock", "lurk", "meet", "encounter", "supplies", "undock"]) expect(kinds.has(k as never)).toBe(true);
     expect(r.ships.ship_cap_c).toMatchObject({ water: "tp_kelp", shortRations: true }); // becalmed short
     expect(r.ships.ship_cap_f).toMatchObject({ water: "dw_harbour", docked: true }); // standing orders
+  });
+
+  it("plays both encounters as real battles and tows the loser (P2.4)", () => {
+    const r = goldenSnapshot();
+    expect(r.encounters.map((e) => e.result)).toEqual(["draw", "captured"]);
+    const kinds = r.replay.map((e) => e.kind);
+    expect(kinds.filter((k) => k === "escape")).toHaveLength(2); // both targets tried to slip away and were caught
+    expect(kinds.filter((k) => k === "battle")).toHaveLength(2);
+    const battles = r.replay.flatMap((e) => (e.kind === "battle" ? [e] : []));
+    expect(battles.map((b) => b.record.rounds.length)).toEqual([5, 4]);
+    expect(battles[1]!.aftermath).toMatchObject({ winner: "ship_cap_e", loser: "ship_cap_d", towed: true, loot: { taken: { plunder: 20 } } });
+    expect(r.replay.filter((e) => e.kind === "towed")).toMatchObject([{ ship: "ship_cap_d", to: "gh_harbour", banked: 80, hullPoints: 80 }]);
+    expect(r.ships.ship_cap_d).toMatchObject({ water: "gh_harbour", docked: true }); // towed home
   });
 });

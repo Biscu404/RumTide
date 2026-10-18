@@ -15,6 +15,8 @@ import type {
   ArchipelagoId, Captain, CaptainId, Condition, EncounterRecord, HuntFilter, Knowledge, LaneId, MapLane, MapWater,
   Orders, ReplayEvent, SeasonState, Ship, ShipId, SkipReason, Stance, Step, Terrain, WaterId, Wind,
 } from "./types.ts";
+import type { AmbushRange } from "./combat/types.ts";
+import { combatEncounter, towShip } from "./combat/encounter.ts";
 import { otherEnd, type World } from "./map.ts";
 import { rngFor, type Rng } from "./rng.ts";
 import { islandFullyCharted, laneVisible, levelOf, onArrive, onLand, onSurvey } from "./knowledge.ts";
@@ -29,15 +31,24 @@ export interface EncounterSide {
   ship: Ship;
   captain: Captain;
   stance: Stance;
+  doctrine: string | undefined; // the doctrine this ship asked for, its step's else its plan's; undefined means the captain's default (8.8)
+  lurking: boolean; // lies in wait (8.1)
+  ambushRange: AmbushRange | undefined; // the starting range a lurk step chose; undefined means the default
+  charted: boolean; // the place was Charted for this captain when the Tide began (D12)
+  withCurrent: boolean; // on a lane, moving the way a Strong Current flows (D79)
 }
 
 export interface EncounterContext {
   world: World;
+  state: SeasonState; // the Tide's working copy of the state; the ships and captains below are inside it
   tide: number;
+  seed: number; // the Tide seed; a battle draws from rngFor(seed, "battle", hunterId, targetId, round)
   t: number;
   at: string; // a water id, or a lane id when onLane
   onLane: boolean;
+  archipelago: ArchipelagoId; // where it happens; a lane belongs to the archipelago of its first end
   terrain: Terrain | null; // the water's terrain; null on a lane
+  wind: Wind; // the wind over that archipelago
   hunter: EncounterSide & { filter: HuntFilter };
   target: EncounterSide;
   mutual: boolean; // both were hunting each other
@@ -45,14 +56,16 @@ export interface EncounterContext {
 }
 
 export interface EncounterOutcome {
-  result: string; // shown in the replay, e.g. "battlePending", "escaped", "parley", "sunk"
+  result: string; // shown in the replay, e.g. "battlePending", "escaped", "tribute", "sunk"
   freeze: ShipId[]; // ships that stop moving for the rest of the Tide
   events?: ReplayEvent[];
+  tow?: ShipId[]; // ships towed to a Harbour at the end of the Tide (8.7)
+  bounties?: { captain: CaptainId; amount: number }[]; // bounties added; they start the next Tide at full size (v0.2 9 rule 2)
 }
 
 export type EncounterResolver = (ctx: EncounterContext) => EncounterOutcome;
 
-/** Phase 1 stand in until combat exists (P2.4): every encounter freezes both ships. */
+/** The Phase 1 stand in: every encounter freezes both ships. Kept for tests that only care about movement; combatEncounter is the default. */
 export const stubEncounter: EncounterResolver = (ctx) => ({
   result: "battlePending",
   freeze: [ctx.hunter.ship.id, ctx.target.ship.id],
@@ -81,7 +94,7 @@ type Action =
   | { kind: "hop"; start: number; end: number; from: WaterId; to: WaterId; lane: LaneId }
   | { kind: "survey" | "dock" | "repair"; start: number; end: number }
   | { kind: "land"; start: number; end: number; site: string }
-  | { kind: "lurk"; start: number; end: number; filter: HuntFilter };
+  | { kind: "lurk"; start: number; end: number; filter: HuntFilter; doctrine: string | undefined; ambushRange: AmbushRange | undefined };
 
 interface Sim {
   ship: Ship;
@@ -99,6 +112,9 @@ interface Sim {
   filter: HuntFilter | null; // hunt filter of the current Sail step
   huntTick: number | null; // a hunting Sail step still hunts on the tick it arrives
   huntTickFilter: HuntFilter | null;
+  planDoctrine: string | undefined; // the plan's doctrine, for every step that names none
+  stepDoctrine: string | undefined; // the doctrine named by the Sail or Lurk step in progress
+  huntTickDoctrine: string | undefined;
   done: boolean;
   frozen: boolean;
   chartedIslands: Set<string>;
@@ -120,7 +136,7 @@ export function resolveTide(input: TideInput): TideResult {
   const state: SeasonState = structuredClone(input.state);
   const preset = SEASON_PRESETS[state.preset];
   const tide = state.tide;
-  const resolver = input.resolveEncounter ?? stubEncounter;
+  const resolver = input.resolveEncounter ?? combatEncounter;
   const winds = windsFor(world, state.seed, tide, input.windOverride);
   const replay: ReplayEvent[] = [];
   const encounters: EncounterRecord[] = [];
@@ -141,6 +157,7 @@ export function resolveTide(input: TideInput): TideResult {
       ship, captain, before: structuredClone(captain.knowledge), steps: plan.steps ?? [], source,
       nextStep: 0, stepIndex: -1, watches, spent: 0, action: null, route: null,
       stance: "trade", filter: null, huntTick: null, huntTickFilter: null,
+      planDoctrine: plan.doctrine, stepDoctrine: undefined, huntTickDoctrine: undefined,
       done: false, frozen: false, chartedIslands,
     });
     emit({ t: 0, kind: "plan", ship: ship.id, source, steps: (plan.steps ?? []).length, watches });
@@ -205,27 +222,62 @@ export function resolveTide(input: TideInput): TideResult {
     s.spent = s.watches;
   };
 
+  /** The doctrine a ship asked for at this tick: the step's, else the plan's, else undefined (the captain's default). Mirrors huntingFilter. */
+  const doctrineOf = (s: Sim, t: number): string | undefined => {
+    if (s.action?.kind === "lurk") return s.action.doctrine ?? s.planDoctrine;
+    const hunting = s.action?.kind === "hop" && s.stance === "hunt";
+    return (!hunting && s.huntTick === t ? s.huntTickDoctrine : s.stepDoctrine) ?? s.planDoctrine;
+  };
+
+  /** True when the ship is crossing a lane in the direction its Strong Current flows (2.2). Only lanes have a direction (D79). */
+  const movesWithCurrent = (s: Sim, place: string, onLane: boolean): boolean => {
+    const lane = onLane ? world.lane[place] : undefined;
+    const act = s.action;
+    if (!lane || lane.current.strength !== "strong" || act?.kind !== "hop" || act.lane !== place) return false;
+    return act.from === (lane.current.flow === "ab" ? lane.a : lane.b);
+  };
+
+  const sideOf = (s: Sim, t: number, place: string, onLane: boolean): EncounterSide => ({
+    ship: s.ship, captain: s.captain,
+    stance: s.action?.kind === "lurk" ? "hunt" : s.stance,
+    doctrine: doctrineOf(s, t),
+    lurking: s.action?.kind === "lurk",
+    ambushRange: s.action?.kind === "lurk" ? s.action.ambushRange : undefined,
+    charted: chartedAt(s.before, place),
+    withCurrent: movesWithCurrent(s, place, onLane),
+  });
+
+  const encountered = new Set<string>(); // pairs that already met in an encounter this Tide: a pair has at most one
+  const toTow: ShipId[] = []; // ships towed to a Harbour when the Tide ends
+  const freshBounties = new Map<CaptainId, number>(); // bounties added this Tide, which only start to shrink next Tide
+
   const tryEncounter = (x: Sim, y: Sim, place: string, onLane: boolean, t: number) => {
     if (x.frozen || y.frozen) return;
+    const pair = x.ship.id < y.ship.id ? `${x.ship.id}|${y.ship.id}` : `${y.ship.id}|${x.ship.id}`;
+    if (encountered.has(pair)) return;
     const fx = huntingFilter(x, t), fy = huntingFilter(y, t);
     const xHunts = !!fx && matches(fx, y) && !isProtected(y, x, place, onLane);
     const yHunts = !!fy && matches(fy, x) && !isProtected(x, y, place, onLane);
     if (!xHunts && !yHunts) return;
+    encountered.add(pair);
     const mutual = xHunts && yHunts;
     const hunter = mutual ? (x.ship.id < y.ship.id ? x : y) : xHunts ? x : y;
     const target = hunter === x ? y : x;
     const filter = (hunter === x ? fx : fy) as HuntFilter;
+    const archipelago = archAtPlace(place, onLane);
     const terrain = onLane ? null : (world.water[place] as MapWater).terrain;
     const outcome = resolver({
-      world, tide, t, at: place, onLane, terrain, mutual,
-      hunter: { ship: hunter.ship, captain: hunter.captain, stance: hunter.action?.kind === "lurk" ? "hunt" : hunter.stance, filter },
-      target: { ship: target.ship, captain: target.captain, stance: target.stance },
+      world, state, tide, seed: input.seed, t, at: place, onLane, archipelago, terrain, wind: winds[archipelago] as Wind, mutual,
+      hunter: { ...sideOf(hunter, t, place, onLane), filter },
+      target: sideOf(target, t, place, onLane),
       rng: rngFor(input.seed, "encounter", hunter.ship.id, target.ship.id, t),
     });
     const rec: EncounterRecord = { t, at: place, onLane, hunter: hunter.ship.id, target: target.ship.id, result: outcome.result };
     encounters.push(rec);
     emit({ kind: "encounter", ...rec });
     for (const e of outcome.events ?? []) emit(e);
+    for (const id of outcome.tow ?? []) if (!toTow.includes(id)) toTow.push(id);
+    for (const b of outcome.bounties ?? []) freshBounties.set(b.captain, (freshBounties.get(b.captain) ?? 0) + b.amount);
     for (const id of [...outcome.freeze].sort()) {
       const s = sims.find((q) => q.ship.id === id);
       if (s) freeze(s);
@@ -321,6 +373,7 @@ export function resolveTide(input: TideInput): TideResult {
       s.nextStep += 1;
       s.stance = "trade";
       s.filter = null;
+      s.stepDoctrine = undefined;
       if (!conditionHolds(s, step.if, t)) { skip(s, t, "conditionFalse"); continue; }
       const water = world.water[s.ship.waterId] as MapWater;
       switch (step.kind) {
@@ -334,6 +387,7 @@ export function resolveTide(input: TideInput): TideResult {
           s.route = { ...r, at: 0 };
           s.stance = step.stance ?? "trade";
           s.filter = s.stance === "hunt" ? step.filter ?? { kind: "anyone" } : null;
+          s.stepDoctrine = step.doctrine;
           startHop(s, t);
           return;
         }
@@ -363,7 +417,8 @@ export function resolveTide(input: TideInput): TideResult {
         case "lurk": {
           if (left(s) < B.actions.lurkMin) { stop(s, t, "outOfWatches", B.actions.lurkMin); return; }
           undock(s, t);
-          s.action = { kind: "lurk", start: t, end: Number.POSITIVE_INFINITY, filter: step.filter };
+          s.stepDoctrine = step.doctrine;
+          s.action = { kind: "lurk", start: t, end: Number.POSITIVE_INFINITY, filter: step.filter, doctrine: step.doctrine, ambushRange: step.ambushRange };
           s.spent = s.watches;
           emit({ t, kind: "lurk", ship: s.ship.id, water: s.ship.waterId });
           return;
@@ -394,7 +449,7 @@ export function resolveTide(input: TideInput): TideResult {
         const r = s.route as Route & { at: number };
         r.at += 1;
         if (r.at >= r.lanes.length) {
-          if (s.stance === "hunt") { s.huntTick = t; s.huntTickFilter = s.filter; }
+          if (s.stance === "hunt") { s.huntTick = t; s.huntTickFilter = s.filter; s.huntTickDoctrine = s.stepDoctrine; }
           s.route = null;
         }
         break;
@@ -475,6 +530,19 @@ export function resolveTide(input: TideInput): TideResult {
   }
 
   // ---------- End of Tide ----------
+  // Losers of a Sunk or Captured battle are towed to a Harbour and docked, before supplies are counted (8.7).
+  for (const id of [...toTow].sort()) {
+    const ship = state.ships[id] as Ship;
+    const captain = state.captains[ship.captainId] as Captain;
+    const { from, to, banked } = towShip(world, state, ship, captain, winds);
+    emit({ t: lastTick, kind: "towed", ship: id, from, to, hullPoints: ship.hullPoints, banked });
+  }
+  // Bounties shrink by a tenth each Tide. One added this Tide starts at full size (v0.2 9 rule 2).
+  for (const id of Object.keys(state.captains).sort()) {
+    const captain = state.captains[id] as Captain;
+    const fresh = Math.min(freshBounties.get(id) ?? 0, captain.bounty);
+    captain.bounty = Math.floor((captain.bounty - fresh) * B.fairness.bountyKeepPerTide) + fresh;
+  }
   for (const s of sims) {
     const ship = s.ship;
     if (!ship.docked) {

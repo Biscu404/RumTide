@@ -3,6 +3,7 @@
 import type { ReplayEvent, SeasonState, Wind } from "./types.ts";
 import type { World } from "./map.ts";
 import { hash32 } from "./rng.ts";
+import { describeBattle, describeCarried } from "./combat/describe.ts";
 
 const COMPASS_NAMES: Record<number, string> = { 0: "N", 45: "NE", 90: "E", 135: "SE", 180: "S", 225: "SW", 270: "W", 315: "NW" };
 
@@ -61,6 +62,23 @@ export function formatReplay(world: World, state: SeasonState, events: ReplayEve
       case "galeDamage": lines.push(`${at} The gale tears at ${shipName(e.ship)}'s rigging (${e.riggingPoints} left).`); break;
       case "meet": lines.push(`${at} ${shipName(e.a)} and ${shipName(e.b)} sight each other ${e.onLane ? "on " + lanePlace(e.at) : "in " + place(e.at)}.`); break;
       case "encounter": lines.push(`${at} ENCOUNTER ${e.onLane ? "on " + lanePlace(e.at) : "in " + place(e.at)}: ${shipName(e.hunter)} catches ${shipName(e.target)} (${e.result}).`); break;
+      case "parley":
+        lines.push(e.accepted
+          ? `${at} ${shipName(e.target)} offers parley to ${shipName(e.hunter)} and pays ${describeCarried(e.paid)} in tribute. Both sail on.`
+          : `${at} ${shipName(e.target)} offers parley, but ${shipName(e.hunter)} flies No Quarter.`);
+        break;
+      case "escape":
+        lines.push(`${at} ${shipName(e.target)} tries to slip away from ${shipName(e.hunter)} (${Math.round(e.chance * 100)}% chance, rolled ${e.roll.toFixed(2)}): ${e.escaped ? "it gets clean away" : "it is caught"}.`);
+        break;
+      case "battle": {
+        const [head, ...rest] = describeBattle(e.record, e.aftermath, { place: named });
+        lines.push(`${at} ${head}`);
+        for (const line of rest) lines.push(" ".repeat(7) + line);
+        break;
+      }
+      case "towed":
+        lines.push(`${at} ${shipName(e.ship)} is towed from ${place(e.from)} to ${place(e.to)} and docked with ${e.hullPoints} Hull.${e.banked ? ` It banks ${e.banked} doubloons.` : ""}`);
+        break;
       case "islandCharted": lines.push(`${at} ${state.captains[e.captain]?.name ?? e.captain} has fully charted ${place(e.island)}.`); break;
       case "supplies":
         lines.push(e.shortRations

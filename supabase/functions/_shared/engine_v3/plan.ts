@@ -2,10 +2,11 @@
 
 import { B } from "./balance.ts";
 import { LEVEL } from "./types.ts";
-import type { ArchipelagoId, Captain, Condition, HuntFilter, Orders, Ship, Step, VoyagePlan, Wind } from "./types.ts";
+import type { ArchipelagoId, Captain, Condition, HuntFilter, Orders, Ship, Step, VoyagePlan, WaterId, Wind } from "./types.ts";
 import type { World } from "./map.ts";
 import { levelOf } from "./knowledge.ts";
 import { findRoute } from "./route.ts";
+import { findDoctrine } from "./combat/doctrine.ts";
 
 /** How many steps a captain's plan may have (3.6). */
 export function stepSlots(captain: Captain): number {
@@ -34,6 +35,11 @@ function conditionProblem(c: Condition | undefined, label: string): string | nul
   }
 }
 
+function doctrineProblem(captain: Captain, name: string | undefined, label: string): string | null {
+  if (name === undefined) return null;
+  return findDoctrine(captain, name) ? null : `${label}: you have no doctrine called ${String(name)}`;
+}
+
 /**
  * Checks a plan the way submit_orders will. Returns a list of problems; empty means valid.
  * The resolver also skips any step that is invalid at run time, so a bad step never crashes a Tide.
@@ -42,6 +48,8 @@ export function validatePlan(w: World, captain: Captain, plan: VoyagePlan): stri
   const p: string[] = [];
   if (!plan || !Array.isArray(plan.steps)) return ["plan: needs a list of steps"];
   const slots = stepSlots(captain);
+  const planDoctrine = doctrineProblem(captain, plan.doctrine, "plan");
+  if (planDoctrine) p.push(planDoctrine);
   if (plan.steps.length > slots) p.push(`plan: ${plan.steps.length} steps, this captain may use ${slots}`);
   plan.steps.forEach((s: Step, i) => {
     const label = `step ${i + 1}`;
@@ -54,9 +62,17 @@ export function validatePlan(w: World, captain: Captain, plan: VoyagePlan): stri
         if (s.stance && !["trade", "quiet", "hunt"].includes(s.stance)) p.push(`${label}: unknown stance ${s.stance}`);
         if (s.stance === "hunt") { const fp = filterProblem(s.filter, label); if (fp) p.push(fp); }
         if (s.route) for (const r of s.route) if (!w.water[r]) p.push(`${label}: route has unknown water ${r}`);
+        { const dp = doctrineProblem(captain, s.doctrine, label); if (dp) p.push(dp); }
         break;
       }
-      case "lurk": { const fp = filterProblem(s.filter, label); if (fp) p.push(fp); break; }
+      case "lurk": {
+        const fp = filterProblem(s.filter, label);
+        if (fp) p.push(fp);
+        if (s.ambushRange !== undefined && s.ambushRange !== "long" && s.ambushRange !== "medium") p.push(`${label}: an ambush starts at long or medium range`);
+        const dp = doctrineProblem(captain, s.doctrine, label);
+        if (dp) p.push(dp);
+        break;
+      }
       case "land": {
         if (!w.site[s.site]) p.push(`${label}: unknown site ${s.site}`);
         else if (levelOf(captain.knowledge, s.site) < LEVEL.sketched) p.push(`${label}: you do not know ${s.site}`);
@@ -70,6 +86,20 @@ export function validatePlan(w: World, captain: Captain, plan: VoyagePlan): stri
 }
 
 /**
+ * The nearest Harbour the captain knows (at least Sketched) that they can route to, by estimated Watches. Ties go to the
+ * lower water id. Null when no known Harbour can be reached. Standing orders and towing both use it (D17, D75).
+ */
+export function nearestKnownHarbour(w: World, captain: Captain, ship: Ship, winds: Record<ArchipelagoId, Wind>): WaterId | null {
+  let best: { water: WaterId; cost: number } | null = null;
+  for (const id of w.waterIds) {
+    if (w.water[id]?.terrain !== "harbour" || levelOf(captain.knowledge, id) < LEVEL.sketched) continue;
+    const r = findRoute(w, captain.knowledge, ship.waterId, id, ship.hull, winds);
+    if (r && (!best || r.estimate < best.cost)) best = { water: id, cost: r.estimate };
+  }
+  return best ? best.water : null;
+}
+
+/**
  * Standing orders when a captain gave none (3.6): docked ships stay docked; ships at sea sail to the
  * nearest known Harbour and Dock.
  */
@@ -77,14 +107,9 @@ export function standingPlan(w: World, captain: Captain, ship: Ship, winds: Reco
   if (ship.docked) return { steps: [] };
   const here = w.water[ship.waterId];
   if (here?.terrain === "harbour") return { steps: [{ kind: "dock" }] };
-  let best: { water: string; cost: number } | null = null;
-  for (const id of w.waterIds) {
-    if (w.water[id]?.terrain !== "harbour" || levelOf(captain.knowledge, id) < LEVEL.sketched) continue;
-    const r = findRoute(w, captain.knowledge, ship.waterId, id, ship.hull, winds);
-    if (r && (!best || r.estimate < best.cost)) best = { water: id, cost: r.estimate };
-  }
-  if (!best) return { steps: [] };
-  return { steps: [{ kind: "sail", to: best.water, stance: "quiet" }, { kind: "dock" }] };
+  const harbour = nearestKnownHarbour(w, captain, ship, winds);
+  if (!harbour) return { steps: [] };
+  return { steps: [{ kind: "sail", to: harbour, stance: "quiet" }, { kind: "dock" }] };
 }
 
 export type PlanSource = "orders" | "planB" | "standing";

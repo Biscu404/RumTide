@@ -9,12 +9,12 @@ export {
   islandFullyCharted, coverage, setPencil,
 } from "./knowledge.ts";
 export {
-  statValue, maxHullPoints, maxRiggingPoints, maxHands, holdCapacity, holdUsed, carriesCargo, upgradeCost,
+  statValue, maxHullPoints, maxRiggingPoints, maxHands, holdCapacity, holdUsed, carriesCargo, upgradeCost, powerRating,
   newShip, watchesFor, emptyHold, zeroLevels,
 } from "./ship.ts";
 export { windFor, windsFor, hopCost, estimateHop, windPart, terrainPart, chartedAt, type HopCost } from "./wcs.ts";
 export { findRoute, pinnedRoute, type Route } from "./route.ts";
-export { stepSlots, validatePlan, standingPlan, choosePlan, type PlanSource } from "./plan.ts";
+export { stepSlots, validatePlan, standingPlan, nearestKnownHarbour, choosePlan, type PlanSource } from "./plan.ts";
 export {
   resolveTide, stubEncounter, type TideInput, type TideResult, type EncounterContext, type EncounterOutcome,
   type EncounterResolver, type EncounterSide,
@@ -22,7 +22,7 @@ export {
 export { newCaptain, newSeason, type NewCaptainSpec, type NewSeasonSpec } from "./season.ts";
 export { formatReplay, replayHash, canonicalJson, describeWind } from "./replay.ts";
 
-// Combat (GAMEPLAY 8). The encounter, fleets and Old Shellback come with P2.4 and later.
+// Combat (GAMEPLAY 8). Fleets and Old Shellback come with P2.5 and P2.6.
 export * from "./combat/types.ts";
 export {
   battleRng, isCrippled, hasLocalKnowledge, helmScore, windGauge, startingRange, helmContest, contestRecord, pairRow, applyPair,
@@ -40,12 +40,18 @@ export {
   type BattleInput,
 } from "./combat/battle.ts";
 export {
-  carriedBy, cargoValue, fairnessFactor, lootMultiplier, lootShare, capturePick, settleLoot, jettison,
+  carriedBy, cargoValue, fairnessFactor, lootMultiplier, lootShare, capturePick, settleLoot, jettison, scale,
   type Goods, type Carried, type Prices, type SalvagePile, type JettisonResult, type Multiplier, type CapturePick, type LootInput,
   type LootResult,
 } from "./combat/loot.ts";
 export {
   ABILITIES, DOCTRINE_SLOT_PERK, JETTISON_PLAY, FALLBACK_PLAY, NO_RULE, TEMPLATE_NAMES, conditionHolds, evaluateDoctrine, doctrineChooser,
+  findDoctrine, pickDoctrine,
   doctrineSlots, validateDoctrine, validateDoctrines, templateDoctrine, templateDoctrines,
   type AbilityDef, type AbilityRegistry, type DoctrineContext, type ValidateOptions, type TemplateName,
 } from "./combat/doctrine.ts";
+export {
+  combatEncounter, escapeChance, parleyResult, enemyTypeOf, battleShipOf, applyBattle, towShip,
+  type ParleyResult, type BattleFlags, type ApplyBattleInput, type BattleApplied,
+} from "./combat/encounter.ts";
+export { describeBattle, describeCarried, type BattleWords } from "./combat/describe.ts";

@@ -3,6 +3,7 @@
 // helm.ts and guns.ts (P2.1), boarding.ts, battle.ts and loot.ts (P2.2), doctrine.ts (P2.3).
 
 import type { CaptainId, HullId, ShipId, Terrain, WaterId, WindKind } from "../types.ts";
+import type { Carried, SalvagePile } from "./loot.ts";
 
 // ---------- Range, Helm moves and Guns orders (8.2, 8.4, 8.5) ----------
 
@@ -194,4 +195,29 @@ export interface BattleRecord {
   final: BattleShip[]; // every ship as the battle ended, hunter first
   dealt: Record<BattleSide, number>; // damage share each side dealt, the measure for Victory on points (D56)
   jettisoned: BattleSide[]; // sides that threw their cargo overboard at some point
+}
+
+// ---------- What a battle did to the world (P2.4) ----------
+
+/** What the winner took and the loser gave up, after the fairness factor, the Cradle halving and the cap (8.7). */
+export interface BattleLoot {
+  share: number; // the table's share for the outcome
+  fairness: number;
+  cradle: number;
+  capped: boolean;
+  taken: Carried; // to the winner
+  lost: Carried; // from the loser; for a Sunk ship this is more than `taken`, the rest went into the Wreck
+}
+
+/** The changes a finished battle made to ships, captains and the season, written down for the replay (P2.4). */
+export interface BattleAftermath {
+  pvp: boolean; // both captains are players
+  winner: ShipId | null;
+  loser: ShipId | null;
+  loot: BattleLoot | null; // null when the outcome pays nothing
+  wreck: SalvagePile | null; // Sunk only, when something was left to wreck
+  flotsam: SalvagePile[]; // cargo thrown overboard, one pile per ship that jettisoned
+  bounty: { added: number; collected: number }; // added to the winner for hunting a weaker ship or refusing parley; collected from the loser
+  shieldUntil: number | null; // the loser of a PvP battle is shielded until this Tide
+  towed: boolean; // the loser is towed to a Harbour at the end of the Tide
 }

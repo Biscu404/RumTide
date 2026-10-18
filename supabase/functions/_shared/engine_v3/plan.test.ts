@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { choosePlan, findRoute, onSurvey, pinnedRoute, standingPlan, startKnowledge, stepSlots, validatePlan } from "./index.ts";
+import { choosePlan, findRoute, nearestKnownHarbour, onSurvey, pinnedRoute, standingPlan, startKnowledge, stepSlots, validatePlan } from "./index.ts";
 import type { VoyagePlan } from "./index.ts";
 import { WEST_BREEZE, season, ship, world, yesRng } from "./testing.ts";
 
@@ -80,5 +80,48 @@ describe("plans (P1.7, GAMEPLAY 3.6)", () => {
     expect(choosePlan(world, c, sh, 6, { tide: 5, planA: fresh }, WEST_BREEZE)).toEqual({ plan: b, source: "planB" });
     c.queuedPlan = null;
     expect(choosePlan(world, c, sh, 6, undefined, WEST_BREEZE).source).toBe("standing");
+  });
+});
+
+describe("doctrine names and ambush range in plans (P2.4)", () => {
+  const captain = season([{ id: "a", name: "A", shipName: "Gull" }]).captains.a!;
+
+  it("accepts a plan, step and lurk that name a saved doctrine, and an ambush range of long or medium", () => {
+    const plan: VoyagePlan = { doctrine: "Brawler", steps: [
+      { kind: "sail", to: "gh_reefside", stance: "hunt", filter: { kind: "anyone" }, doctrine: " brawler " },
+      { kind: "lurk", filter: { kind: "players" }, ambushRange: "long", doctrine: "Brawler" },
+      { kind: "lurk", filter: { kind: "players" }, ambushRange: "medium" },
+    ] };
+    expect(validatePlan(world, captain, plan)).toEqual([]);
+  });
+
+  it("rejects a doctrine the captain has not saved, and an ambush from any other range", () => {
+    const plan = { doctrine: "Boarders", steps: [
+      { kind: "sail", to: "gh_reefside", doctrine: "Runner" },
+      { kind: "lurk", filter: { kind: "anyone" }, doctrine: "Coward", ambushRange: "close" },
+    ] } as unknown as VoyagePlan;
+    expect(validatePlan(world, captain, plan)).toEqual([
+      "plan: you have no doctrine called Boarders",
+      "step 1: you have no doctrine called Runner",
+      "step 2: an ambush starts at long or medium range",
+      "step 2: you have no doctrine called Coward",
+    ]);
+  });
+});
+
+describe("nearestKnownHarbour (D17, D75)", () => {
+  const st = season([
+    { id: "a", name: "A", shipName: "G", water: "gh_reefside" },
+    { id: "b", name: "B", shipName: "H", water: "dw_shallows" },
+    { id: "c", name: "C", shipName: "I", water: "wr_fog" },
+  ]);
+
+  it("finds the cheapest Harbour the captain can route to", () => {
+    expect(nearestKnownHarbour(world, st.captains.a!, ship(st, "a"), WEST_BREEZE)).toBe("gh_harbour");
+    expect(nearestKnownHarbour(world, st.captains.b!, ship(st, "b"), WEST_BREEZE)).toBe("dw_harbour");
+  });
+
+  it("is null when the captain knows no way to one", () => {
+    expect(nearestKnownHarbour(world, st.captains.c!, ship(st, "c"), WEST_BREEZE)).toBeNull(); // Whisper Rock is not on the chart
   });
 });

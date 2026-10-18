@@ -113,6 +113,12 @@ export const B = {
     },
   },
 
+  // Power Rating (D26): (max Hull / hullPer + Cannons + Sails + Hands / handsPer) / divisor. A fresh sloop is 10.
+  power: { hullPer: 10, handsPer: 3, divisor: 4 },
+
+  // Towing (8.7): a Sunk or Captured ship is towed to the nearest known Harbour with Hull raised to at least this share of its max.
+  tow: { hullShare: 0.5 },
+
   // Loot (8.7, v0.2 9). Used from P2.
   loot: { sunkGrab: 0.25, captured: 0.4, struck: 0.15, victory: 0.2, capPerBattle: 600, cradlePvp: 0.5, flotsamTides: 2, wreckTides: 4, salvagePerAction: 5 },
   fairness: { floor: 0.25, underdogCap: 1.5, bountyBelowRatio: 2 / 3, bountyKeepPerTide: 0.9 },

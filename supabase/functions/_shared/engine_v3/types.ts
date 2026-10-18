@@ -2,6 +2,8 @@
 // Section numbers point at docs/GAMEPLAY.md.
 
 import type { PresetId } from "./balance.ts";
+import type { AmbushRange, BattleAftermath, BattleRecord, Doctrine } from "./combat/types.ts";
+import type { SalvagePile } from "./combat/loot.ts";
 
 export type ArchipelagoId = string;
 export type IslandId = string;
@@ -130,6 +132,9 @@ export interface Skills {
   cunning: number;
 }
 
+/** The parley threshold a captain sets (v0.2 7.6): off, or pay tribute to a hunter whose Power Rating is that many times theirs. */
+export type ParleySetting = "off" | 1.25 | 1.5;
+
 export interface Captain {
   id: CaptainId;
   name: string;
@@ -143,6 +148,12 @@ export interface Captain {
   fleetId: string | null;
   shieldUntilTide: number; // players cannot hunt this captain while tide <= this
   queuedPlan: { tide: number; plan: VoyagePlan } | null; // Plan B carried over (3.6)
+  doctrines: Doctrine[]; // the captain's saved doctrines, up to 3 with different names (8.8)
+  defaultDoctrine: string; // the name of the doctrine used when neither the step nor the plan picks one
+  parley: ParleySetting;
+  noQuarter: boolean; // refuse every parley offer when hunting (v0.2 7.6)
+  bounty: number; // doubloons the Admiralty pays whoever beats this captain; shrinks each Tide (v0.2 9 rule 2)
+  bossesBeaten: string[]; // boss ids this captain has been on the winning side against (sorted); the Narrows gate (2.5)
 }
 
 export interface Ship {
@@ -181,19 +192,20 @@ export type Condition =
   | { kind: "windIs"; wind: WindKind }
   | { kind: "captainHere"; captainId: CaptainId };
 
+// A ship fights with the doctrine its step names, else the plan's, else the captain's default (8.8).
 export type Step =
-  | { kind: "sail"; to: WaterId; stance?: Stance; filter?: HuntFilter; route?: WaterId[]; if?: Condition }
+  | { kind: "sail"; to: WaterId; stance?: Stance; filter?: HuntFilter; route?: WaterId[]; doctrine?: string; if?: Condition }
   | { kind: "survey"; if?: Condition }
   | { kind: "land"; site: SiteId; if?: Condition }
   | { kind: "dock"; if?: Condition }
-  | { kind: "lurk"; filter: HuntFilter; if?: Condition }
+  | { kind: "lurk"; filter: HuntFilter; doctrine?: string; ambushRange?: AmbushRange; if?: Condition } // ambushRange defaults to Medium (8.1)
   | { kind: "repair"; if?: Condition };
 
 export type StepKind = Step["kind"];
 
 export interface VoyagePlan {
   steps: Step[];
-  doctrine?: string; // used from P2
+  doctrine?: string; // the doctrine for every step that does not name one
 }
 
 export interface Orders {
@@ -221,6 +233,8 @@ export interface SeasonState {
   mapId: string;
   captains: Record<CaptainId, Captain>;
   ships: Record<ShipId, Ship>;
+  wrecks: Record<string, SalvagePile>; // what a Sunk ship left behind, by pile id (8.7). Salvaging is P5
+  flotsam: Record<string, SalvagePile>; // cargo thrown overboard, by pile id (8.7)
 }
 
 // ---------- Replay ----------
@@ -244,6 +258,10 @@ export type ReplayEvent =
   | { t: number; kind: "galeDamage"; ship: ShipId; riggingPoints: number }
   | { t: number; kind: "meet"; a: ShipId; b: ShipId; at: string; onLane: boolean }
   | { t: number; kind: "encounter"; hunter: ShipId; target: ShipId; at: string; onLane: boolean; result: string }
+  | { t: number; kind: "parley"; hunter: ShipId; target: ShipId; threshold: number; accepted: boolean; paid: { plunder: number; goods: Partial<Record<Good, number>> } }
+  | { t: number; kind: "escape"; hunter: ShipId; target: ShipId; chance: number; roll: number; escaped: boolean }
+  | { t: number; kind: "battle"; record: BattleRecord; aftermath: BattleAftermath }
+  | { t: number; kind: "towed"; ship: ShipId; from: WaterId; to: WaterId; hullPoints: number; banked: number }
   | { t: number; kind: "islandCharted"; captain: CaptainId; island: IslandId }
   | { t: number; kind: "supplies"; ship: ShipId; provisionsUsed: number; provisionsLeft: number; shortRations: boolean }
   | { t: number; kind: "tideEnd"; tide: number };
