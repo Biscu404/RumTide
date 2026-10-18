@@ -19,7 +19,7 @@ You are the coordinator. Use the Agent tool to delegate to the named subagents. 
 6. **Build.** engineer implements with the spec, the assets and the text in hand. Engine changes come with unit tests.
 7. **Verify.** qa-tester runs the sweep and writes a report to `docs/qa/`.
 8. **Fix loop.** Send blockers and major bugs back to the right role. Allow two rounds. If it still fails, stop and ask Biscu.
-9. **Close.** Ask the producer to update `docs/STATUS.md` and add any rule decisions to `docs/DECISIONS.md`.
+9. **Close.** Follow the Definition of done in `CLAUDE.md`. It is the one rule for what to update and when.
 
 ## Rules
 
