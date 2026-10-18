@@ -2,6 +2,57 @@
 
 What was decided, when and why. Newest first. When a design decision changes, add an entry here in the same commit.
 
+
+## 2026-10-18: Version 0.3 engine core (roadmap P0 and P1)
+
+The game moves to the v0.3 design in `docs/GAMEPLAY.md`: two Tides a day, archipelagos, Watches and the Wind and Current System, charting, programmed doctrines. The new engine lives in `supabase/functions/_shared/engine_v3/`, next to the v0.2 engine in `engine/`. The prototype (server, client, bots, sim) keeps running on v0.2 until the server and client move over in roadmap phases P12 and P13; then `engine_v3` replaces `engine`. Where GAMEPLAY.md and GAME_DESIGN.md disagree, GAMEPLAY.md wins for the v0.3 engine. Section numbers in this entry point at GAMEPLAY.md.
+
+### Open decisions from GAMEPLAY 22 (defaults, P0.3)
+
+These are defaults, chosen so the build can move. Biscu can overturn any of them.
+
+| # | Decision | Default | Why |
+|-|-|-|-|
+| 1 | Season 1 length | 21 days, 42 Tides | Two Tides a day already gives half again as many resolutions as v0.2's 28 day season |
+| 2 | Heritage when buying a new hull | Name (optionally with a numeral), flag, sail colours, figurehead and trophies move. Scars and ship traits stay with the old ship in the Old Moorings | Biscu's rule that scars stay with the ship that earned them, while identity stays with the captain |
+| 3 | Medium Hotspots | The rarest, surprise tier: about 1 every 8 to 10 Tides, no warning | Matches Biscu's wording; Season 0 has none, so this can wait |
+| 4 | Cradle Truce | No hunting players in the Cradle before Tide 5 | Gives everyone the tutorial and a First Mate before PvP |
+| 5 | The Forger | One unique NPC, plus at most 2 Forger's Kits per season | Keeps forgery special, as Biscu asked |
+| 6 | Season 0 shape | The full Season 0 column of GAMEPLAY 21 | Biscu decided this on 18 October 2026 |
+| 7 | Working names | Keep all of them for now | Names can change at any time without code changes |
+| 8 | Source of truth | GAMEPLAY.md for gameplay; GAME_DESIGN.md v0.2 for everything it covers that GAMEPLAY.md does not | Fold both into one doc once Season 0 is stable |
+
+### Engine rules (P0 and P1)
+
+| Id | Decision | Why | Task |
+|-|-|-|-|
+| D1 | Every map element id (archipelago, island, water, lane, site, strait) is unique across the whole map, lowercase with underscores. A captain's knowledge is one map from id to level | One lookup instead of five; the validator enforces it | P1.3 |
+| D2 | Lane bearings are derived from water positions (x east, y south) and rounded to the nearest 45 degrees | Map files cannot get bearings wrong, and the client can draw the same positions | P1.3 |
+| D3 | A lane into a hidden island must itself be hidden; islands with hidden lanes cannot be fully charted until those lanes are found | Hidden islands stay hidden, and finding secrets matters for the full chart bonus | P1.3, P1.4 |
+| D4 | Time inside a Tide is a shared clock of ticks from 0 to 9, one tick per Watch. Ships with fewer Watches finish sooner and then sit still in their last water until the Tide ends | Makes Watches mean speed as well as reach, and keeps meetings exact | P1.8 |
+| D5 | Two ships meet when they are in the same water on the same tick, or travel the same lane in opposite directions at overlapping times. The crossing time is solved exactly and rounded to 0.001 | The exact rule needed for head on interceptions | P1.8 |
+| D6 | After an encounter on a lane, each ship returns to the water it left; the hop is abandoned and unused Watches are lost | Simple, and a ship never ends a Tide on a lane | P1.8 |
+| D7 | In Phase 1 every encounter freezes both ships (`stubEncounter`). A ship has at most one encounter per Tide unless the resolver lets it keep sailing | Combat (P2.4) replaces the stub and decides escapes | P1.8 |
+| D8 | A Hunt sail step hunts while sailing and on the tick it arrives. A Lurk hunts from when it starts until the Tide ends. Idle ships never hunt | Hunters catch ships at their destination; finished plans are passive | P1.8 |
+| D9 | When two ships hunt each other, the lower ship id is recorded as the hunter and the encounter is marked mutual | Deterministic; P2 can treat mutual encounters differently | P1.8 |
+| D10 | The Cradle Truce protects players from every hunter (players and NPCs) in the start archipelago before Tide 5. Shields only protect against player hunters | GAMEPLAY 2.4 says no hunting of players; shields exist to stop players bullying | P1.8 |
+| D11 | Surveying or landing from a Harbour keeps a ship docked. Sailing, lurking and repairing cast off | Looking around the harbour should not cost you your safe berth | P1.8 |
+| D12 | The reef penalty, and later Local Knowledge, use what the captain had Charted when the Tide began, not what they charted on arrival | Arriving charts the water at once, which would otherwise cancel every reef penalty | P1.6 |
+| D13 | Provisions and Powder take half a Hold unit each. A fresh sloop starts with 4 Provisions and 6 Powder, 5 of its 10 units | Otherwise a sloop is overloaded before it carries any cargo | P1.5 |
+| D14 | Watches: bonuses apply up to the cap of 9, then penalties apply, never below 1 | Penalties always bite, even for maxed ships | P1.5 |
+| D15 | Wind is derived from the season seed, the archipelago and the Tide number, never from the Tide seed | Forecasts are exact, any number of Tides ahead, and players cannot change the weather | P1.6 |
+| D16 | Every random roll comes from a named stream: `rngFor(seed, ...labels)` | Adding a roll in one system never shifts another system's results | P1.2 |
+| D17 | Standing orders sail Quiet to the nearest known Harbour and Dock; ties go to the lower water id | v0.2 said sail quietly home; ties need a rule | P1.7 |
+| D18 | Sight in Phase 1: your own water only. The `lookout` perk adds neighbouring waters, except Fog waters. Ships on lanes cannot be seen | Enough for "if in sight" conditions; Lookouts get their full rules in P8 | P1.8 |
+| D19 | A Survey rolls once for a hidden passage, and only where one exists. A found passage is Charted, its far water Sketched and its island Rumoured | GAMEPLAY 3.2 and 4.3 | P1.4 |
+| D20 | Landing on a site with an unlock key reveals every lane behind that key as Sketched and makes the waters and islands at both ends Rumoured | GAMEPLAY 2.4: Hermit's Reach becomes Rumoured after the Whispering Ruins | P1.4 |
+| D21 | The planner can route only through lanes the captain has at least Sketched and waters at least Rumoured. A route is chosen at the start of its step and kept, even if a hop turns out dearer | Plans fail in exactly the way the captain's knowledge is wrong (Becalmed Short) | P1.7 |
+| D22 | Steps that make no sense at run time (dock away from a Harbour, land on another island) are skipped with a reason instead of failing the Tide | A bad step must never break a Tide; submit_orders will reject them earlier | P1.8 |
+| D23 | Shields after a PvP loss last 4 Tides (two days), doubled from v0.2 because there are now two Tides a day | Same real time protection as v0.2 | P0.4 |
+| D24 | The Boom is a placeholder 2% per Tide, half of v0.2's 4% | Same growth per day; P6.3 retunes the whole economy | P0.4 |
+| D25 | Not in Phase 1, with the task that adds it: Crossings (P5.6), going over Hold capacity (port actions, P5.1), the Fisher's Child Provisions perk (P8.1), Navigator current reading each Tide (P8.3), Storms (Season 1, the Maw) | Keeps Phase 1 to movement and knowledge | P1 |
+| D26 | Power Rating, for parley, fairness and NPC scaling: PR = (max Hull ÷ 10 + Cannons + Sails + Hands ÷ 3) ÷ 4. A fresh sloop is 10 | Replaces v0.2's formula, which used the Crew stat that no longer exists | P2.0 |
+
 ## 2026-10-15: Palette, phone layout and sound (client step 7, without the sprites)
 
 Step 7 of section 19.1 is "recolour the assets into Endesga 32, polish the phone layout, add coin and cannon sounds and the Tide jingle". Two of the three are done. The recolour is not, because there are no sprites yet: everything is still drawn shapes. See "Not done" below.

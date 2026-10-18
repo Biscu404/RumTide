@@ -10,7 +10,10 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "sim": "node --import ./tools/register.mjs tools/sim/index.ts",
-    "bots": "node --import ./tools/register.mjs tools/bots/index.ts"
+    "bots": "node --import ./tools/register.mjs tools/bots/index.ts",
+    "tide:demo": "node tools/v3/tide-demo.ts",
+    "golden:update": "node tools/v3/update-golden.ts",
+    "check": "npm run typecheck && npm test"
   },
   "dependencies": {
     "phaser": "4.2.1",
