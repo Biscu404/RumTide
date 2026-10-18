@@ -14,6 +14,11 @@ Confirm these rule calls, all in `docs/DECISIONS.md`:
 * **D36** (P2.1): any growth past Long ends the battle as Escaped.
 * **D42** (P2.1): the Shallows. A Brigantine or Frigate without Local Knowledge must win a Helm contest to reach Close, or the range stops at Medium.
 
+Answer these open questions:
+* **v0.2 playtest:** does the internal playtest in `docs/PLAYTEST.md` still happen now that Season 0 is the v0.3 column?
+* **P0.3 defaults:** only default #6 of the P0.3 table was Biscu's call. #1 and #2 start to matter at P6.3 and P5.
+* **Streak breaker:** GAMEPLAY 19.1 is unbuilt (D34) and no task owns it.
+
 ## Top risks
 
 | # | Risk | Evidence | Impact | Next step |
@@ -22,4 +27,4 @@ Confirm these rule calls, all in `docs/DECISIONS.md`:
 | 2 | Fairness and balance unmeasured | The brief defers all tuning to P3. No v0.3 sim or bots exist (`tools/sim` and `tools/bots` run v0.2). P2.1 and P2.2 made 37 rule calls (D27 to D63) and only D27 was Biscu's. GAMEPLAY 8.9 and 20 have no tool behind them. | A dominant doctrine or a harsh loss hits friends first. This damages the pillar "fair fights and soft falls". | Build the P3 simulator right after P2.4. Confirm D35, D36, D42 and D57. |
 | 3 | Nothing playable on v0.3 until P12 and P13, and the live stack is unproven | Only the engine tests and `tools/v3` use `engine_v3`. DECISIONS lists items "not run anywhere": Deno entry files, the cron migration, migrations 3 to 5 on a real project. `docs/PLAYTEST.md` is all unticked. The server assumes one Tide a day. | A failed Tide on a live project is the worst day. Two Tides a day doubles the exposure. | Run one live rehearsal Tide before P12. Have qa-tester gate P12. |
 | 4 | Content and art gap | `client/public/assets/` holds only `.gitkeep` and an empty `sprites/`. `art/`, `docs/text/`, `docs/audio/`, `docs/qa/` and `docs/specs/` are empty, and `docs/LORE.md` does not exist. GAMEPLAY 12.6 needs 30 Squalls, 8 Tales, 6 Sagas and 4 trait Tales. | A working engine with no nightly story. This hurts the pillar "a story every night". | Start `docs/CREW.md` C2 to C5 alongside P2. |
-| 5 | Doc drift | GAME_DESIGN 16.1 still says 14 Tides while GAMEPLAY says 28. The Project copies of `DECISIONS.md` and `GAME_DESIGN.md` on claude.ai go stale whenever these files change. | Confusion when a second developer joins, or when a chat reads an old rule. | Re-upload both to the Project after each task. Keep the authority order at the top of this file. |
+| 5 | Doc drift | GAME_DESIGN 16.1 still says 14 Tides while GAMEPLAY says 28. | Confusion when a second developer joins. | Fix 16.1 to match GAMEPLAY the next time a task touches Tide counts. |

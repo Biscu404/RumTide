@@ -12,6 +12,7 @@ The full design is in `docs/GAME_DESIGN.md`. It is long, so do not read it all a
 
 ## Version 0.3 engine rules (engine_v3)
 
+* The v0.3 engine lives in `supabase/functions/_shared/engine_v3/`, next to the v0.2 engine in `engine/`.
 * `docs/GAMEPLAY.md` is the source of truth for v0.3 gameplay. Where it disagrees with `docs/GAME_DESIGN.md`, GAMEPLAY.md wins for `engine_v3`. GAME_DESIGN.md still covers the pillars, art and audio, co op, fairness and architecture.
 * Read the 2026-10-18 entry in `docs/DECISIONS.md` before changing `engine_v3`, and add your own calls there with the task id.
 * Do not edit the v0.2 `engine/` while building v0.3, unless a task says so.
