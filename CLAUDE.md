@@ -83,3 +83,12 @@ Update this section when the focus changes.
 * Resolve one v0.3 Tide and print it: `npm run tide:demo`
 * Rewrite the v0.3 golden Tide after an intentional rule change: `npm run golden:update`
 * Run a bot season: `npm run bots` (six scripted captains and a six raider brawl play Season 0 on the real engine over 30 seeds each, `npm run bots -- 100` for more; every season is played twice, directly and through the Edge Function handlers, and the two must end identically; fails on any impossible state, crash, non deterministic season or insane total)
+
+## Crew (specialist roles)
+
+* Eight roles live in `.claude/agents/`: producer, art-director, pixel-artist, game-designer, narrative-writer, engineer, qa-tester, sound-designer. Use the matching role for its kind of work. Details and workflows are in `docs/CREW.md`.
+* When documents disagree, the order of authority is `docs/DECISIONS.md`, then `docs/GAMEPLAY.md`, then `docs/GAME_DESIGN.md`.
+* Art follows the `rumtide-art-bible` skill (Endesga 32 only). Run `npm run assets:check` after touching assets.
+* Player facing text follows the `rumtide-lore` skill. Run `npm run prose:check` after writing text.
+* Slash commands: `/feature` runs one feature through the crew, `/gate` runs a quality gate.
+* Roles report back in under 200 words: what changed, files touched, what to check, open questions.

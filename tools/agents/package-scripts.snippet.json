@@ -1,0 +1,6 @@
+{
+  "scripts": {
+    "assets:check": "python3 tools/assets/check_palette.py client/public/assets",
+    "prose:check": "python3 tools/agents/check_prose.py docs client/src supabase"
+  }
+}

@@ -6,3 +6,7 @@ dist/
 *.local
 supabase/.branches/
 supabase/.temp/
+
+art/previews/
+.claude/settings.local.json
+.claude/agent-memory-local/
