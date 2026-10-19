@@ -13,12 +13,13 @@ import type {
 } from "../types.ts";
 import type { World } from "../map.ts";
 import { nearestKnownHarbour } from "../plan.ts";
-import { maxHands, maxHullPoints, maxRiggingPoints, powerRating, statValue } from "../ship.ts";
+import { cannonsOf, maxHands, maxHullPoints, maxRiggingPoints, powerRating, sailsOf } from "../ship.ts";
 import type { EncounterContext, EncounterOutcome, EncounterResolver, EncounterSide } from "../tide.ts";
 import { runBattle } from "./battle.ts";
 import type { BattleInput, BattleMate } from "./battle.ts";
 import { doctrineChooser, pickDoctrine } from "./doctrine.ts";
 import { apportion, pickFlagship } from "./fleet.ts";
+import { isBoss, recordBossWin } from "./shellback.ts";
 import { cargoValue, carriedBy, jettison, scale, settleLoot, splitByHolding, splitCarried, sumCarried } from "./loot.ts";
 import type { Carried, SalvagePile } from "./loot.ts";
 import { BATTLE_SIDES } from "./types.ts";
@@ -108,13 +109,14 @@ export function battleShipOf(ship: Ship, captain: Pick<Captain, "id">, side: Bat
     name: ship.name,
     side,
     hull: ship.hull,
-    cannons: statValue(ship.hull, ship.levels.cannons),
-    sails: statValue(ship.hull, ship.levels.sails),
+    cannons: cannonsOf(ship),
+    sails: sailsOf(ship),
     maxHullPoints: maxHullPoints(ship),
     maxRiggingPoints: maxRiggingPoints(ship),
     maxHands: maxHands(ship),
     helmBonus: 0,
     boardingBonus: 0,
+    ...(ship.statline ? { fixedHelm: ship.statline.helm } : {}), // a monster scores what its statline says (D101)
     charted: flags.charted,
     withCurrent: flags.withCurrent,
     lurker: flags.lurker,
@@ -279,9 +281,17 @@ export function applyBattle(input: ApplyBattleInput): BattleApplied {
     aftermath.shieldUntil = record.tide + B.shieldTidesAfterPvpLoss;
   }
 
+  // Beating a boss opens its gate for every player on the winning side (2.5, D105).
+  const beatenBoss = losers.find((m) => isBoss(m.captain));
+  if (beatenBoss) {
+    const by = recordBossWin(winners.map((m) => m.captain), beatenBoss.captain);
+    if (by.length > 0) aftermath.beaten = { boss: beatenBoss.captain.id, by };
+  }
+
+  // A boss that loses retreats into its shell where it lay, whole again next Tide: it is never towed (2.5, D104).
   if (TOWED.includes(outcome.kind)) {
-    aftermath.towed = true;
-    for (const m of losers) applied.tow.push(m.ship.id);
+    for (const m of losers) if (!isBoss(m.captain)) applied.tow.push(m.ship.id);
+    aftermath.towed = applied.tow.length > 0;
   }
   if (record.fleet) {
     const fleet: FleetAftermath = {
@@ -355,7 +365,8 @@ export const combatEncounter: EncounterResolver = (ctx: EncounterContext): Encou
   }
 
   let refusedParley = false;
-  if (!ctx.mutual) {
+  // A boss that is hunted stands and fights: it offers no parley and never slips away (2.5, D104).
+  if (!ctx.mutual && !isBoss(target.captain)) {
     const parley = parleyResult(target.captain, hunter.captain, powerRatings.target, powerRatings.hunter);
     if (parley.kind === "tribute") {
       const paid = payTribute(target.ship, hunter.ship, parley.fraction);
@@ -368,7 +379,7 @@ export const combatEncounter: EncounterResolver = (ctx: EncounterContext): Encou
     }
 
     const chance = escapeChance(
-      statValue(target.ship.hull, target.ship.levels.sails), statValue(hunter.ship.hull, hunter.ship.levels.sails),
+      sailsOf(target.ship), sailsOf(hunter.ship),
       target.stance === "quiet", ctx.terrain === "fog",
     );
     const roll = ctx.rng.stream("escape").next();

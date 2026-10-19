@@ -7,10 +7,15 @@ import type { Captain, Good, HullId, Ship, Stat } from "./types.ts";
 const hullDef = (hull: HullId) => B.hulls[hull];
 const grow = (level: number) => 1 + B.upgrade.perLevel * level;
 
+type Built = Pick<Ship, "hull" | "levels" | "statline">; // a monster's statline, when it has one, wins over its hull and levels
+
 export const statValue = (hull: HullId, level: number) => B.baseStat * hullDef(hull).mult * grow(level);
-export const maxHullPoints = (ship: Pick<Ship, "hull" | "levels">) => Math.round(B.baseHull * hullDef(ship.hull).mult * grow(ship.levels.hull));
-export const maxRiggingPoints = (ship: Pick<Ship, "hull" | "levels">) => Math.round(B.baseRigging * hullDef(ship.hull).mult * grow(ship.levels.sails));
-export const maxHands = (ship: Pick<Ship, "hull" | "levels">) => Math.floor(hullDef(ship.hull).maxHands * grow(ship.levels.berths));
+export const maxHullPoints = (ship: Built) => ship.statline?.maxHull ?? Math.round(B.baseHull * hullDef(ship.hull).mult * grow(ship.levels.hull));
+export const maxRiggingPoints = (ship: Built) => ship.statline?.maxRigging ?? Math.round(B.baseRigging * hullDef(ship.hull).mult * grow(ship.levels.sails));
+export const maxHands = (ship: Built) => ship.statline?.maxHands ?? Math.floor(hullDef(ship.hull).maxHands * grow(ship.levels.berths));
+/** The Cannons and Sails stat values of a ship: its statline's if it is a monster, else the hull and level curve (6.2). */
+export const cannonsOf = (ship: Built) => ship.statline?.cannons ?? statValue(ship.hull, ship.levels.cannons);
+export const sailsOf = (ship: Built) => ship.statline?.sails ?? statValue(ship.hull, ship.levels.sails);
 export const holdCapacity = (ship: Pick<Ship, "hull" | "levels">) => Math.floor(hullDef(ship.hull).hold * grow(ship.levels.hold));
 export const holdUsed = (ship: Pick<Ship, "hold">) => GOODS.reduce((n, g) => n + (ship.hold[g] ?? 0) * B.holdSpace[g], 0);
 export const carriesCargo = (ship: Pick<Ship, "hold" | "plunder">) => ship.plunder > 0 || CARGO_GOODS.some((g) => (ship.hold[g] ?? 0) > 0);
@@ -19,9 +24,8 @@ export const carriesCargo = (ship: Pick<Ship, "hold" | "plunder">) => ship.plund
  * Power Rating (D26), for parley, fairness and NPC scaling: (max Hull / 10 + Cannons + Sails + Hands / 3) / 4.
  * A fresh sloop is 10. Hands are the Hands aboard now, so a ship that has lost its crew rates lower (D74).
  */
-export const powerRating = (ship: Pick<Ship, "hull" | "levels" | "hands">): number =>
-  (maxHullPoints(ship) / B.power.hullPer + statValue(ship.hull, ship.levels.cannons) + statValue(ship.hull, ship.levels.sails) + ship.hands / B.power.handsPer) /
-  B.power.divisor;
+export const powerRating = (ship: Built & Pick<Ship, "hands">): number =>
+  (maxHullPoints(ship) / B.power.hullPer + cannonsOf(ship) + sailsOf(ship) + ship.hands / B.power.handsPer) / B.power.divisor;
 
 /** Upgrade cost for buying the next level of a stat (v0.2 5.3), with the season's cost multiplier. */
 export const upgradeCost = (currentLevel: number, costMult = 1) =>

@@ -7,3 +7,4 @@
 
 * NPC merchants and locals should fight like Runners or Cowards, not Brawlers (D85). Helps every player who hunts a merchant. Goes into the NPC brain, Season 0 (P9).
 * The escape roll could use the Rigging left, not the Sails stat, so a Crippled ship runs worse (D77). Helps combat feel. Goes into P3 tuning, Season 0.
+* Old Shellback could keep fighting every captain who reaches the Narrows in a Tide until one beats him, instead of one fight a Tide (D81, D108). Helps a group of friends who arrive together and now queue at the gate. Goes into P3 tuning, Season 0.

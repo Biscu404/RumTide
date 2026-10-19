@@ -1,7 +1,7 @@
 // Shared test helpers for combat. Not part of the engine surface.
 
 import { Rng } from "../rng.ts";
-import { maxHands, maxHullPoints, maxRiggingPoints, newShip, statValue } from "../ship.ts";
+import { cannonsOf, maxHands, maxHullPoints, maxRiggingPoints, newShip, sailsOf } from "../ship.ts";
 import type { HullId, Ship } from "../types.ts";
 import type { BattleInput, Chooser } from "./battle.ts";
 import type { BattleShip, BattleSide, GunsOrder, HelmMove } from "./types.ts";
@@ -14,13 +14,14 @@ export function battleShipFrom(ship: Ship, side: BattleSide, over: Partial<Battl
     name: ship.name,
     side,
     hull: ship.hull,
-    cannons: statValue(ship.hull, ship.levels.cannons),
-    sails: statValue(ship.hull, ship.levels.sails),
+    cannons: cannonsOf(ship),
+    sails: sailsOf(ship),
     maxHullPoints: maxHullPoints(ship),
     maxRiggingPoints: maxRiggingPoints(ship),
     maxHands: maxHands(ship),
     helmBonus: 0,
     boardingBonus: 0,
+    ...(ship.statline ? { fixedHelm: ship.statline.helm } : {}),
     charted: false,
     withCurrent: false,
     lurker: false,

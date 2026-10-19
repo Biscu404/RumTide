@@ -23,6 +23,7 @@ export function sixShips(): { state: SeasonState; orders: Record<string, Orders>
     preset: "season0",
     seed: 1234,
     world: cradle,
+    bosses: false, // the fixture is six ships; Old Shellback is shown by `npm run tide:demo -- --shellback`
     captains: [
       { id: "cap_a", name: "Anna", shipName: "Salty Gull", water: "gh_lee" },
       { id: "cap_b", name: "Bogdan", shipName: "Wet Sock", water: "dw_harbour" },

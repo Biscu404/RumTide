@@ -156,11 +156,25 @@ export interface Captain {
   bossesBeaten: string[]; // boss ids this captain has been on the winning side against (sorted); the Narrows gate (2.5)
 }
 
+/**
+ * A monster's fixed numbers (GAMEPLAY 2.5). A ship that has one takes these in place of what its hull and levels would
+ * give, so Old Shellback can have Hull 300 and no Rigging. Bosses rewrite it every Tide from balance (shellback.ts).
+ */
+export interface Statline {
+  maxHull: number;
+  maxRigging: number; // 0 for a monster with no Rigging at all
+  maxHands: number; // the Hands its claws fight as
+  cannons: number; // 0 for a monster with no guns
+  sails: number; // the escape roll and the Power Rating read this
+  helm: number; // its Helm score, fixed: no wind gauge, terrain or crew changes it
+}
+
 export interface Ship {
   id: ShipId;
   captainId: CaptainId;
   name: string;
-  hull: HullId;
+  hull: HullId; // a monster's hull is `sloop`, the neutral one; its statline replaces what the hull would give
+  statline?: Statline; // only monsters have one
   waterId: WaterId;
   docked: boolean;
   levels: Record<Stat, number>;
@@ -183,7 +197,8 @@ export type HuntFilter =
   | { kind: "npcs" }
   | { kind: "merchants" }
   | { kind: "carryingCargo" }
-  | { kind: "captain"; captainId: CaptainId };
+  | { kind: "captain"; captainId: CaptainId }
+  | { kind: "notBeaten"; boss: string }; // players who are not yet in their own `bossesBeaten` for this boss (2.5). A boss's own plan uses it; players cannot
 
 export type Condition =
   | { kind: "shipInSight"; filter: HuntFilter }
@@ -262,6 +277,7 @@ export type ReplayEvent =
   | { t: number; kind: "escape"; hunter: ShipId; target: ShipId; chance: number; roll: number; escaped: boolean }
   | { t: number; kind: "battle"; record: BattleRecord; aftermath: BattleAftermath }
   | { t: number; kind: "towed"; ship: ShipId; from: WaterId; to: WaterId; hullPoints: number; banked: number }
+  | { t: number; kind: "bossRecovers"; ship: ShipId; hullPoints: number; maxHullPoints: number } // a boss is whole again at the start of the Tide (2.5)
   | { t: number; kind: "islandCharted"; captain: CaptainId; island: IslandId }
   | { t: number; kind: "supplies"; ship: ShipId; provisionsUsed: number; provisionsLeft: number; shortRations: boolean }
   | { t: number; kind: "tideEnd"; tide: number };

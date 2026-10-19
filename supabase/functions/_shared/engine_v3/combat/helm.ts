@@ -34,9 +34,11 @@ export const hasLocalKnowledge = (ship: BattleShip, opponent: BattleShip): boole
 
 /**
  * Helm score = Sails x (Rigging left / max Rigging) x (1 + crew bonuses) x wind gauge x terrain (8.4).
- * A ship with no max Rigging scores 0 here; Old Shellback's fixed score is P2.6's business.
+ * A monster has a fixed score instead (Old Shellback, D101): nothing multiplies it. A ship with no max Rigging and no
+ * fixed score would score 0.
  */
 export function helmScore(ship: BattleShip, opponent: BattleShip, terrain: Terrain, gauge: boolean): number {
+  if (ship.fixedHelm !== undefined) return ship.fixedHelm;
   const rigging = ship.maxRiggingPoints > 0 ? ship.riggingPoints / ship.maxRiggingPoints : 0;
   let score = ship.sails * rigging * (NEUTRAL + ship.helmBonus);
   if (gauge) score *= C.windGaugeBonus;

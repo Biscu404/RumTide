@@ -79,6 +79,7 @@ export function formatReplay(world: World, state: SeasonState, events: ReplayEve
       case "towed":
         lines.push(`${at} ${shipName(e.ship)} is towed from ${place(e.from)} to ${place(e.to)} and docked with ${e.hullPoints} Hull.${e.banked ? ` It banks ${e.banked} doubloons.` : ""}`);
         break;
+      case "bossRecovers": lines.push(`${at} ${shipName(e.ship)} crawls out of its shell, whole again (${e.hullPoints} of ${e.maxHullPoints} Hull).`); break;
       case "islandCharted": lines.push(`${at} ${state.captains[e.captain]?.name ?? e.captain} has fully charted ${place(e.island)}.`); break;
       case "supplies":
         lines.push(e.shortRations
