@@ -6,7 +6,7 @@ The full design is in `docs/GAME_DESIGN.md`. It is long, so do not read it all a
 
 ## Current focus
 
-* Next task: P3.2, run the five checks of GAMEPLAY 8.9 with `npm run sim:v3` and tune the combat numbers in `balance.ts` until they pass. The brief is `docs/briefs/P3-combat-testing.md`. Task ids come from the Rumtide Roadmap tracker on claude.ai.
+* Next task: P3.B1, Biscu approves the boarding spec `docs/specs/boarding.md` (D116 to D120). Then P3.B2 builds it in `engine_v3` and P3.B3 teaches the simulator the Deck orders. P3.2, tuning `balance.ts` until the five checks of GAMEPLAY 8.9 pass, is paused until then. Task ids come from the Rumtide Roadmap tracker on claude.ai.
 * Done work is in `git log` and `docs/DECISIONS.md`.
 * Decisions waiting on Biscu are in `docs/STATUS.md`.
 

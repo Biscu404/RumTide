@@ -3,6 +3,19 @@
 What was decided, when and why. Newest first. When a design decision changes, add an entry here in the same commit.
 
 
+## 2026-10-20: Boarding rework (P3.B)
+
+Biscu's calls on boarding, made while P3.2 was tuning. The proposal they belong to is `docs/specs/boarding.md`. Only the rows below are decided. The rest of the spec is proposed until Biscu approves it (P3.B1), and **no engine file or number changes until then**. GAMEPLAY 8.6 still describes the boarding that is built today.
+
+| Id | Decision | Why | Task |
+|-|-|-|-|
+| D116 | **Boarding is reworked from the ground up before P3.2 tuning goes on.** P3.2 pauses, and resumes on the new boarding | P3.2 tried two rules for the guns of grappled ships, on top of its first three number changes. With no guns at all while grappled the Brawler fell to 5% of the field and Repel became the free pick, because it was the one order that did anything. With Round shot off and Grapeshot kept, checks 1, 3 and 4 passed but check 2 still failed on Repel alone. No number gives Repel a job, and the P3 brief allows a rule change when no number can fix a check. Biscu decided on 20 October 2026 | P3.B |
+| D117 | **The Brawler buff is the boarder's edge,** for whichever ship's Board order makes the grapple: First over the rail (a strength bonus in the grapple round, against a crew that has to fight with Fists) and Lashed fast (its Helm score counts more in every Cut Free contest). It is not tied to the Brawler template | Any captain who boards earns it, and a replay shows why the boarder won. A bonus on a template's name would be invisible in a replay, lost by a captain who writes the same rules by hand, and would push check 1 (no template above 60%). Biscu chose it on 20 October 2026 over a template bonus or a Bosun branch | P3.B |
+| D118 | **The deck fight is a cycle of Deck orders.** While grappled the great guns are quiet and each rule gives a Deck order: Charge (cutlasses) beats Volley (muskets and swivels), Volley beats Repel (pikes at the rail), Repel beats Charge. Fire Pots are a limited special and Fists is the fallback | Reading the opponent wins fights, as in the Helm cycle of 8.4, and it gives Repel a real job: it is the answer to Charge. Biscu chose it on 20 October 2026 over one order per weapon, or one melee with gear as stats | P3.B |
+| D119 | **Drill is a Hands track of 15 levels in three stages of five** (Deckhands, Cutthroats, Sea Wolves). Each level adds boarding strength, and each stage gives more per level and costs more. Finishing a stage unlocks something: Fire Pots at 5, Grapnels at 10, Second Wave at 15 | Biscu proposed the 3 stages of 5 with rising power and cost, and chose power plus an unlock over power only or one weapon per stage, on 20 October 2026 | P3.B |
+| D120 | **Season 0 has all three Drill stages.** The cap is `drillMaxLevel` in `SEASON_PRESETS`, 15 in both seasons | Biscu chose it on 20 October 2026 over capping Season 0 at 10. It adds to the scope risk in `docs/STATUS.md` | P3.B |
+
+
 ## 2026-10-19: Phase 3, combat testing (P3)
 
 The v0.3 combat simulator, in `tools/v3/sim/`. **P3.1 changes no engine file and no number**, and the golden Tide did not move. P3.2 tunes `balance.ts` against it. The brief is `docs/briefs/P3-combat-testing.md`. Section numbers point at GAMEPLAY.md. GAMEPLAY 8.9 says "about" more than once, so each check below has a line drawn on it. These are test lines, not gameplay numbers, so they live in the simulator (`field.ts`, `power.ts`, `boss.ts`) and not in `balance.ts`.
