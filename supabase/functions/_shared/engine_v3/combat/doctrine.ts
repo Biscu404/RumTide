@@ -115,7 +115,7 @@ export function evaluateDoctrine(doctrine: Doctrine, view: RoundView, ctx: Doctr
     const action = rule.then;
     switch (action?.kind) {
       case "fight":
-        return { kind: "fight", rule: i, abilities, helm: action.helm, guns: action.guns };
+        return { kind: "fight", rule: i, abilities, helm: action.helm, guns: action.guns, ...(action.exposed !== undefined ? { exposed: action.exposed } : {}) };
       case "surrender":
         return { kind: "surrender", rule: i, abilities };
       case "jettison":
@@ -211,6 +211,7 @@ function actionProblem(a: DoctrineAction, label: string, registry: AbilityRegist
   switch (a?.kind) {
     case "fight":
       if (!HELM_MOVES.includes(a.helm)) return `${label}: unknown Helm move ${String(a.helm)}`;
+      if (a.exposed !== undefined) return `${label}: only a monster rears up, a captain's doctrine may not`; // D102
       return GUNS_ORDERS.includes(a.guns) ? null : `${label}: unknown Guns order ${String(a.guns)}`;
     case "ability": return registry[a.ability] ? null : `${label}: unknown ability ${String(a.ability)}`;
     case "surrender": case "jettison": return null;

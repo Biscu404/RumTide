@@ -9,7 +9,7 @@ export {
   islandFullyCharted, coverage, setPencil,
 } from "./knowledge.ts";
 export {
-  statValue, maxHullPoints, maxRiggingPoints, maxHands, holdCapacity, holdUsed, carriesCargo, upgradeCost, powerRating,
+  statValue, maxHullPoints, maxRiggingPoints, maxHands, cannonsOf, sailsOf, holdCapacity, holdUsed, carriesCargo, upgradeCost, powerRating,
   newShip, watchesFor, emptyHold, zeroLevels,
 } from "./ship.ts";
 export { windFor, windsFor, hopCost, estimateHop, windPart, terrainPart, chartedAt, type HopCost } from "./wcs.ts";
@@ -19,10 +19,10 @@ export {
   resolveTide, stubEncounter, type TideInput, type TideResult, type EncounterContext, type EncounterOutcome,
   type EncounterResolver, type EncounterSide,
 } from "./tide.ts";
-export { newCaptain, newSeason, type NewCaptainSpec, type NewSeasonSpec } from "./season.ts";
+export { newCaptain, newBoss, newSeason, type NewCaptainSpec, type NewSeasonSpec } from "./season.ts";
 export { formatReplay, replayHash, canonicalJson, describeWind } from "./replay.ts";
 
-// Combat (GAMEPLAY 8). Old Shellback comes with P2.6.
+// Combat (GAMEPLAY 8) and Old Shellback (2.5).
 export * from "./combat/types.ts";
 export {
   battleRng, isCrippled, hasLocalKnowledge, helmScore, windGauge, startingRange, helmContest, contestRecord, pairRow, applyPair,
@@ -61,3 +61,7 @@ export {
   fleetGrapples, fleetMelee, type FlagshipCandidate, type Shot, type MateHelm, type FleetMelee,
 } from "./combat/fleet.ts";
 export { describeBattle, describeCarried, type BattleWords } from "./combat/describe.ts";
+export {
+  SHELLBACK_ID, SHELLBACK_DOCTRINE, isBoss, shellbackStatline, applyStatline, shellbackDoctrine, bossPlan, upkeepBosses, recordBossWin,
+  hasBeaten, bossAtStrait, mayCross,
+} from "./combat/shellback.ts";

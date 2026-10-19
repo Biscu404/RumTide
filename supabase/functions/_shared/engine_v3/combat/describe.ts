@@ -85,7 +85,8 @@ function roundLines(record: BattleRecord, round: RoundRecord): string[] {
   for (const s of round.ships) {
     const rule = s.rule < 0 ? "no rule fits, so the fallback" : `rule ${s.rule + 1}`;
     const jettison = s.jettison ? " It heaves its cargo over the side." : "";
-    lines.push(`  ${nameOf(s.ship)} plays ${HELM[s.helm]} and ${GUNS[s.guns]} (${rule}).${jettison}`);
+    const rears = s.exposed ? ` It rears up and shows its soft underside: Round shot does ${s.exposed} times the damage to it.` : "";
+    lines.push(`  ${nameOf(s.ship)} plays ${HELM[s.helm]} and ${GUNS[s.guns]} (${rule}).${jettison}${rears}`);
   }
   for (const c of round.contests) {
     const what = c.kind === "chase" ? "the chase" : c.kind === "shallows" ? "reaching Close in the Shallows" : "cutting free";
@@ -221,6 +222,11 @@ export function describeBattle(record: BattleRecord, aftermath: BattleAftermath,
     if (a.loot.cradle !== 1) notes.push("loot is halved in the Cradle");
     if (a.loot.capped) notes.push("the per battle cap applies");
     lines.push(`  ${named(a.winner)} takes ${describeCarried(a.loot.taken)} (${percent(a.loot.share)} of what ${named(a.loser)} carried${notes.length ? ", " + notes.join(", ") : ""}).`);
+  }
+  if (a.beaten) {
+    const boss = record.ships.find((s) => s.captainId === a.beaten?.boss)?.name ?? a.beaten.boss;
+    const names = a.beaten.by.map((c) => record.ships.find((s) => s.captainId === c)?.name ?? c);
+    lines.push(`  ${cap(listOf(names))} ${names.length > 1 ? "have" : "has"} beaten ${boss}, and may now pass the gate it guards. ${boss} will be back next Tide.`);
   }
   if (a.wreck) lines.push(`  ${describeCarried(a.wreck)} is left in a Wreck at ${words.place(a.wreck.water)} until Tide ${a.wreck.untilTide}.`);
   for (const f of a.flotsam) lines.push(`  ${describeCarried(f)} floats free at ${words.place(f.water)} until Tide ${f.untilTide}.`);

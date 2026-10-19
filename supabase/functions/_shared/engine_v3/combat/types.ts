@@ -58,6 +58,7 @@ export interface BattleShip {
   maxHands: number;
   helmBonus: number; // Helmsman, skill and trait bonuses to the Helm score as a fraction, 0.1 is +10%. 0 until crew (P8)
   boardingBonus: number; // Bosun, trait and Background bonuses to boarding strength (8.6), same unit. 0 until crew (P8)
+  fixedHelm?: number; // a monster's Helm score; when set it is the score, with no gauge, terrain or crew on top (D101). Absent for every player ship
   charted: boolean; // the battle's water was Charted for this captain when the Tide began (D12)
   withCurrent: boolean; // moving with a Strong Current (2.2), decided when the battle is set up (P2.4)
   lurker: boolean; // springs an ambush (8.1)
@@ -89,6 +90,7 @@ export interface RoundShipRecord {
   abilities: { rule: number; ability: string }[]; // ability rules that fired above it, in order
   helm: HelmMove; // the move played, after the Crippled rule
   guns: GunsOrder;
+  exposed?: number; // a monster reared up this round: Round shot does this many times the damage to it. Absent for every other round (D102)
   helmScore: number;
   shot: { track: DamageTrack | null; damage: number; powderUsed: number }; // what this ship's guns did
   scrape: number; // Hull lost to a Reef scrape this round
@@ -162,7 +164,7 @@ export type DoctrineCondition =
   | { kind: "abilityUnused"; ability: string };
 
 export type DoctrineAction =
-  | { kind: "fight"; helm: HelmMove; guns: GunsOrder }
+  | { kind: "fight"; helm: HelmMove; guns: GunsOrder; exposed?: number } // `exposed` is for monsters only: a captain's saved doctrine may not carry it (D102)
   | { kind: "ability"; ability: string } // fires the crew ability, then the rules below still give the Helm move and Guns order
   | { kind: "surrender" } // Struck Colours
   | { kind: "jettison" }; // cargo overboard becomes Flotsam; the round plays Hold and Hold Fire, and the rule fires once per battle (D65)
@@ -250,7 +252,8 @@ export interface BattleAftermath {
   flotsam: SalvagePile[]; // cargo thrown overboard, one pile per ship that jettisoned
   bounty: { added: number; collected: number }; // added to the winner for hunting a weaker ship or refusing parley; collected from the loser
   shieldUntil: number | null; // the loser of a PvP battle is shielded until this Tide
-  towed: boolean; // the loser is towed to a Harbour at the end of the Tide
+  towed: boolean; // the loser is towed to a Harbour at the end of the Tide. A beaten boss is never towed (D104)
+  beaten?: { boss: CaptainId; by: CaptainId[] }; // only when the losing side was a boss: the winning player captains, who now pass its gate (D105)
   fleet?: FleetAftermath; // only in a fleet battle (P2.5)
 }
 

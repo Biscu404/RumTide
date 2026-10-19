@@ -64,6 +64,7 @@ function terrainFactor(range: Range, terrain: Terrain): number {
 export interface GunsContext {
   terrain: Terrain;
   helmMod: number; // this ship's rake, flank or stern shot, or weakened modifier from resolveHelm (gunsMod); NEUTRAL for none
+  exposed?: number; // the defender reared up: Round shot does this many times the damage this round (D102); absent means NEUTRAL
 }
 
 const OPEN_WATER: GunsContext = { terrain: "open", helmMod: NEUTRAL };
@@ -75,6 +76,7 @@ export interface GunsFactors {
   gunnery: number;
   helm: number;
   terrain: number;
+  exposed: number; // Round shot against a monster that has reared up, else neutral
   powder: number; // the out of Powder factor, else neutral
   charged: number; // Hold Fire's bonus the round after it, else neutral
   stale: number; // the stale factor from the third round in a row with the same order, else neutral
@@ -116,6 +118,7 @@ export function fireGuns(
     gunnery: gunnery(attacker),
     helm: ctx.helmMod,
     terrain: terrainFactor(range, ctx.terrain),
+    exposed: ammo.key === "round" ? ctx.exposed ?? NEUTRAL : NEUTRAL,
     powder: dry ? C.outOfPowder : NEUTRAL,
     charged: attacker.guns.charged ? C.holdFireNext : NEUTRAL,
     stale: staleNow(attacker.guns, order) ? C.stale : NEUTRAL,

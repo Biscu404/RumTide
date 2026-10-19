@@ -7,6 +7,7 @@ import type { World } from "./map.ts";
 import { levelOf } from "./knowledge.ts";
 import { findRoute } from "./route.ts";
 import { findDoctrine } from "./combat/doctrine.ts";
+import { bossPlan, isBoss } from "./combat/shellback.ts";
 
 /** How many steps a captain's plan may have (3.6). */
 export function stepSlots(captain: Captain): number {
@@ -16,6 +17,7 @@ export function stepSlots(captain: Captain): number {
   return Math.min(B.plan.maxSteps, n);
 }
 
+/** The filters a player may use. A boss's own `notBeaten` filter is not one of them (D103). */
 function filterProblem(f: HuntFilter | undefined, label: string): string | null {
   if (!f) return `${label}: needs a filter`;
   if (!["anyone", "players", "npcs", "merchants", "carryingCargo", "captain"].includes(f.kind)) return `${label}: unknown filter ${String((f as { kind: unknown }).kind)}`;
@@ -104,6 +106,7 @@ export function nearestKnownHarbour(w: World, captain: Captain, ship: Ship, wind
  * nearest known Harbour and Dock.
  */
 export function standingPlan(w: World, captain: Captain, ship: Ship, winds: Record<ArchipelagoId, Wind>): VoyagePlan {
+  if (isBoss(captain)) return bossPlan(captain); // a boss never goes home: it lies in wait in its water (D103)
   if (ship.docked) return { steps: [] };
   const here = w.water[ship.waterId];
   if (here?.terrain === "harbour") return { steps: [{ kind: "dock" }] };

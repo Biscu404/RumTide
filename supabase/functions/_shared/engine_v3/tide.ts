@@ -17,6 +17,7 @@ import type {
 } from "./types.ts";
 import type { AmbushRange } from "./combat/types.ts";
 import { combatEncounter, towShip } from "./combat/encounter.ts";
+import { hasBeaten, upkeepBosses } from "./combat/shellback.ts";
 import { otherEnd, type World } from "./map.ts";
 import { rngFor, type Rng } from "./rng.ts";
 import { islandFullyCharted, laneVisible, levelOf, onArrive, onLand, onSurvey } from "./knowledge.ts";
@@ -144,6 +145,8 @@ export function resolveTide(input: TideInput): TideResult {
   const emit = (e: ReplayEvent) => replay.push(e);
 
   emit({ t: 0, kind: "tideStart", tide, winds });
+  // A boss beaten last Tide is whole again, and from Tide 9 a little more tired (2.5).
+  for (const e of upkeepBosses(state, tide)) emit(e);
 
   // ---------- Set up every ship ----------
   const shipIds = Object.keys(state.ships).sort();
@@ -193,6 +196,7 @@ export function resolveTide(input: TideInput): TideResult {
       case "merchants": return target.captain.npcRole === "merchant";
       case "carryingCargo": return carriesCargo(target.ship);
       case "captain": return target.captain.id === f.captainId;
+      case "notBeaten": return target.captain.kind === "player" && !hasBeaten(target.captain, f.boss);
     }
   };
 
@@ -570,7 +574,7 @@ export function resolveTide(input: TideInput): TideResult {
   }
   for (const s of sims) {
     const ship = s.ship;
-    if (!ship.docked) {
+    if (!ship.docked && !ship.statline) { // a monster lives off the sea and eats no Provisions
       const need = B.hulls[ship.hull].provisionsPerTide;
       const used = Math.min(need, ship.hold.provisions);
       ship.hold.provisions -= used;

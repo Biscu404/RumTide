@@ -48,6 +48,7 @@ export type RoundChoice =
       helm: HelmMove;
       guns: GunsOrder;
       jettison?: boolean; // also throw the cargo overboard; the Helm move and Guns order are whatever the Chooser gave (a doctrine plays Hold and Hold Fire, D65)
+      exposed?: number; // a monster rears up: Round shot does this many times the damage to it this round (D102)
     }
   | { kind: "surrender"; rule: number; abilities: AbilityFire[] };
 
@@ -152,6 +153,7 @@ function shipRecord(
     abilities: choice.abilities.map((a) => ({ ...a })),
     helm,
     guns,
+    ...(choice.kind === "fight" && choice.exposed !== undefined && choice.exposed !== 1 ? { exposed: choice.exposed } : {}),
     helmScore: score,
     shot: { track: shot.track, damage: shot.damage, powderUsed: shot.powderUsed },
     scrape,
@@ -353,9 +355,15 @@ export function runBattle(input: BattleInput): BattleRecord {
       if (grapples.some((g) => g.ok)) after = "grappled";
 
       // 4. Guns fire at the same time, at the new range (8.5). Every ship fires from the state the round began with.
+      // A monster that reared up this round takes more from Round shot (D102); only the enemy flagship is ever the aim.
+      const exposure: Record<BattleSide, number> = {
+        hunter: fights[flag.hunter]!.exposed ?? 1,
+        target: fights[flag.target]!.exposed ?? 1,
+      };
       const fired: Record<ShipId, GunsResult> = {};
       for (const id of all) {
-        fired[id] = fireGuns(working[id]!, working[flag[other(sideOf(id))]!]!, after, orders[id]!, rng, { terrain, helmMod: gunsMod[id]! });
+        const foe = other(sideOf(id));
+        fired[id] = fireGuns(working[id]!, working[flag[foe]!]!, after, orders[id]!, rng, { terrain, helmMod: gunsMod[id]!, exposed: exposure[foe] });
       }
       // A side's guns are added up per track, times the fleet bonus and Desperate Defence, and shared out between the
       // enemy ships by max Hull (7.5). With one ship a side this is just each ship's shot against the other.

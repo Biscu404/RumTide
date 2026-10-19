@@ -10,7 +10,7 @@ export const rawCradle = (): GameMap => structuredClone(cradleRaw) as GameMap;
 export const WEST_BREEZE: Record<string, Wind> = { cradle: { kind: "breeze", from: 270 } };
 
 export function season(captains: NewCaptainSpec[], tide = 6): SeasonState {
-  const s = newSeason({ seasonId: "test", preset: "season0", seed: 99, world, captains });
+  const s = newSeason({ seasonId: "test", preset: "season0", seed: 99, world, captains, bosses: false }); // Old Shellback has his own tests (shellback.test.ts)
   s.tide = tide;
   return s;
 }

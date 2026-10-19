@@ -1,10 +1,12 @@
 // Creating seasons, captains and ships.
 
 import { B, SEASON_PRESETS, type PresetId } from "./balance.ts";
-import type { Captain, CaptainKind, HullId, NpcRole, SeasonState, Ship, WaterId } from "./types.ts";
-import { startKnowledge } from "./knowledge.ts";
+import { LEVEL } from "./types.ts";
+import type { Captain, CaptainKind, HullId, MapBoss, NpcRole, SeasonState, Ship, WaterId } from "./types.ts";
+import { raise, startKnowledge } from "./knowledge.ts";
 import { newShip } from "./ship.ts";
 import { templateDoctrine } from "./combat/doctrine.ts";
+import { SHELLBACK_DOCTRINE, SHELLBACK_ID, applyStatline, shellbackDoctrine, shellbackStatline } from "./combat/shellback.ts";
 import type { World } from "./map.ts";
 
 export interface NewCaptainSpec {
@@ -48,12 +50,31 @@ export function newCaptain(world: World, preset: PresetId, spec: NewCaptainSpec)
   return { captain, ship };
 }
 
+/**
+ * A boss of the map as a captain and ship, lying in its water (2.5). Null for a boss this engine has no statline for yet.
+ * Old Shellback is an NPC with the `boss` role, a sloop hull that only names him (his statline replaces every number a hull
+ * would give), no gold of his own, and the Narrows Charted for him: it is his home, so he has Local Knowledge there (D79).
+ */
+export function newBoss(world: World, preset: PresetId, boss: MapBoss): { captain: Captain; ship: Ship } | null {
+  if (boss.id !== SHELLBACK_ID) return null;
+  const { captain, ship } = newCaptain(world, preset, {
+    id: boss.id, name: "Old Shellback", shipName: "Old Shellback", kind: "npc", npcRole: "boss", hull: "sloop", water: boss.water, docked: false,
+  });
+  captain.chest = 0;
+  captain.doctrines = [shellbackDoctrine()];
+  captain.defaultDoctrine = SHELLBACK_DOCTRINE;
+  raise(captain.knowledge, boss.water, LEVEL.charted);
+  applyStatline(ship, shellbackStatline(1, SEASON_PRESETS[preset].shellbackDecayFromTide));
+  return { captain, ship };
+}
+
 export interface NewSeasonSpec {
   seasonId: string;
   preset: PresetId;
   seed: number;
   world: World;
   captains: NewCaptainSpec[];
+  bosses?: boolean; // put the map's bosses in their waters (default true). A test that only cares about movement leaves them out
 }
 
 export function newSeason(spec: NewSeasonSpec): SeasonState {
@@ -72,6 +93,14 @@ export function newSeason(spec: NewSeasonSpec): SeasonState {
     const { captain, ship } = newCaptain(spec.world, spec.preset, c);
     state.captains[captain.id] = captain;
     state.ships[ship.id] = ship;
+  }
+  if (spec.bosses ?? true) {
+    for (const boss of spec.world.map.bosses) {
+      const made = newBoss(spec.world, spec.preset, boss);
+      if (!made) continue;
+      state.captains[made.captain.id] = made.captain;
+      state.ships[made.ship.id] = made.ship;
+    }
   }
   return state;
 }

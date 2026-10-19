@@ -160,8 +160,15 @@ export const B = {
   // Hotspots (11). Used from P10.
   hotspots: { smallPerArchipelagoPerTide: [1, 2], mediumEveryTides: [8, 10], bigWarningTides: 2 },
 
-  // Old Shellback (2.5). Used from P2.6.
-  shellback: { hull: 300, clawHands: 40, decayPerTide: 0.08 },
+  // Old Shellback (2.5, D100). hull, clawHands and decayPerTide are the statline of GAMEPLAY 2.5. cannons, sails and helm are
+  // not in 2.5, so each is the base stat of a fresh sloop (10), the simplest reading, and untuned until P3: his guns, his Sails
+  // (the escape roll and the Power Rating) and his fixed Helm score, which no gauge or terrain changes. In round `rearUpRound`
+  // he rears up and Round shot does `rearUpRoundShot` times the damage to him; from round `grappleFromRound` he grapples.
+  shellback: {
+    hull: 300, clawHands: 40, decayPerTide: 0.08,
+    cannons: 10, sails: 10, helm: 10,
+    rearUpRound: 3, grappleFromRound: 4, rearUpRoundShot: 2,
+  },
 
   // Agendas (15) and wagers (17). Used from P11.
   agendas: { drawCount: 3, accuseRight: 40, accuseWrongLegend: 20, accuseWrongFame: 10, rewardShare: 0.18 },

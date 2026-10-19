@@ -6,7 +6,7 @@ The full design is in `docs/GAME_DESIGN.md`. It is long, so do not read it all a
 
 ## Current focus
 
-* Next task: P2.6, Old Shellback: his statline, habits and the Narrows gate. Brief: `docs/briefs/P2-combat.md`. Task ids come from the Rumtide Roadmap tracker on claude.ai.
+* Next task: P3, combat testing: the v0.3 simulator and the tuning of the combat numbers (GAMEPLAY 8.9). There is no P3 brief in `docs/briefs/` yet. Task ids come from the Rumtide Roadmap tracker on claude.ai.
 * Done work is in `git log` and `docs/DECISIONS.md`.
 * Decisions waiting on Biscu are in `docs/STATUS.md`.
 
@@ -87,7 +87,7 @@ A task is done when its own checks pass and all of this is true:
 * Build for production: `npm run build` (output in `dist/`)
 * Run the balance simulation: `npm run sim` (checks the combat table of section 7.3, a bot trader against the solo pacing of sections 3.5 and 5.5, and the galleon odds of section 8.2)
 * Check everything at once: `npm run check` (types and all tests, v0.2 and v0.3)
-* Resolve one v0.3 Tide and print it: `npm run tide:demo`
+* Resolve one v0.3 Tide and print it: `npm run tide:demo` (`npm run tide:demo -- --shellback` plays a challenge to Old Shellback instead)
 * Rewrite the v0.3 golden Tide after an intentional rule change: `npm run golden:update`
 * Run a bot season: `npm run bots` (six scripted captains and a six raider brawl play Season 0 on the real engine over 30 seeds each, `npm run bots -- 100` for more; every season is played twice, directly and through the Edge Function handlers, and the two must end identically; fails on any impossible state, crash, non deterministic season or insane total)
 
