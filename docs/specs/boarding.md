@@ -1,6 +1,15 @@
 # Spec: boarding, the deck fight
 
-**Status: proposed, 20 October 2026.** Biscu made the four big calls (D116 to D120 in `docs/DECISIONS.md`). Everything else here is the game designer's proposal until Biscu approves this spec. Approval starts the build (P3.B2). Once it is built, GAMEPLAY 6.2, 6.4, 6.5, 8.3, 8.5, 8.6, 8.8 and 8.9 are rewritten to match and this file points at them.
+**Status: approved, 22 October 2026,** together with `docs/specs/fighting-styles.md` (D129). Biscu made the four big calls (D116 to D120 in `docs/DECISIONS.md`) and handed the rest over on 21 October 2026. P3.B2 builds both specs. Once they are built, GAMEPLAY 6.2, 6.4, 6.5, 8.3, 8.5, 8.6, 8.8 and 8.9 are rewritten to match and this file points at them.
+
+**What the Fighting Styles spec changes here (D121 to D129):**
+
+* The Brawler template of section 5 goes. The Boarder (the same rules, boarding from Short) and the Rammer replace it, and the Runner and the Coward become the Smuggler.
+* Grapnels: the Boarder has them from Drill 0 as Grapnel lines. Every other style still unlocks them at Drill 10.
+* Fire Pots: a Firebrand has them from Drill 0, with 6 pots to start, and its fires can sink a ship. A Fire Pot from any other style keeps the rule of section 2.
+* Starting numbers: `pairWin` 1.8, `pairLose` 0.75, Fire Pots `hit` 1.4, First over the rail 1.5, Lashed fast 2.
+* Acceptance item 2 (the Brawler at 40% of the field) becomes the wheel check of the Fighting Styles spec.
+* A deck fight still going after round 5 goes on for up to 2 more rounds (D127).
 
 ## The problem
 
@@ -132,7 +141,7 @@ Never cut the cycle or the boarder's edge. They are what fix check 2 and keep th
 
 | Task | Owner | What |
 |-|-|-|
-| P3.B1 | Biscu | Approve this spec, or say what to change |
+| P3.B1 | Biscu | Done 22 October 2026: approved with the Fighting Styles spec (D129) |
 | P3.B2 | engineer (Claude Code) | `engine_v3`: Deck orders and the cycle, the edge, Fire Pots and the fire, the Drill stat and Power Rating, doctrine conditions, templates, Old Shellback's habits, replay text, tests and the golden Tide. GAMEPLAY rewritten to match |
 | P3.B3 | engineer and qa-tester | The simulator learns Deck orders: Grappled plays in check 2, drilled scenes, the Brawler floor and the Lashed fast measure |
 | P3.2 | game designer and qa-tester | Tuning resumes on the new boarding, including the new numbers |
