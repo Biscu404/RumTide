@@ -2,12 +2,13 @@
 
 **Status: approved, 22 October 2026,** together with `docs/specs/fighting-styles.md` (D129). Biscu made the four big calls (D116 to D120 in `docs/DECISIONS.md`) and handed the rest over on 21 October 2026. P3.B2 builds both specs. Once they are built, GAMEPLAY 6.2, 6.4, 6.5, 8.3, 8.5, 8.6, 8.8 and 8.9 are rewritten to match and this file points at them.
 
-**What the Fighting Styles spec changes here (D121 to D129):**
+**What the Fighting Styles spec changes here (D121 to D134):**
 
 * The Brawler template of section 5 goes. The Boarder (the same rules, boarding from Short) and the Rammer replace it, and the Runner and the Coward become the Smuggler.
 * Grapnels: the Boarder has them from Drill 0 as Grapnel lines. Every other style still unlocks them at Drill 10.
 * Fire Pots: a Firebrand has them from Drill 0, with 6 pots to start, and its fires can sink a ship. A Fire Pot from any other style keeps the rule of section 2.
-* Starting numbers: `pairWin` 1.8, `pairLose` 0.75, Fire Pots `hit` 1.4, First over the rail 1.5, Lashed fast 2.
+* Starting numbers: `pairWin` 1.8, `pairLose` 0.75, Fire Pots `hit` 1.4, First over the rail 1.25 (D130), Lashed fast 2.
+* Old Shellback's habits in section 5 are replaced by the rework of D133: his shell, his moods, the claw snatch, claws 50, and being driven off.
 * Acceptance item 2 (the Brawler at 40% of the field) becomes the wheel check of the Fighting Styles spec.
 * A deck fight still going after round 5 goes on for up to 2 more rounds (D127).
 

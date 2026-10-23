@@ -3,6 +3,19 @@
 What was decided, when and why. Newest first. When a design decision changes, add an entry here in the same commit.
 
 
+## 2026-10-23: Fighting Styles retuned, Old Shellback reworked (P3.B1)
+
+Biscu: "fix the bugs, try to add either mechanics or fix the numbers to balance them out." These rows close the open items of the 22 October prototype: two hard counters, the Rammer and Boarder lean, draws, and an Old Shellback that half the styles could never beat. Measured in the same scratch prototype; the numbers are in `docs/specs/fighting-styles.md`.
+
+| Id | Decision | Why | Task |
+|-|-|-|-|
+| D130 | **The style numbers are retuned:** Mortar 1.2 at Far and Long and 0.85 at Medium, First over the rail x1.25, the dash spoils a rake to x1.75, Tinderbox 80%, a Rammer's blaze from a Firebrand 2 rounds | A second search with the new mechanics below. All 12 designed wins now land between 55% and 80% of decided battles, the even pairs between 39% and 53%, and every style wins 38% to 52% of the field | P3.B1 |
+| D131 | **Three new trait parts:** Long Nines (a Gunline that Holds fires Round shot at Long at 0.9), Fighters (a Boarder's crew has 20% more boarding strength) and Grapnels catch the prow (a Ram against a Boarder that plays Board does half) | Numbers alone could not fix the Bombardier over the Gunline (85%) or the Rammer and Boarder lean (71%) without breaking other pairs. Each part touches one matchup: the Bombardier now beats the Gunline 73%, and the Rammer and Boarder are even at 53% | P3.B1 |
+| D132 | **A Victory on points needs a 5% lead in damage share, not 10%** (GAMEPLAY 8.7) | The Bombardier drew 37% of its fights and the Skirmisher 28%. With 5% the highest is 22%, and a fight that one side clearly won on the guns now says so | P3.B1 |
+| D133 | **Old Shellback is reworked.** His shell takes 70% of every hit except when he rears up; a Mortar does three times its damage to him, ignoring the shell. He rears up in round 2, 3 or 4 by a seeded roll. A ship that crosses his bow at Short or Close while he Closes In is snatched into a grapple. His claws are 50. He is beaten when Sunk, Captured or driven off (Hull below 35% or claws below 25%), and a Victory on points never beats him | Against the styles he was solved or unbeatable: the Gunline and Skirmisher beat him every time, and the Rammer, Boarder and Firebrand never. The rake and Grapeshot plan beat him regardless of style. Now the best doctrine a search found for each style beats him 51% to 68% | P3.B1 |
+| D134 | **Check 5 runs per style:** the best doctrine each style's captain can write beats Old Shellback 35% to 70%, and the best of all stays 40% to 60% (D114) | Old Shellback is the gate out of the Cradle, so a style that cannot beat him traps its captain. P3.B3 runs the full check 5 search once per style | P3.B1 |
+
+
 ## 2026-10-22: Fighting Styles and six distances (P3.B1)
 
 Biscu asked for more real fighting doctrines and for five or six distances, and on 20 October 2026 moved doctrine traits from Season 1 into Season 0. On 21 October 2026 he handed the calls over: "just test them, I trust your judgement, if there is a problem, just fix it." The spec is `docs/specs/fighting-styles.md`. Every row was tested in a scratch prototype of `engine_v3` (the spec's "Measured" section). With these calls P3.B1 is done: the boarding spec and this one are approved together, and P3.B2 builds both. No engine file changes before P3.B2.
