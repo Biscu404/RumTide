@@ -1,38 +1,50 @@
-// The arena of the v0.3 combat simulator (P3.1): ships, scenes and one duel on the real engine.
+// The arena of the v0.3 combat simulator (P3.1, P3.B3): ships, scenes and one duel on the real engine.
 // Everything here calls runBattle (engine_v3/combat/battle.ts) with the Choosers that real doctrines build, so a number
 // the simulator prints is a number the game would produce. Nothing here has a rule of its own, and nothing is random
 // except through the battle's own seeded streams (and the seeded random plan of plans.ts).
+//
+// A ship can carry a Fighting Style, and then it really has it: the engine's own newShip gives it the style's crew (the
+// Bombardier's 60%), its Fire Pots (a Firebrand's two) and every trait that reads Ship.style. A Fighter for a style plays that
+// style's template doctrine (styleFighter). Drill is a level like any other, and pots can be set for a test setup.
 
 import {
-  battleShipOf, doctrineChooser, hash32, maxHands, maxHullPoints, maxRiggingPoints, newShip, powerRating, runBattle,
+  battleShipOf, doctrineChooser, hash32, maxHands, maxHullPoints, maxRiggingPoints, newShip, powerRating, runBattle, styleTemplate,
+  templateDoctrine,
 } from "../../../supabase/functions/_shared/engine_v3/index.ts";
 import type {
-  AmbushRange, BattleRecord, BattleSide, Chooser, Doctrine, HullId, Ship, Stat, Terrain, WindKind,
+  AmbushRange, BattleRecord, BattleSide, Chooser, Doctrine, FightingStyle, HullId, Ship, Stat, TemplateName, Terrain, WindKind,
 } from "../../../supabase/functions/_shared/engine_v3/index.ts";
 import { randomPlan } from "./plans.ts";
 
 // ---------- Ships ----------
 
-/** A ship to build: a hull and the upgrade level of each stat. A level 0 sloop is the fresh ship every captain starts with. */
+/**
+ * A ship to build: a hull, the upgrade level of each stat, a Fighting Style and Fire Pots. A level 0 sloop with no style is the
+ * fresh ship a captain starts a season with; a style changes it the way the engine does (newShip).
+ */
 export interface ShipSpec {
   hull?: HullId;
   levels?: Partial<Record<Stat, number>>;
+  style?: FightingStyle;
+  /** Fire Pots in the hold. Left out, the ship has what newShip gives it: a Firebrand its starting pots, everyone else none. */
+  pots?: number;
 }
 
 /** A ship of this build, full of Hull, Rigging, Hands and Powder. */
 export function buildShip(id: string, spec: ShipSpec = {}): Ship {
-  const ship = newShip(`ship_${id}`, `cap_${id}`, `The ${id}`, spec.hull ?? "sloop", "dw_shallows", false);
+  const ship = newShip(`ship_${id}`, `cap_${id}`, `The ${id}`, spec.hull ?? "sloop", "dw_shallows", false, spec.style);
   for (const [stat, level] of Object.entries(spec.levels ?? {}) as [Stat, number][]) ship.levels[stat] = level;
   ship.hullPoints = maxHullPoints(ship);
   ship.riggingPoints = maxRiggingPoints(ship);
   ship.hands = maxHands(ship);
+  if (spec.pots !== undefined) ship.hold.firePots = spec.pots;
   return ship;
 }
 
 /** The Power Rating of a build, from the engine (D26). A fresh sloop is 10. */
 export const ratingOf = (spec: ShipSpec = {}): number => powerRating(buildShip("rating", spec));
 
-/** The same level on the four stats that matter in a fight (Hull, Cannons, Sails, Berths). Hold and Drill do not (P3.B3 teaches the simulator Drill). */
+/** The same level on the four stats that matter in a fight (Hull, Cannons, Sails, Berths). Hold does not, and Drill is spent on its own (checks 7 and 8). */
 export const evenLevels = (level: number): Record<Stat, number> => ({ hull: level, cannons: level, sails: level, berths: level, hold: 0, drill: 0 });
 
 /**
@@ -64,6 +76,23 @@ export interface Fighter {
   doctrine?: Doctrine;
   /** What the other side's "enemy type" condition sees this captain as. Players are `player`. */
   kind?: "player" | "monster";
+}
+
+/** The six Fighting Styles of the wheel (fighting styles spec section 5). The Smuggler is the trader's style and sits outside it. */
+export type WheelStyle = Exclude<FightingStyle, "smuggler">;
+
+/**
+ * The six styles of the wheel in the order of the spec's tables, each with the template doctrine its captain starts with. This
+ * is the field of check 1. (The engine has a list of all seven styles too, also called FIGHTING_STYLES; it is not this one.)
+ */
+export const FIGHTING_STYLES: readonly { style: WheelStyle; template: TemplateName }[] = (
+  ["bombardier", "gunline", "skirmisher", "rammer", "boarder", "firebrand"] as const
+).map((style) => ({ style, template: styleTemplate(style) }));
+
+/** A captain of this style: a ship that really has the style, playing the style's template. `ship` adds levels, pots and so on. */
+export function styleFighter(style: FightingStyle, ship: ShipSpec = {}): Fighter {
+  const template = styleTemplate(style);
+  return { name: template, ship: { ...ship, style }, doctrine: templateDoctrine(template) };
 }
 
 /** Where a battle happens. Open water in a Breeze is the baseline of GAMEPLAY 8.4. */
@@ -102,15 +131,19 @@ export const sceneByName = (name: string): Scene => {
 const chooserOf = (f: Fighter, other: Fighter, seed: number, side: BattleSide): Chooser =>
   f.doctrine ? doctrineChooser(f.doctrine, { enemyType: other.kind ?? "player" }) : randomPlan(seed, side);
 
-/** Runs one battle: `hunter` against `target` in the scene, on the Tide seed. Pure. */
-export function duel(hunter: Fighter, target: Fighter, scene: Scene, seed: number): BattleRecord {
+/**
+ * Runs one battle: `hunter` against `target` in the scene, on the Tide seed. Pure. `hunterChooser` wraps the hunter's own Chooser,
+ * which check 2 uses to force one play in one round and carry on with the doctrine in every other.
+ */
+export function duel(hunter: Fighter, target: Fighter, scene: Scene, seed: number, hunterChooser?: (own: Chooser) => Chooser): BattleRecord {
   const flags = { charted: scene.charted === true, withCurrent: false, lurker: false };
+  const own = chooserOf(hunter, target, seed, "hunter");
   return runBattle({
     tide: 5, seed, at: "dw_shallows", terrain: scene.terrain, wind: scene.wind,
     hunter: battleShipOf(buildShip("a", hunter.ship), { id: "cap_a" }, "hunter", flags),
     target: battleShipOf(buildShip("b", target.ship), { id: "cap_b" }, "target", flags),
     doctrines: { hunter: hunter.doctrine?.name ?? hunter.name, target: target.doctrine?.name ?? target.name },
-    choosers: { hunter: chooserOf(hunter, target, seed, "hunter"), target: chooserOf(target, hunter, seed, "target") },
+    choosers: { hunter: hunterChooser ? hunterChooser(own) : own, target: chooserOf(target, hunter, seed, "target") },
     ...(scene.ambush ? { ambush: scene.ambush } : {}),
   });
 }
