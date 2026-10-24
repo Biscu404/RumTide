@@ -32,8 +32,8 @@ export function buildShip(id: string, spec: ShipSpec = {}): Ship {
 /** The Power Rating of a build, from the engine (D26). A fresh sloop is 10. */
 export const ratingOf = (spec: ShipSpec = {}): number => powerRating(buildShip("rating", spec));
 
-/** The same level on the four stats that matter in a fight (Hull, Cannons, Sails, Berths). Hold does not. */
-export const evenLevels = (level: number): Record<Stat, number> => ({ hull: level, cannons: level, sails: level, berths: level, hold: 0 });
+/** The same level on the four stats that matter in a fight (Hull, Cannons, Sails, Berths). Hold and Drill do not (P3.B3 teaches the simulator Drill). */
+export const evenLevels = (level: number): Record<Stat, number> => ({ hull: level, cannons: level, sails: level, berths: level, hold: 0, drill: 0 });
 
 /**
  * The balanced sloop whose Power Rating is closest to `ratio` times a fresh sloop's. The total of levels is spread as evenly as

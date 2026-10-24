@@ -5,13 +5,13 @@ import { Rng } from "../rng.ts";
 import { runBattle } from "./battle.ts";
 import type { BattleInput, BattleMate, Chooser, RoundView } from "./battle.ts";
 import {
-  apportion, desperateDefence, fleetBonus, fleetGrapples, fleetMelee, mateCutFree, mateHelm, pickFlagship, shareDamage, shareOut,
-  sideBonus, strikeTotals, withLosses,
+  apportion, desperateDefence, fleetBonus, fleetGrapples, fleetMelee, grapnelRescue, mateCutFree, mateHelm, pickFlagship, shareDamage,
+  shareOut, sideBonus, strikeTotals, withLosses,
 } from "./fleet.ts";
 import { fireGuns } from "./guns.ts";
 import { battleRng } from "./helm.ts";
-import type { BattleRecord, BattleShip, BattleSide, GunsOrder, HelmMove, Range } from "./types.ts";
-import { always, battleOf, deepFreeze, fleetShip, scripted, surrendersAt } from "./testing.ts";
+import type { BattleRecord, BattleShip, BattleSide, DeckOrder, GunsOrder, HelmMove, Range } from "./types.ts";
+import { always, battleOf, deepFreeze, fleetShip, scripted, styleShip, surrendersAt } from "./testing.ts";
 
 const F = B.fleet;
 
@@ -240,8 +240,10 @@ describe("boarding for a fleet (8.6)", () => {
   it("adds the crews' boarding strength up, side against side, and applies the side bonus to the Hands killed", () => {
     const a = fleetShip("a", "hunter"), b = fleetShip("b", "hunter"), c = fleetShip("c", "target");
     const ships = { ship_a: a, ship_b: b, ship_c: c };
-    const orders = { ship_a: "roundShot", ship_b: "roundShot", ship_c: "roundShot" } as Record<string, GunsOrder>;
-    const melee = fleetMelee(ids, ships, orders, "open", { hunter: sideBonus(2, 1, true), target: sideBonus(1, 2, true) });
+    const decks = { ship_a: "fists", ship_b: "fists", ship_c: "fists" } as Record<string, DeckOrder>;
+    const melee = fleetMelee({
+      ids, flagships, ships, decks, terrain: "open", bonus: { hunter: sideBonus(2, 1, true), target: sideBonus(1, 2, true) },
+    });
     expect(melee.record.strength).toEqual({ hunter: 60, target: 30 });
     expect(melee.record.lost).toEqual({ hunter: 8, target: 13 }); // 20% of 30 x 1.25, and 20% of 60 x 1.1
     expect(melee.record.hands).toEqual({ hunter: 52, target: 17 });
@@ -253,12 +255,68 @@ describe("boarding for a fleet (8.6)", () => {
   it("takes Hands only from ships that have them, and never more than a side has", () => {
     const a = fleetShip("a", "hunter", "sloop", { hands: 2 });
     const c = fleetShip("c", "target", "sloop", { hands: 4 });
-    const orders = { ship_a: "repel", ship_c: "roundShot" } as Record<string, GunsOrder>;
-    const melee = fleetMelee({ hunter: ["ship_a"], target: ["ship_c"] }, { ship_a: a, ship_c: c }, orders, "open", {
-      hunter: sideBonus(1, 1, true), target: sideBonus(1, 1, true),
+    const melee = fleetMelee({
+      ids: { hunter: ["ship_a"], target: ["ship_c"] }, flagships: { hunter: "ship_a", target: "ship_c" }, ships: { ship_a: a, ship_c: c },
+      decks: { ship_a: "repel", ship_c: "fists" }, terrain: "open", bonus: { hunter: sideBonus(1, 1, true), target: sideBonus(1, 1, true) },
     });
     expect(melee.record.lost.hunter).toBeLessThanOrEqual(2);
     expect(melee.record.hands.hunter).toBeGreaterThanOrEqual(0);
+  });
+
+  it("judges each crew's Deck order against the enemy flagship's, as a Helm move is (D91)", () => {
+    // The hunter side: a flagship that Repels and a mate that Charges. The target flagship Charges.
+    const a = fleetShip("a", "hunter"), b = fleetShip("b", "hunter"), c = fleetShip("c", "target");
+    const decks = { ship_a: "repel", ship_b: "charge", ship_c: "charge" } as Record<string, DeckOrder>;
+    const melee = fleetMelee({
+      ids, flagships, ships: { ship_a: a, ship_b: b, ship_c: c }, decks, terrain: "open", bonus: { hunter: sideBonus(1, 1, false), target: sideBonus(1, 1, false) },
+    });
+    // a's Repel beats c's Charge, b's Charge ties it. The target loses 0.2 x 30 x (0.6 x 1.8 x 1.25) + 0.2 x 30 x (1.5 x 1 x 1.25).
+    expect(melee.pairings).toEqual({ ship_a: "won", ship_b: "even", ship_c: "lost" });
+    const toTarget = 6 * 0.6 * B.combat.deck.pairWin * B.combat.deck.guard.charge + 6 * 1.5 * B.combat.deck.guard.charge;
+    expect(melee.record.lost.target).toBe(Math.round(toTarget));
+    // c's Charge loses to a's Repel: 0.2 x 30 x 1.5 x 0.75 x 0.6 (the guard of Repel).
+    expect(melee.record.lost.hunter).toBe(Math.round(6 * 1.5 * B.combat.deck.pairLose * B.combat.deck.guard.repel));
+  });
+
+  it("gives the first over the rail bonus only to the crews named", () => {
+    const a = fleetShip("a", "hunter"), b = fleetShip("b", "hunter"), c = fleetShip("c", "target");
+    const decks = { ship_a: "charge", ship_b: "charge", ship_c: "fists" } as Record<string, DeckOrder>;
+    const input = { ids, flagships, ships: { ship_a: a, ship_b: b, ship_c: c }, decks, terrain: "open" as const, bonus: { hunter: sideBonus(1, 1, false), target: sideBonus(1, 1, false) } };
+    expect(fleetMelee(input).record.strength.hunter).toBe(60);
+    expect(fleetMelee({ ...input, firstOver: ["ship_b"] }).record.strength.hunter).toBeCloseTo(30 + 30 * B.combat.edge.firstOverTheRail);
+  });
+
+  it("lets a Boarder mate Board from Short, and a plain mate not", () => {
+    const ships = { ship_a: styleShip("hunter", "gunline"), ship_b: { ...styleShip("hunter", "boarder"), shipId: "ship_b" }, ship_c: fleetShip("c", "target") };
+    const orders = { ...base.orders, ship_b: "board" as GunsOrder };
+    expect(fleetGrapples({ ...base, orders, ships, range: "short" })).toEqual([{ side: "hunter", ship: "ship_b", ok: true, why: "helm" }]);
+    expect(fleetGrapples({ ...base, orders, ships: { ...ships, ship_b: { ...fleetShip("b", "hunter") } }, range: "short" })).toEqual([]);
+    expect(fleetGrapples({ ...base, orders, range: "short" })).toEqual([]); // without the ships nobody knows who is a Boarder
+  });
+
+  it("gives a failed Board a Helm contest when the ship has Grapnels, against the enemy flagship, from the ship's own stream", () => {
+    const b = { ...styleShip("hunter", "boarder"), shipId: "ship_b" };
+    const ships = { ship_a: fleetShip("a", "hunter"), ship_b: b, ship_c: fleetShip("c", "target") };
+    const input = {
+      ...base, range: "close" as const, ships, orders: { ...base.orders, ship_b: "board" as GunsOrder },
+      scores: { ship_a: 10, ship_b: 5, ship_c: 10 }, moves: { ...base.moves, ship_c: "closeIn" as HelmMove },
+    };
+    const failed = fleetGrapples(input);
+    expect(failed).toEqual([{ side: "hunter", ship: "ship_b", ok: false, why: "failed" }]);
+    const rng = () => battleRng(5, "ship_a", "ship_c", 1);
+    const rescued = grapnelRescue(input, failed, rng());
+    expect(rescued.contests).toHaveLength(1);
+    expect(rescued.contests[0]).toMatchObject({ kind: "grapnel", side: "hunter", ship: "ship_b", scores: { hunter: 15, target: 10 } });
+    expect(rescued.contests[0]!.roll).toBe(rng().stream("grapnel", "ship_b").next());
+    expect(failed[0]!.ok).toBe(false); // the attempts it was given are not changed
+    expect(rescued.grapples[0]!.ok).toBe(rescued.contests[0]!.winner === "hunter");
+    // A ship with no Grapnels does not get one, and a Board that worked is left alone.
+    const plain = grapnelRescue({ ...input, ships: { ...ships, ship_b: { ...fleetShip("b", "hunter") } } }, failed, rng());
+    expect(plain.contests).toEqual([]);
+    expect(plain.grapples).toEqual(failed);
+    // At Drill 10 any ship has them, and the score counts once.
+    const drilled = grapnelRescue({ ...input, ships: { ...ships, ship_b: { ...fleetShip("b", "hunter"), drill: 10 } } }, failed, rng());
+    expect(drilled.contests[0]).toMatchObject({ scores: { hunter: 5, target: 10 } });
   });
 });
 
@@ -526,6 +584,117 @@ describe("boarding in a fleet battle (8.6)", () => {
     const r = fleetFight({ flag: a, chooser: closeIn, mates: [mateOf("b", "hunter", closeIn, { hands: 2 })] }, { flag: c, chooser: closeIn }, NEAR);
     expect(r.rounds[1]!.melee!.hands.hunter).toBeGreaterThan(20);
     expect(r.rounds.length).toBeGreaterThan(2);
+  });
+});
+
+describe("the deck fight and fire in a fleet battle (P3.B2 piece 2, D91, D94)", () => {
+  const NEAR = { ambush: "medium" } as const;
+  const big = { hands: 60, maxHands: 60 };
+  const stand = (order: GunsOrder) => always("hold", order);
+  const sturdy = { hullPoints: 900, maxHullPoints: 900 };
+
+  it("gives the edge to the side whose ship made the grapple, a mate included, and First over the rail to that Board alone", () => {
+    const r = fleetFight(
+      { flag: fleetShip("a", "hunter", "sloop", big), chooser: scripted({ 1: ["closeIn", "roundShot"] }, ["hold", "charge"]),
+        mates: [mateOf("b", "hunter", scripted({ 1: ["closeIn", "roundShot"] }, ["closeIn", "board"]), big)] },
+      { flag: fleetShip("c", "target", "sloop", big), chooser: scripted({ 1: ["closeIn", "roundShot"] }, ["hold", "roundShot"]) },
+      NEAR,
+    );
+    const round = r.rounds[1]!;
+    expect(round.grapples).toMatchObject([{ side: "hunter", ship: "ship_b", ok: true }]);
+    expect(round.edge).toBe("hunter");
+    expect(round.melee!.firstOver).toBe("hunter");
+    const deck = (id: string) => round.ships.find((x) => x.ship === id)!.deck!.order;
+    expect([deck("ship_a"), deck("ship_b"), deck("ship_c")]).toEqual(["fists", "charge", "fists"]);
+    expect(round.melee!.strength).toEqual({ hunter: 60 + 60 * B.combat.edge.firstOverTheRail, target: 60 });
+  });
+
+  it("gives nobody the edge when the flagships grapple by Close In against Close In, though a mate played Board", () => {
+    const r = fleetFight(
+      { flag: fleetShip("a", "hunter", "sloop", big), chooser: always("closeIn", "roundShot"), mates: [mateOf("b", "hunter", scripted({ 1: ["closeIn", "roundShot"] }, ["closeIn", "board"]), big)] },
+      { flag: fleetShip("c", "target", "sloop", big), chooser: always("closeIn", "roundShot") }, NEAR,
+    );
+    const round = r.rounds[1]!;
+    expect(round.rangeAfter).toBe("grappled");
+    expect(round.edge).toBeUndefined();
+    expect(round.ships.every((x) => x.deck!.order === "fists")).toBe(true);
+  });
+
+  it("judges every crew's Deck order against the enemy flagship's: a mate's Charge meets the flagship's Repel, not its own mate's Volley", () => {
+    const r = fleetFight(
+      { flag: fleetShip("a", "hunter", "sloop", big), chooser: scripted({ 1: ["closeIn", "roundShot"], 2: ["closeIn", "board"] }, ["hold", "charge"]), mates: [mateOf("b", "hunter", stand("charge"), big)] },
+      { flag: fleetShip("c", "target", "sloop", big), chooser: scripted({ 1: ["hold", "roundShot"] }, ["hold", "repel"]), mates: [mateOf("d", "target", stand("volley"), big)] },
+      NEAR,
+    );
+    const round = r.rounds[2]!; // the round after the grapple
+    const deck = (id: string) => round.ships.find((x) => x.ship === id)!.deck!;
+    expect(deck("ship_c")).toMatchObject({ order: "repel" });
+    expect(deck("ship_a")).toMatchObject({ order: "charge", pairing: "lost" }); // the flagship Charges into the enemy flagship's Repel
+    expect(deck("ship_b")).toMatchObject({ order: "charge", pairing: "lost" }); // and so does the mate: judged against the flagship
+    expect(deck("ship_d")).toMatchObject({ order: "volley", pairing: "lost" }); // the enemy mate's Volley meets the hunters' flagship's Charge
+  });
+
+  it("counts the lashed side's flagship twice in a mate's Cut Free contest: Lashed fast holds for the whole side", () => {
+    const huge = { hands: 150, maxHands: 150 };
+    const r = fleetFight(
+      { flag: fleetShip("a", "hunter", "sloop", huge), chooser: scripted({ 1: ["closeIn", "roundShot"], 2: ["closeIn", "board"] }, ["hold", "holdFire"]),
+        mates: [mateOf("b", "hunter", always("hold", "holdFire"), huge)] },
+      { flag: fleetShip("c", "target", "sloop", huge), chooser: scripted({ 1: ["hold", "roundShot"] }, ["hold", "holdFire"]),
+        mates: [mateOf("d", "target", scripted({ 3: ["openRange", "holdFire"] }, ["hold", "holdFire"]), huge)] },
+      NEAR,
+    );
+    expect(r.rounds[1]!.edge).toBe("hunter");
+    const free = r.rounds[2]!.contests.find((x) => x.kind === "cutFree" && x.ship === "ship_d")!;
+    expect(free.scores).toEqual({ hunter: 10 * B.combat.edge.lashedFast, target: 10 });
+  });
+
+  it("burns the throwing ship and the enemy flagship for a Fire Pot's flash, and nobody else", () => {
+    let flashed = 0;
+    for (let seed = 1; seed <= 80; seed++) {
+      const rec = fleetFight(
+        { flag: fleetShip("a", "hunter", "sloop", big), chooser: scripted({ 1: ["closeIn", "roundShot"], 2: ["closeIn", "board"] }, ["hold", "charge"]),
+          mates: [mateOf("b", "hunter", scripted({ 1: ["closeIn", "roundShot"] }, ["hold", "firePots"]), { ...big, drill: 5, firePots: 3 })] },
+        { flag: fleetShip("c", "target", "sloop", big), chooser: scripted({ 1: ["hold", "roundShot"] }, ["hold", "charge"]),
+          mates: [mateOf("d", "target", stand("charge"), big)] },
+        { ...NEAR, seed },
+      );
+      const round = rec.rounds[2]!;
+      const flash = (round.fires ?? []).filter((f) => f.source === "firePots");
+      if (flash.length === 0) continue;
+      flashed++;
+      expect(flash).toEqual([
+        { source: "firePots", ship: "ship_c", by: "ship_b", rounds: 0, hull: 8 }, // the enemy flagship
+        { source: "firePots", ship: "ship_b", by: "ship_c", rounds: 0, hull: 8 }, // and the ship that threw it
+      ]);
+      const hull = (id: string, k: number) => rec.rounds[k]!.ships.find((x) => x.ship === id)!.hullPoints;
+      expect(hull("ship_c", 2)).toBe(hull("ship_c", 1) - 8);
+      expect(hull("ship_b", 2)).toBe(hull("ship_b", 1) - 8);
+      expect(hull("ship_a", 2)).toBe(hull("ship_a", 1)); // the flagship of the thrower's own side is untouched
+      expect(hull("ship_d", 2)).toBe(hull("ship_d", 1)); // and so is the other mate
+    }
+    expect(flashed).toBeGreaterThan(5);
+  });
+
+  it("sets the enemy flagship alight with a mate's Hot Shot, not the enemy mate", () => {
+    let lit = 0;
+    for (let seed = 1; seed <= 120; seed++) {
+      const firebrand: BattleMate = {
+        ship: { ...fleetShip("b", "hunter", "sloop", big), style: "firebrand" }, doctrine: "Mate", chooser: scripted({ 1: ["closeIn", "roundShot"] }, ["hold", "hotShot"]),
+      };
+      const rec = fleetFight(
+        { flag: fleetShip("a", "hunter", "sloop", big), chooser: always("hold", "holdFire"), mates: [firebrand] },
+        { flag: fleetShip("c", "target", "sloop", { ...big, ...sturdy }), chooser: always("hold", "holdFire"), mates: [mateOf("d", "target", always("hold", "holdFire"), { ...big, ...sturdy })] },
+        { ...NEAR, seed },
+      );
+      for (const round of rec.rounds) {
+        for (const f of round.fires ?? []) {
+          lit++;
+          expect(f).toMatchObject({ source: "hotShot", ship: "ship_c", by: "ship_b", rounds: 3 });
+        }
+        expect(round.ships.find((x) => x.ship === "ship_d")!.fire).toBeUndefined();
+      }
+    }
+    expect(lit).toBeGreaterThan(5);
   });
 });
 

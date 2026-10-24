@@ -27,6 +27,8 @@ const SEED = 1234;
 const FLAGS: [string, string] = ["ship_hunter", "ship_target"];
 const idle = always("hold", "holdFire");
 const plain = (side: BattleSide, over: Partial<BattleShip> = {}) => testShip(side, "sloop", over);
+/** A target that a fire cannot sink in five rounds: a Mortar now sets ships alight (piece 2), and these tests are about something else. */
+const sturdy = () => plain("target", { hullPoints: 900, maxHullPoints: 900 });
 const styled = (side: BattleSide, style: FightingStyle, over: Partial<BattleShip> = {}) => styleShip(side, style, "sloop", over);
 
 /** The first Tide seed from 1 up for which a battle satisfies `wanted`. The engine is pure, so this is a fixed answer. */
@@ -231,8 +233,8 @@ describe("the Mortar (spec section 3, D137)", () => {
 
   it("does not move the other ship's rolls: its guns hit the same whether the Bombardier shells or shoots", () => {
     const target = always("hold", "roundShot");
-    const shelling = fight(bomb(), plain("target"), shell, target);
-    const shooting = fight(bomb(), plain("target"), always("hold", "roundShot"), target);
+    const shelling = fight(bomb(), sturdy(), shell, target);
+    const shooting = fight(bomb(), sturdy(), always("hold", "roundShot"), target);
     expect(shelling.rounds.map((r) => r.ships[1]!.shot.damage)).toEqual(shooting.rounds.map((r) => r.ships[1]!.shot.damage));
   });
 });
@@ -242,7 +244,7 @@ describe("Zeroing In (spec section 3)", () => {
   const zeroings = (r: BattleRecord) => r.rounds.map((x) => x.ships[0]!.mortar?.zeroing ?? null);
 
   it("adds 10% for each round in a row the range has not changed, up to 50%", () => {
-    const r = fight(bomb(), plain("target"), always("hold", "mortar"), idle);
+    const r = fight(bomb(), sturdy(), always("hold", "mortar"), idle);
     const z = zeroings(r);
     expect(z.length).toBe(5);
     [1.1, 1.2, 1.3, 1.4, 1.5].forEach((want, i) => expect(z[i]).toBeCloseTo(want));
@@ -252,14 +254,14 @@ describe("Zeroing In (spec section 3)", () => {
 
   it("starts again whenever the range changes", () => {
     const target = scripted({ 3: ["closeIn", "holdFire"] }, ["hold", "holdFire"]);
-    const r = fight(bomb(), plain("target"), always("hold", "mortar"), target);
+    const r = fight(bomb(), sturdy(), always("hold", "mortar"), target);
     expect(r.rounds.map((x) => x.rangeAfter)).toEqual(["far", "far", "long", "long", "long"]);
     const z = zeroings(r);
     [1.1, 1.2, 1, 1.1, 1.2].forEach((want, i) => expect(z[i]).toBeCloseTo(want));
   });
 
   it("counts only rounds the Mortar fires", () => {
-    const r = fight(bomb(), plain("target"), scripted({ 3: ["hold", "roundShot"] }, ["hold", "mortar"]), idle);
+    const r = fight(bomb(), sturdy(), scripted({ 3: ["hold", "roundShot"] }, ["hold", "mortar"]), idle);
     const z = zeroings(r);
     expect(z[2]).toBeNull();
     [1.1, 1.2, null, 1.1, 1.2].forEach((want, i) => (want === null ? expect(z[i]).toBeNull() : expect(z[i]).toBeCloseTo(want)));

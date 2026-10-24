@@ -121,15 +121,16 @@ export type HullId = "sloop" | "brigantine" | "frigate";
 
 /**
  * A captain's Fighting Style (docs/specs/fighting-styles.md, D122, D123): a trait that pays only when its own move or order is
- * played, and a template doctrine. Six fight; the Smuggler is the trader's style and sits outside the wheel. The Boarder
- * and the Firebrand are named here and get their traits with the boarding rework (P3.B2 piece 2).
+ * played, and a template doctrine. Six fight; the Smuggler is the trader's style and sits outside the wheel.
  */
 export type FightingStyle = "bombardier" | "gunline" | "skirmisher" | "rammer" | "boarder" | "firebrand" | "smuggler";
 export const FIGHTING_STYLES: readonly FightingStyle[] = ["bombardier", "gunline", "skirmisher", "rammer", "boarder", "firebrand", "smuggler"];
 
-export type Stat = "hull" | "cannons" | "sails" | "berths" | "hold";
-export type Good = "provisions" | "powder" | "timber" | "rum" | "sugar" | "spice";
-export const GOODS: readonly Good[] = ["provisions", "powder", "timber", "rum", "sugar", "spice"];
+/** The six ship upgrades (6.2). Drill (boarding spec section 4) is the Hands track, 0 to 15; the others go to 10. */
+export type Stat = "hull" | "cannons" | "sails" | "berths" | "hold" | "drill";
+/** What a hold carries. Provisions, Powder and Fire Pots are supplies; the rest is cargo. */
+export type Good = "provisions" | "powder" | "firePots" | "timber" | "rum" | "sugar" | "spice";
+export const GOODS: readonly Good[] = ["provisions", "powder", "firePots", "timber", "rum", "sugar", "spice"];
 export const CARGO_GOODS: readonly Good[] = ["timber", "rum", "sugar", "spice"]; // goods that count as cargo for hunters
 
 export type CaptainKind = "player" | "npc";

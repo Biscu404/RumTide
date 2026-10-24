@@ -10,6 +10,7 @@ export {
 } from "./knowledge.ts";
 export {
   statValue, maxHullPoints, maxRiggingPoints, maxHands, crewShare, cannonsOf, sailsOf, holdCapacity, holdUsed, carriesCargo, upgradeCost, powerRating,
+  drillOf, drillCap, drillStage, drillBonus, drillFactor, drillUnlocked, drillCost, type DrillUnlock,
   newShip, watchesFor, emptyHold, zeroLevels,
 } from "./ship.ts";
 export { windFor, windsFor, hopCost, estimateHop, windPart, terrainPart, chartedAt, type HopCost } from "./wcs.ts";
@@ -33,9 +34,11 @@ export {
   type GunsContext, type GunsFactors, type GunsResult, type MortarShell,
 } from "./combat/guns.ts";
 export {
-  boardingStrength, meleeRound, lacksHands, surrenders, captureCheck, captureCheckBySide, grappleAttempts, grappleReason, cutFree,
-  type CaptureResult, type CutFreeResult,
+  boardingStrength, lacksHands, surrenders, captureCheck, captureCheckBySide, grappleAttempts, grappleReason, cutFree, lashedScores,
+  grapnelContest, type CaptureResult, type CutFreeResult, type StrengthOptions,
 } from "./combat/boarding.ts";
+export { pairing, pairFactor, crewOrder, hasSecondWave, deckKill, type CrewContext } from "./combat/deck.ts";
+export { blazeRounds, ignite, fireLoss, flashLoss, type Blaze, type Blazes } from "./combat/fire.ts";
 export {
   runBattle, pointsOutcome, damageShare, sideShare, type AbilityFire, type RoundChoice, type LastPlay, type RoundView, type Chooser,
   type BattleInput, type BattleMate,
@@ -58,12 +61,14 @@ export {
 } from "./combat/encounter.ts";
 export {
   fleetBonus, desperateDefence, sideBonus, pickFlagship, apportion, shareOut, shareDamage, strikeTotals, withLosses, mateHelm, mateCutFree,
-  fleetGrapples, fleetMelee, type FlagshipCandidate, type Shot, type MateHelm, type FleetMelee,
+  fleetGrapples, grapnelRescue, fleetMelee, type FlagshipCandidate, type Shot, type MateHelm, type FleetMelee, type FleetGrappleInput,
+  type MeleeInput,
 } from "./combat/fleet.ts";
 export { describeBattle, describeCarried, type BattleWords } from "./combat/describe.ts";
 export {
   hasStyle, playableOrder, styleHelmFactor, spotters, dashBands, styleGunsMods, canSpoilRake, spoiledRake, isRam, ramHull, ramSelf,
-  zeroingFactor, firesLongNines,
+  zeroingFactor, firesLongNines, boardsFromShort, hasGrapnels, grapnelBonus, fightersFactor, tinderboxFactor, canThrowPots, shotFireChance,
+  emberChance,
 } from "./combat/styles.ts";
 export {
   SHELLBACK_ID, SHELLBACK_DOCTRINE, isBoss, shellbackStatline, applyStatline, shellbackDoctrine, bossPlan, upkeepBosses, recordBossWin,

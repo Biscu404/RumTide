@@ -87,9 +87,9 @@ describe("doctrine names and ambush range in plans (P2.4)", () => {
   const captain = season([{ id: "a", name: "A", shipName: "Gull" }]).captains.a!;
 
   it("accepts a plan, step and lurk that name a saved doctrine, and an ambush range of long or medium", () => {
-    const plan: VoyagePlan = { doctrine: "Brawler", steps: [
-      { kind: "sail", to: "gh_reefside", stance: "hunt", filter: { kind: "anyone" }, doctrine: " brawler " },
-      { kind: "lurk", filter: { kind: "players" }, ambushRange: "long", doctrine: "Brawler" },
+    const plan: VoyagePlan = { doctrine: "Boarder", steps: [
+      { kind: "sail", to: "gh_reefside", stance: "hunt", filter: { kind: "anyone" }, doctrine: " boarder " },
+      { kind: "lurk", filter: { kind: "players" }, ambushRange: "long", doctrine: "Boarder" },
       { kind: "lurk", filter: { kind: "players" }, ambushRange: "medium" },
     ] };
     expect(validatePlan(world, captain, plan)).toEqual([]);

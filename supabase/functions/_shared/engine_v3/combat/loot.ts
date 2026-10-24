@@ -17,7 +17,7 @@ const NEUTRAL = 1; // a factor that changes nothing
 
 // ---------- What a ship carries ----------
 
-/** Cargo goods by name; absent means none. Only CARGO_GOODS ever appear (Provisions and Powder are not loot). */
+/** Cargo goods by name; absent means none. Only CARGO_GOODS ever appear (Provisions, Powder and Fire Pots are supplies, not loot). */
 export type Goods = Partial<Record<Good, number>>;
 
 export interface Carried {

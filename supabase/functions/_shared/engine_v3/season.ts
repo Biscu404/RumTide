@@ -23,7 +23,7 @@ export interface NewCaptainSpec {
 
 /**
  * A new captain and ship as they start a season: start knowledge, starting gold, docked at the start water. A captain who
- * picks a Fighting Style sails with it and starts with its template doctrine; any other starts with the Brawler.
+ * picks a Fighting Style sails with it and starts with its template doctrine; any other starts with the Boarder.
  */
 export function newCaptain(world: World, preset: PresetId, spec: NewCaptainSpec): { captain: Captain; ship: Ship } {
   const p = SEASON_PRESETS[preset];

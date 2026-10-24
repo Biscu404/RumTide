@@ -3,14 +3,14 @@ import { B, TEMPLATE_NAMES, doctrineSlots, newSeason, templateDoctrine, validate
 import { season, world } from "./testing.ts";
 
 describe("new captains and seasons (P2.4)", () => {
-  it("gives every captain the Brawler template as their only doctrine", () => {
+  it("gives every captain the Boarder template as their only doctrine, the Brawler's successor", () => {
     const state = season([
       { id: "a", name: "A", shipName: "Gull" },
       { id: "m", name: "M", shipName: "Biscuit", kind: "npc", npcRole: "merchant" },
     ]);
     for (const c of Object.values(state.captains)) {
-      expect(c.doctrines).toEqual([templateDoctrine("Brawler")]);
-      expect(c.defaultDoctrine).toBe("Brawler");
+      expect(c.doctrines).toEqual([templateDoctrine("Boarder")]);
+      expect(c.defaultDoctrine).toBe("Boarder");
       expect(validateDoctrines(c.doctrines, { slots: doctrineSlots(c) })).toEqual([]);
     }
     expect(TEMPLATE_NAMES).toContain(state.captains.a!.defaultDoctrine);
@@ -24,7 +24,7 @@ describe("new captains and seasons (P2.4)", () => {
   it("gives each captain their own copy of the doctrine", () => {
     const state = season([{ id: "a", name: "A", shipName: "Gull" }, { id: "b", name: "B", shipName: "Sock" }]);
     state.captains.a!.doctrines[0]!.name = "Edited";
-    expect(state.captains.b!.doctrines[0]!.name).toBe("Brawler");
+    expect(state.captains.b!.doctrines[0]!.name).toBe("Boarder");
   });
 
   it("starts a season with no Wrecks and no Flotsam", () => {

@@ -1,98 +1,99 @@
 import { describe, expect, it } from "vitest";
 import { B } from "../balance.ts";
 import { Rng } from "../rng.ts";
-import type { Terrain } from "../types.ts";
-import { boardingStrength, captureCheck, cutFree, grappleAttempts, meleeRound, surrenders } from "./boarding.ts";
+import type { ShipId, Terrain } from "../types.ts";
+import { boardingStrength, captureCheck, cutFree, grapnelContest, grappleAttempts, lashedScores, surrenders } from "./boarding.ts";
+import { fleetMelee, sideBonus } from "./fleet.ts";
 import { battleRng, helmScore, resolveHelm } from "./helm.ts";
-import { deepFreeze, ScriptedRng, testShip } from "./testing.ts";
-import type { BattleShip, BattleSide, GunsOrder, HelmMove } from "./types.ts";
+import { deepFreeze, ScriptedRng, styleShip, testShip } from "./testing.ts";
+import type { BattleShip, BattleSide, DeckOrder, GunsOrder, HelmMove } from "./types.ts";
 
 const C = B.combat;
 const hunter = (over: Partial<BattleShip> = {}) => testShip("hunter", "sloop", over);
 const target = (over: Partial<BattleShip> = {}) => testShip("target", "sloop", over);
 const sides = <T>(h: T, t: T): Record<BattleSide, T> => ({ hunter: h, target: t });
 
-describe("boarding strength (P2.2, GAMEPLAY 8.6)", () => {
+describe("boarding strength (P2.2, GAMEPLAY 8.6, boarding spec section 2)", () => {
   it("is Hands, a fresh sloop's 30", () => {
-    expect(boardingStrength(hunter(), "grapeshot", "open")).toBe(30);
+    expect(boardingStrength(hunter(), "open")).toBe(30);
   });
 
   it("grows with the Bosun, trait and Background bonuses", () => {
-    expect(boardingStrength(hunter({ boardingBonus: 0.1 }), "roundShot", "open")).toBeCloseTo(33);
+    expect(boardingStrength(hunter({ boardingBonus: 0.1 }), "open")).toBeCloseTo(33);
   });
 
-  it("is 1.3 times for a ship that plays Repel, and no other order", () => {
-    expect(boardingStrength(hunter(), "repel", "open")).toBeCloseTo(30 * C.boarding.repel);
-    for (const order of ["roundShot", "chainShot", "grapeshot", "holdFire", "board"] as const) {
-      expect(boardingStrength(hunter(), order, "open")).toBe(30);
-    }
+  it("does not depend on the Deck order any more: Repel is no longer 1.3 times", () => {
+    expect(C.boarding).not.toHaveProperty("repel");
+    expect(boardingStrength(hunter(), "open")).toBe(30);
   });
 
   it("is 15% more in Kelp (2.2), and in no other water", () => {
-    expect(boardingStrength(hunter(), "grapeshot", "kelp")).toBeCloseTo(30 * C.kelpBoarding);
+    expect(boardingStrength(hunter(), "kelp")).toBeCloseTo(30 * C.kelpBoarding);
     for (const terrain of ["open", "shallows", "reef", "rocky", "fog"] as const) {
-      expect(boardingStrength(hunter(), "grapeshot", terrain)).toBe(30);
+      expect(boardingStrength(hunter(), terrain)).toBe(30);
     }
   });
 
-  it("multiplies the bonuses together", () => {
-    expect(boardingStrength(hunter({ boardingBonus: 0.2 }), "repel", "kelp")).toBeCloseTo(30 * 1.2 * C.boarding.repel * C.kelpBoarding);
+  it("multiplies the bonuses together: crew, Drill, Kelp, First over the rail, Fighters and Tinderbox", () => {
+    const drilled = styleShip("hunter", "boarder", "sloop", { boardingBonus: 0.2, drill: 5 });
+    const factor = 1 + 5 * B.drill.perLevel[0];
+    expect(boardingStrength(drilled, "open")).toBeCloseTo(30 * 1.2 * factor * B.styles.boarder.fighters);
+    expect(boardingStrength(drilled, "kelp", { firstOver: true })).toBeCloseTo(
+      30 * 1.2 * factor * C.kelpBoarding * C.edge.firstOverTheRail * B.styles.boarder.fighters,
+    );
+    const firebrand = styleShip("target", "firebrand");
+    expect(boardingStrength(hunter(), "open", { foes: [firebrand] })).toBeCloseTo(30 * B.styles.firebrand.tinderbox);
+    expect(boardingStrength(hunter(), "open", { foes: [target()] })).toBe(30);
   });
 
   it("is zero for a ship with no Hands", () => {
-    expect(boardingStrength(hunter({ hands: 0 }), "repel", "kelp")).toBe(0);
+    expect(boardingStrength(hunter({ hands: 0 }), "kelp")).toBe(0);
   });
 });
 
-describe("the boarding melee (P2.2, GAMEPLAY 8.6)", () => {
-  const melee = (h: BattleShip, t: BattleShip, orders = sides<GunsOrder>("grapeshot", "grapeshot"), terrain: Terrain = "open") =>
-    meleeRound(sides(h, t), orders, terrain);
+describe("the deck fight as a plain melee (P2.2, GAMEPLAY 8.6, boarding spec section 2)", () => {
+  // Fists against Fists is today's melee: each side removes 20% of its own boarding strength from the other.
+  const melee = (h: BattleShip, t: BattleShip, decks = sides<DeckOrder>("fists", "fists"), terrain: Terrain = "open", firstOver: ShipId[] = []) =>
+    fleetMelee({
+      ids: { hunter: [h.shipId], target: [t.shipId] }, flagships: { hunter: h.shipId, target: t.shipId },
+      ships: { [h.shipId]: h, [t.shipId]: t }, decks: { [h.shipId]: decks.hunter, [t.shipId]: decks.target }, terrain,
+      bonus: { hunter: sideBonus(1, 1, false), target: sideBonus(1, 1, false) }, firstOver,
+    });
 
   it("removes Hands from the other side equal to 20% of its own boarding strength", () => {
     const m = melee(hunter(), target());
-    expect(m.strength).toEqual({ hunter: 30, target: 30 });
-    expect(m.lost).toEqual({ hunter: 6, target: 6 });
-    expect(m.hands).toEqual({ hunter: 24, target: 24 });
+    expect(m.record.strength).toEqual({ hunter: 30, target: 30 });
+    expect(m.record.lost).toEqual({ hunter: 6, target: 6 });
+    expect(m.record.hands).toEqual({ hunter: 24, target: 24 });
   });
 
   it("is each side's own strength that counts, so the bigger crew kills more", () => {
     const m = melee(hunter({ hands: 30 }), target({ hands: 20 }));
-    expect(m.lost).toEqual({ hunter: 4, target: 6 }); // the hunter loses 20% of 20, the target 20% of 30
+    expect(m.record.lost).toEqual({ hunter: 4, target: 6 }); // the hunter loses 20% of 20, the target 20% of 30
   });
 
   it("happens at the same time: a side wiped out in the round still strikes back", () => {
     const m = melee(hunter({ hands: 30 }), target({ hands: 5 }));
-    expect(m.lost).toEqual({ hunter: 1, target: 5 });
-    expect(m.hands.target).toBe(0);
+    expect(m.record.lost).toEqual({ hunter: 1, target: 5 });
+    expect(m.record.hands.target).toBe(0);
   });
 
   it("never takes more Hands than a side has", () => {
     const m = melee(hunter(), target({ hands: 2 }));
-    expect(m.lost.target).toBe(2);
-    expect(m.hands.target).toBe(0);
-  });
-
-  it("makes a Repelling ship kill 30% more", () => {
-    const m = melee(hunter(), target(), sides<GunsOrder>("grapeshot", "repel"));
-    expect(m.strength.target).toBeCloseTo(39);
-    expect(m.lost).toEqual({ hunter: 8, target: 6 }); // the target's 7.8 rounds to 8
-  });
-
-  it("makes Repel cancel when both ships play it", () => {
-    const m = melee(hunter(), target(), sides<GunsOrder>("repel", "repel"));
-    expect(m.lost.hunter).toBe(m.lost.target);
+    expect(m.record.lost.target).toBe(2);
+    expect(m.record.hands.target).toBe(0);
   });
 
   it("adds the crew bonus to a side, and Kelp to both", () => {
-    const m = melee(hunter({ boardingBonus: 0.5 }), target(), sides<GunsOrder>("grapeshot", "grapeshot"), "kelp");
-    expect(m.strength.hunter).toBeCloseTo(30 * 1.5 * C.kelpBoarding);
-    expect(m.strength.target).toBeCloseTo(30 * C.kelpBoarding);
+    const m = melee(hunter({ boardingBonus: 0.5 }), target(), sides<DeckOrder>("fists", "fists"), "kelp");
+    expect(m.record.strength.hunter).toBeCloseTo(30 * 1.5 * C.kelpBoarding);
+    expect(m.record.strength.target).toBeCloseTo(30 * C.kelpBoarding);
   });
 
   it("does not change its inputs", () => {
     const h = deepFreeze(hunter());
     const t = deepFreeze(target());
-    expect(() => meleeRound(sides(h, t), sides<GunsOrder>("repel", "board"), "kelp")).not.toThrow();
+    expect(() => melee(h, t, sides<DeckOrder>("charge", "repel"), "kelp")).not.toThrow();
   });
 });
 
@@ -243,11 +244,41 @@ describe("Cut Free (P2.2, GAMEPLAY 8.6)", () => {
     expect(a).toEqual(b);
   });
 
+  it("counts the Helm score of a ship it is lashed fast to lashedFast times, and only in the contest of the ship trying to get away", () => {
+    const lashedToTarget = cutFree(new ScriptedRng(0), sides<HelmMove>("openRange", "hold"), scores, sides(false, true));
+    expect(lashedToTarget.contests[0]).toMatchObject({ scores: { hunter: 10, target: 10 * C.edge.lashedFast }, chance: 1 / (1 + C.edge.lashedFast) });
+    // The boarder cutting free of the ship it boarded is not helped: its own score is what counts for it.
+    const boarderOpens = cutFree(new ScriptedRng(0), sides<HelmMove>("openRange", "hold"), scores, sides(true, false));
+    expect(boarderOpens.contests[0]).toMatchObject({ scores: { hunter: 10, target: 10 }, chance: 0.5 });
+    // Both lashed (both have Grapnels): each opener faces the other's doubled score.
+    const both = cutFree(new ScriptedRng(0.99, 0.99), sides<HelmMove>("openRange", "openRange"), scores, sides(true, true));
+    expect(both.contests.map((c) => c.scores)).toEqual([{ hunter: 10, target: 20 }, { hunter: 20, target: 10 }]);
+  });
+
+  it("is not lashed by default", () => {
+    expect(cutFree(new ScriptedRng(0), sides<HelmMove>("openRange", "hold"), scores).contests[0]!.scores).toEqual(scores);
+    expect(lashedScores(scores, "hunter", sides(false, false))).toBe(scores);
+    expect(lashedScores(scores, "hunter", sides(false, true))).toEqual({ hunter: 10, target: 20 });
+  });
+
   it("uses the Helm scores it is given", () => {
     const h = hunter();
     const t = target({ sails: 30 });
     const scoresNow = sides(helmScore(h, t, "open", false), helmScore(t, h, "open", false));
     expect(scoresNow).toEqual({ hunter: 10, target: 30 });
     expect(cutFree(new ScriptedRng(0), sides<HelmMove>("openRange", "hold"), scoresNow).contests[0]!.chance).toBeCloseTo(0.25);
+  });
+});
+
+describe("the grapnels (boarding spec section 4, fighting styles spec section 3)", () => {
+  it("is a Helm contest from its own stream, with a Boarder's score counted three times and any other ship's once", () => {
+    const boarder = styleShip("hunter", "boarder");
+    const plain = hunter();
+    const rng = () => battleRng(7, "ship_hunter", "ship_target", 2);
+    const b = grapnelContest(rng(), boarder, "hunter", 10, 20);
+    expect(b).toMatchObject({ kind: "grapnel", side: "hunter", scores: { hunter: 30, target: 20 }, chance: 30 / 50 });
+    expect(b.roll).toBe(rng().stream("grapnel", "ship_hunter").next());
+    const p = grapnelContest(rng(), plain, "hunter", 10, 20);
+    expect(p).toMatchObject({ scores: { hunter: 10, target: 20 }, chance: 10 / 30 });
   });
 });

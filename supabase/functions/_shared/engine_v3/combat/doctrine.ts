@@ -90,6 +90,7 @@ export function conditionHolds(condition: DoctrineCondition, view: RoundView, si
     case "terrain": return view.terrain === condition.terrain;
     case "windGauge": return view.gauge === (condition.holder === "mine" ? side : other(side));
     case "havePowder": return mine.powder > 0;
+    case "haveFirePots": return (mine.firePots ?? 0) > 0;
     case "abilityUnused": return mine.abilities.includes(condition.ability);
     default: return false;
   }
@@ -150,10 +151,11 @@ export function findDoctrine(captain: Pick<Captain, "doctrines">, name: string |
 
 /**
  * The doctrine a captain fights with: the one asked for (the step's, else the plan's), else the captain's default, else
- * their first saved doctrine, else a fresh Brawler. It always gives one, so a missing name never stops a battle (D68).
+ * their first saved doctrine, else a fresh copy of the template a captain with no style starts with. It always gives one, so
+ * a missing name never stops a battle (D68).
  */
 export function pickDoctrine(captain: Pick<Captain, "doctrines" | "defaultDoctrine">, wanted: string | undefined): Doctrine {
-  return findDoctrine(captain, wanted) ?? findDoctrine(captain, captain.defaultDoctrine) ?? captain.doctrines?.[0] ?? templateDoctrine("Brawler");
+  return findDoctrine(captain, wanted) ?? findDoctrine(captain, captain.defaultDoctrine) ?? captain.doctrines?.[0] ?? templateDoctrine(styleTemplate(undefined));
 }
 
 // ---------- Slots (8.8) ----------
@@ -205,6 +207,7 @@ function conditionProblem(c: DoctrineCondition, label: string, registry: Ability
     case "terrain": return TERRAINS[c.terrain] ? null : `${label}: unknown terrain ${String(c.terrain)}`;
     case "windGauge": return ["mine", "theirs"].includes(c.holder) ? null : `${label}: the wind gauge is mine or theirs`;
     case "havePowder": return null;
+    case "haveFirePots": return null;
     case "abilityUnused": return registry[c.ability] ? null : `${label}: unknown ability ${String(c.ability)}`;
     default: return `${label}: unknown condition ${String((c as { kind?: unknown } | undefined)?.kind)}`;
   }
@@ -273,13 +276,12 @@ export function validateDoctrines(doctrines: Doctrine[], opts: ValidateOptions):
 // ---------- The templates (8.8, docs/specs/fighting-styles.md section 6) ----------
 
 /**
- * The template doctrines: one for each Fighting Style built so far, and the Brawler, the starting doctrine, which stays until
- * the Boarder replaces it with the boarding rework (P3.B2 piece 2). The Runner and the Coward became the Smuggler.
+ * The template doctrines, one for each Fighting Style (spec section 6). The Runner and the Coward became the Smuggler, and the
+ * Brawler split into the Rammer and the Boarder (D123).
  */
-export const TEMPLATE_NAMES = ["Bombardier", "Gunline", "Skirmisher", "Rammer", "Brawler", "Smuggler"] as const;
+export const TEMPLATE_NAMES = ["Bombardier", "Gunline", "Skirmisher", "Rammer", "Boarder", "Firebrand", "Smuggler"] as const;
 export type TemplateName = (typeof TEMPLATE_NAMES)[number];
 
-const T = D.templates;
 const fight = (helm: HelmMove, guns: GunsOrder): DoctrineAction => ({ kind: "fight", helm, guns });
 /** IF Grappled THEN Open Range, Repel: a fresh rule each time, so no two templates share an object. */
 const cutFree = (): DoctrineRule => ({ if: [{ kind: "range", op: "is", range: "grappled" }], then: fight("openRange", "repel") });
@@ -327,6 +329,31 @@ const rammer = (): Doctrine => ({
   ],
 });
 
+/** Closes in and boards from Short. Once over the rail it charges, and answers the pikes of a Repel with muskets. */
+const boarder = (): Doctrine => ({
+  name: "Boarder",
+  rules: [
+    { if: [{ kind: "range", op: "is", range: "grappled" }, { kind: "theirLastGuns", order: "repel" }], then: fight("hold", "volley") },
+    { if: [{ kind: "range", op: "is", range: "grappled" }], then: fight("hold", "charge") },
+    { if: [{ kind: "range", op: "atMost", range: "short" }], then: fight("closeIn", "board") },
+    { if: [], then: fight("closeIn", "roundShot") },
+  ],
+});
+
+/**
+ * Throws pitch once the ships are lashed together, crosses to a Hot Shot when they cross its bow, and saves the Hot Shot for Short
+ * and Close, where it is strong. It costs double Powder and is weak beyond Short.
+ */
+const firebrand = (): Doctrine => ({
+  name: "Firebrand",
+  rules: [
+    { if: [{ kind: "range", op: "is", range: "grappled" }], then: fight("hold", "firePots") },
+    { if: [{ kind: "theirLastHelm", move: "crossTheirBow" }], then: fight("openRange", "hotShot") },
+    { if: [{ kind: "range", op: "atLeast", range: "medium" }], then: fight("closeIn", "roundShot") },
+    { if: [], then: fight("closeIn", "hotShot") },
+  ],
+});
+
 /** Runs with the cargo, cuts their Rigging so they cannot keep up, and strikes early to keep most of what it carries (8.7). */
 const smuggler = (): Doctrine => ({
   name: "Smuggler",
@@ -337,19 +364,8 @@ const smuggler = (): Doctrine => ({
   ],
 });
 
-/** Closes in, boards at Close, thins their crew with Grapeshot once the ships are locked together. */
-const brawler = (): Doctrine => ({
-  name: "Brawler",
-  rules: [
-    { if: [{ kind: "range", op: "is", range: "grappled" }], then: fight("closeIn", "grapeshot") },
-    { if: [{ kind: "range", op: "is", range: "close" }], then: fight("closeIn", "board") },
-    { if: [{ kind: "track", who: "theirs", track: "hands", op: "below", pct: T.brawlerBoardHandsPct }], then: fight("closeIn", "board") },
-    { if: [], then: fight("closeIn", "roundShot") },
-  ],
-});
-
 const BUILDERS: Record<TemplateName, () => Doctrine> = {
-  Bombardier: bombardier, Gunline: gunline, Skirmisher: skirmisher, Rammer: rammer, Brawler: brawler, Smuggler: smuggler,
+  Bombardier: bombardier, Gunline: gunline, Skirmisher: skirmisher, Rammer: rammer, Boarder: boarder, Firebrand: firebrand, Smuggler: smuggler,
 };
 
 /** A fresh copy of a template, safe to rename and edit. */
@@ -358,11 +374,13 @@ export const templateDoctrine = (name: TemplateName): Doctrine => BUILDERS[name]
 /** Fresh copies of every template, in the order of TEMPLATE_NAMES. */
 export const templateDoctrines = (): Doctrine[] => TEMPLATE_NAMES.map(templateDoctrine);
 
-/** The template a Fighting Style gives (spec section 2). The Boarder and the Firebrand start with the Brawler until piece 2. */
+/** The template a Fighting Style gives (spec section 2). */
 const STYLE_TEMPLATE: Record<FightingStyle, TemplateName> = {
-  bombardier: "Bombardier", gunline: "Gunline", skirmisher: "Skirmisher", rammer: "Rammer", boarder: "Brawler", firebrand: "Brawler", smuggler: "Smuggler",
+  bombardier: "Bombardier", gunline: "Gunline", skirmisher: "Skirmisher", rammer: "Rammer", boarder: "Boarder", firebrand: "Firebrand", smuggler: "Smuggler",
 };
 
-/** The template doctrine a captain of this style starts with; the Brawler for a captain with no style. */
-export const styleTemplate = (style: FightingStyle | undefined): TemplateName => (style ? STYLE_TEMPLATE[style] : "Brawler");
-
+/**
+ * The template doctrine a captain of this style starts with. A captain with no style starts with the Boarder, the Brawler's
+ * successor, so a new captain still starts out boarding.
+ */
+export const styleTemplate = (style: FightingStyle | undefined): TemplateName => (style ? STYLE_TEMPLATE[style] : "Boarder");

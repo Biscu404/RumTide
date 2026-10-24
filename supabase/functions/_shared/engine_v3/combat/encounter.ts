@@ -13,7 +13,7 @@ import type {
 } from "../types.ts";
 import type { World } from "../map.ts";
 import { nearestKnownHarbour } from "../plan.ts";
-import { cannonsOf, maxHands, maxHullPoints, maxRiggingPoints, powerRating, sailsOf } from "../ship.ts";
+import { cannonsOf, drillOf, maxHands, maxHullPoints, maxRiggingPoints, powerRating, sailsOf } from "../ship.ts";
 import type { EncounterContext, EncounterOutcome, EncounterResolver, EncounterSide } from "../tide.ts";
 import { runBattle } from "./battle.ts";
 import type { BattleInput, BattleMate } from "./battle.ts";
@@ -101,8 +101,10 @@ export interface BattleFlags {
   lurker: boolean; // lies in wait (8.1)
 }
 
-/** One ship as the battle sees it: derived stats, health, Powder, and no crew bonuses until crew exists (P8). */
+/** One ship as the battle sees it: derived stats, health, Powder, Drill and Fire Pots, and no crew bonuses until crew exists (P8). */
 export function battleShipOf(ship: Ship, captain: Pick<Captain, "id">, side: BattleSide, flags: BattleFlags): BattleShip {
+  const drill = drillOf(ship);
+  const pots = ship.hold.firePots ?? 0;
   return {
     shipId: ship.id,
     captainId: captain.id,
@@ -121,10 +123,12 @@ export function battleShipOf(ship: Ship, captain: Pick<Captain, "id">, side: Bat
     charted: flags.charted,
     withCurrent: flags.withCurrent,
     lurker: flags.lurker,
+    ...(drill > 0 ? { drill } : {}), // the Drill level, for boarding strength and the unlocks (absent means 0)
     hullPoints: ship.hullPoints,
     riggingPoints: ship.riggingPoints,
     hands: ship.hands,
     powder: ship.hold.powder,
+    ...(pots > 0 ? { firePots: pots } : {}), // a ship that carries no Fire Pots has no field, as before
     abilities: [],
     guns: { order: null, repeats: 0, charged: false },
   };
@@ -198,6 +202,7 @@ export function applyBattle(input: ApplyBattleInput): BattleApplied {
     m.ship.riggingPoints = final.riggingPoints;
     m.ship.hands = final.hands;
     m.ship.hold.powder = final.powder;
+    if (final.firePots !== undefined) m.ship.hold.firePots = final.firePots; // thrown pots are used up
   }
 
   // Cargo thrown overboard is gone before the winner can take it (D60).
