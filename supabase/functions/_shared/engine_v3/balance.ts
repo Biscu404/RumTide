@@ -93,9 +93,11 @@ export const B = {
     outOfPowder: 0.5,
     grapeDamagePerHand: 3,
     range: {
-      round: { long: 0.6, medium: 1.0, close: 1.0, grappled: 0.5 },
-      chain: { long: 1.0, medium: 0.8, close: 0.4, grappled: 0 },
-      grape: { long: 0, medium: 0.5, close: 1.2, grappled: 1.0 },
+      round: { far: 0.2, long: 0.6, medium: 1.0, short: 1.0, close: 1.0, grappled: 0.5 },
+      chain: { far: 0.4, long: 1.0, medium: 0.8, short: 0.6, close: 0.4, grappled: 0 },
+      grape: { far: 0, long: 0, medium: 0.5, short: 0.85, close: 1.2, grappled: 1.0 },
+      mortar: { far: 1.0, long: 1.0, medium: 0.5, short: 0, close: 0, grappled: 0 },
+      hot: { far: 0, long: 0.3, medium: 0.6, short: 0.8, close: 0.8, grappled: 0 },
     },
     terrainHelm: { shallowsSloop: 1.15, localKnowledge: 1.15, withStrongCurrent: 1.15 },
     terrainGuns: { rockyLong: 0.75, fogLong: 0.5 },
@@ -113,8 +115,38 @@ export const B = {
     },
   },
 
+  // PROTOTYPE (scratch copy only, never merged): switches and placeholder numbers for the boarding rework of docs/specs/boarding.md.
+  proto: {
+    deck: 0, // 1: the melee reads Deck orders (Charge, Volley, Repel, Fire Pots, Fists)
+    firstOver: 0, // 1: the boarder fights as a Charge in the grapple round with firstOverBonus, the other crew with Fists
+    lashed: 0, // 1: the boarder's Helm score counts lashedFactor times in Cut Free contests
+    closeFire: 0, // 1: the guns of the grapple round fire at Close
+    firstOverOnce: 0, // 1: First over the rail only in the first grapple of a battle
+    firstOverBonus: 1.5, lashedFactor: 1.5,
+    hit: { charge: 1.5, volley: 1.1, repel: 0.6, firePots: 1.8, fists: 1.0 },
+    guard: { charge: 1.25, volley: 1.0, repel: 0.6, firePots: 1.0, fists: 1.0 },
+    pairWin: 1.3, pairLose: 0.8,
+    firePotChance: 0.3, firePotHull: 8, pots: 3,
+    drillPerLevel: [0.04, 0.06, 0.08], // strength added per Drill level in stage 1, 2 and 3
+    fireAt: 5, grapnelsAt: 10, secondWaveAt: 15, secondWaveShare: 0.25,
+    // Fighting Styles (one trait per starting style): dash adds a band to a Brawler's Close In, dashSpoilsRake stops a Cross raking a dashing ship,
+    // kite removes the Skirmisher's Open Range penalty, slippery multiplies a Runner's Helm when it Opens, steady multiplies a Coward's guns when it Holds.
+    dash: 0, dashSpoilsRake: 0, kite: 0, slippery: 1, steady: 1, styleGrapnels: 0,
+    overtime: 0, spoiledRake: 1,
+    // Six Fighting Styles (scratch): Ram, Fire, Mortar, Hot Shot, Braced, Grapnel lines.
+    ramHull: 30, ramSelf: 8, ramStagger: 0.7,
+    fireHull: 8, fireRounds: 2, fireGuns: 0.8, firebrandExtra: 1, fireSpread: 0.35,
+    hotShotFire: 0.4, mortarFire: 0.2, zeroStep: 0.25, zeroMax: 1.5,
+    bracedRake: 1.25, grapnelLines: 0, firebrandPots: 6,
+    ramFireRounds: 2, ramVsFire: 1, bombStartFar: 0,
+    bombHands: 1, tinder: 1, grapnelBonus: 1, bracedRam: 1,
+    ramContest: 0, ramHoldEase: 0.5, dashSpoilContest: 0, mortarHit: 1, zeroHit: 0, bombOpenHelm: 1, ramGivesGrapple: 0,
+    longNines: 0.6, bombRamArmor: 1, boarderStrength: 1, ramVsBoard: 1,
+    bossArmour: 1, bossRetreat: 0, bossRetreatHull: 0.5, bossRetreatClaws: 0.5, bossNoPoints: 0, bossMoods: 0, bossSnatch: 0, mortarVsBoss: 1, quietCutFree: 0, bossGrapeArmour: 0, mortarRakes: 0, fireDeck: 1, hotPowder: 1, gunlineFire: 1, mortarFireRounds: 0, boarderChase: 1, firebrandBurns: 1, bossRamArmour: 0,
+  },
+
   // Power Rating (D26): (max Hull / hullPer + Cannons + Sails + Hands / handsPer) / divisor. A fresh sloop is 10.
-  power: { hullPer: 10, handsPer: 3, divisor: 4 },
+  power: { hullPer: 10, handsPer: 3, divisor: 4, exponent: 1 },
 
   // Towing (8.7): a Sunk or Captured ship is towed to the nearest known Harbour with Hull raised to at least this share of its max.
   tow: { hullShare: 0.5 },

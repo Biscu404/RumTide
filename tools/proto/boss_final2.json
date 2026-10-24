@@ -1,0 +1,15 @@
+{
+ "proto.bossRetreat": 1,
+ "proto.bossNoPoints": 1,
+ "proto.bossMoods": 1,
+ "proto.bossSnatch": 1,
+ "shellback.hull": 300,
+ "shellback.cannons": 22,
+ "shellback.helm": 10,
+ "shellback.rearUpRoundShot": 2,
+ "shellback.clawHands": 52,
+ "proto.bossRetreatClaws": 0.25,
+ "proto.bossRetreatHull": 0.35,
+ "proto.bossArmour": 0.8,
+ "proto.mortarVsBoss": 3.0
+}

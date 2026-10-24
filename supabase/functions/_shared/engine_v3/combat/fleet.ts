@@ -229,22 +229,84 @@ export interface FleetMelee {
   record: MeleeRecord; // strength, Hands lost and Hands left, for each whole side
   lost: Record<ShipId, number>; // Hands each ship lost
   credit: Record<ShipId, number>; // each ship's part in the Hands its side killed, by boarding strength: a side's parts add up to 1
+  deck?: { orders: Record<ShipId, string>; fire: boolean; thrown: ShipId[] }; // PROTOTYPE
+}
+
+// ---------- PROTOTYPE: the deck fight (docs/specs/boarding.md) ----------
+
+export interface DeckContext {
+  rng: Rng;
+  grappleRound: boolean; // the ships were not grappled when this round began
+  boarder: BattleSide | null; // the side whose Board order made the grapple this round; null if both boarded or none did
+  wasDry: Record<ShipId, boolean>; // the ship had no Powder when the round began
+  pots: Record<ShipId, number>; // Fire Pots left when the round began
+  bothBoarded: boolean;
+  edge: boolean; // First over the rail applies this round
+}
+
+type Drilled = BattleShip & { drill?: number };
+export const drillLevel = (ship: BattleShip): number => (ship as Drilled).drill ?? 0;
+
+/** Strength added by Drill: each level adds its stage's share (stages of five levels). */
+export function drillBonus(level: number): number {
+  let bonus = 0;
+  for (let i = 1; i <= level; i++) bonus += B.proto.drillPerLevel[Math.min(2, Math.floor((i - 1) / 5))] as number;
+  return bonus;
+}
+
+const BEATS: Record<string, string> = { charge: "volley", volley: "repel", repel: "charge" };
+const pairFactor = (mine: string, theirs: string): number =>
+  BEATS[mine] === theirs ? B.proto.pairWin : BEATS[theirs] === mine ? B.proto.pairLose : NEUTRAL;
+
+/** The order a crew really fights with this round (D-proto): what it played, or Fists when it cannot. */
+function deckOrder(ship: BattleShip, side: BattleSide, played: GunsOrder, ctx: DeckContext): string {
+  const P = B.proto;
+  const o = played as string;
+  if (ctx.edge && ctx.boarder !== null) {
+    // The boarder charges over the rail. The other crew chose its order before the grapple, so it fights with Fists.
+    if (side === ctx.boarder) return o === "board" ? "charge" : "fists";
+    return o === "board" ? "charge" : "fists";
+  }
+  if (o === "board") return ctx.edge && ctx.bothBoarded ? "charge" : "fists";
+  if (o === "charge") return "charge";
+  if (o === "volley") return ctx.wasDry[ship.shipId] ? "fists" : "volley";
+  if (o === "repel") return "repel";
+  if (o === "firePots") return (drillLevel(ship) >= P.fireAt || (ship as any).style === "Firebrand") && (ctx.pots[ship.shipId] ?? 0) > 0 ? "firePots" : "fists";
+  return "fists";
 }
 
 /**
  * The boarding melee of a Grappled round, side against side. A side's boarding strength is its ships' added up; it removes
  * 20% of that, times its bonus (7.5), from the enemy's Hands, shared out by max Hull and never past the Hands a ship has.
+ * PROTOTYPE: with B.proto.deck on, each crew also fights with a Deck order (docs/specs/boarding.md).
  */
 export function fleetMelee(
   ids: Record<BattleSide, readonly ShipId[]>, ships: Record<ShipId, BattleShip>, orders: Record<ShipId, GunsOrder>,
-  terrain: Terrain, bonus: Record<BattleSide, SideBonus>,
+  terrain: Terrain, bonus: Record<BattleSide, SideBonus>, deckCtx?: DeckContext,
 ): FleetMelee {
+  const P = B.proto;
   const crew = (side: BattleSide) => ids[side].map((id) => ships[id] as BattleShip);
   const strengthOf: Record<ShipId, number> = {};
   const strength = { hunter: 0, target: 0 };
+  const deckOf: Record<ShipId, string> = {};
+  const deck = P.deck === 1 && deckCtx !== undefined;
   for (const side of ["hunter", "target"] as const) {
     for (const ship of crew(side)) {
-      strengthOf[ship.shipId] = boardingStrength(ship, orders[ship.shipId] as GunsOrder, terrain);
+      if (!deck) {
+        strengthOf[ship.shipId] = boardingStrength(ship, orders[ship.shipId] as GunsOrder, terrain);
+      } else {
+        const order = deckOrder(ship, side, orders[ship.shipId] as GunsOrder, deckCtx as DeckContext);
+        deckOf[ship.shipId] = order;
+        let st = ship.hands * (NEUTRAL + ship.boardingBonus) * (NEUTRAL + drillBonus(drillLevel(ship)));
+        if (terrain === "kelp") st *= C.kelpBoarding;
+        const dc = deckCtx as DeckContext;
+        if (dc.edge && dc.boarder === side && (orders[ship.shipId] as string) === "board") st *= P.firstOverBonus;
+        // PROTOTYPE: Tinderbox. A crew fighting a Firebrand fights on a deck packed with tinder and pitch.
+        if (crew(other(side)).some((f) => (f as any).style === "Firebrand")) st *= P.tinder;
+        if ((ship as any).style === "Boarder") st *= P.boarderStrength; // PROTOTYPE: a Boarder's crew are fighters first
+        if ((ship as any).burningNow) st *= P.fireDeck; // PROTOTYPE: half the crew is fighting the fire
+        strengthOf[ship.shipId] = st;
+      }
       strength[side] += strengthOf[ship.shipId] as number;
     }
   }
@@ -252,10 +314,34 @@ export function fleetMelee(
   const credit: Record<ShipId, number> = {};
   const sideLost = { hunter: 0, target: 0 };
   const hands = { hunter: 0, target: 0 };
+  let fire = false;
+  const thrown: ShipId[] = [];
+  if (deck) {
+    const dc = deckCtx as DeckContext;
+    for (const side of ["hunter", "target"] as const) {
+      for (const ship of crew(side)) {
+        if (deckOf[ship.shipId] === "firePots") {
+          thrown.push(ship.shipId);
+          if (dc.rng.stream("melee", "fire", ship.shipId).next() < P.firePotChance) fire = true;
+        }
+      }
+    }
+  }
   for (const side of ["hunter", "target"] as const) {
     const victims = crew(side);
     const have = victims.reduce((n, v) => n + v.hands, 0);
-    sideLost[side] = Math.min(have, Math.round(C.boarding.killShare * strength[other(side)] * bonus[other(side)].total));
+    const foe = other(side);
+    let killed = C.boarding.killShare * strength[foe] * bonus[foe].total;
+    if (deck) {
+      const mine = deckOf[(victims[0] as BattleShip).shipId] as string;
+      const attacker = crew(foe)[0] as BattleShip;
+      const theirs = deckOf[attacker.shipId] as string;
+      const hit = (P.hit as Record<string, number>)[theirs] as number;
+      const guard = mine === "repel" && theirs === "firePots" ? NEUTRAL : ((P.guard as Record<string, number>)[mine] as number);
+      killed *= hit * pairFactor(theirs, mine) * guard;
+      if (drillLevel(attacker) >= P.secondWaveAt) killed *= NEUTRAL + P.secondWaveShare;
+    }
+    sideLost[side] = Math.min(have, Math.round(killed));
     hands[side] = have - sideLost[side];
     const parts = shareDamage(victims, "hands", sideLost[side]);
     victims.forEach((v, i) => { lost[v.shipId] = parts[i] as number; });
@@ -265,7 +351,7 @@ export function fleetMelee(
     const parts = apportionFloat(1, killers.map((k) => strengthOf[k.shipId] as number));
     killers.forEach((k, i) => { credit[k.shipId] = parts[i] as number; });
   }
-  return { record: { strength, lost: sideLost, hands }, lost, credit };
+  return { record: { strength, lost: sideLost, hands }, lost, credit, ...(deck ? { deck: { orders: deckOf, fire, thrown } } : {}) };
 }
 
 /** Splits an amount in proportion to weights, not in whole units: for credit that only has to add up. Equal parts if every weight is 0. */

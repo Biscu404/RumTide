@@ -217,6 +217,15 @@ export function resolveHelm(input: HelmInput, rng: Rng): HelmResult {
   };
   const contests: ContestRecord[] = [];
   const scrape = { hunter: 0, target: 0 };
+  const style = (side: BattleSide): string => (ships[side] as any).style ?? (ships[side].fixedHelm === undefined ? process.env.PROTO_STYLE ?? "" : "");
+  // PROTOTYPE: Slippery. A Runner that Opens Range sails better in every contest of that round.
+  for (const side of BATTLE_SIDES) if ((style(side) === "Runner" || style(side) === "Smuggler") && moves[side] === "openRange") scores[side] *= B.proto.slippery;
+  // PROTOTYPE: a Bombardier's spotters see a ship coming and it turns away early.
+  for (const side of BATTLE_SIDES) if (style(side) === "Bombardier" && moves[side] === "openRange") scores[side] *= B.proto.bombOpenHelm;
+  // PROTOTYPE: a Boarder runs down its prey: better Helm in a round it Closes In.
+  for (const side of BATTLE_SIDES) if (style(side) === "Boarder" && moves[side] === "closeIn") scores[side] *= B.proto.boarderChase;
+  // PROTOTYPE: a ship staggered by a Ram last round sails worse this round.
+  for (const side of BATTLE_SIDES) if ((ships[side] as any).staggered) scores[side] *= B.proto.ramStagger;
 
   if (range === "grappled") {
     return { row: "grappled", moves, scores, range, escaped: false, gunsMod: { hunter: NEUTRAL, target: NEUTRAL }, scrape, contests };
@@ -230,6 +239,24 @@ export function resolveHelm(input: HelmInput, rng: Rng): HelmResult {
   }
   const pair = applyPair(moves, range, chaseWinner);
   let position = pair.position;
+  // PROTOTYPE: Fighting Styles.
+  const here = RANGES.indexOf(range);
+  for (const side of BATTLE_SIDES) {
+    const foe = other(side);
+    if (B.proto.dash === 1 && (style(side) === "Brawler" || style(side) === "Rammer") && moves[side] === "closeIn") {
+      if (position > here && position < GRAPPLED) position = Math.min(position + 1, CLOSE); // Dash: one band more
+      if (B.proto.dashSpoilsRake === 1 && pair.row === "crossClose") { pair.gunsMod[side] = NEUTRAL; pair.gunsMod[foe] = B.proto.spoiledRake; }
+      if (B.proto.dashSpoilContest === 1 && pair.row === "crossClose" && helmContest(rng.stream("helm", "dashSpoil", side), scores[side], scores[foe]).aWins) {
+        pair.gunsMod[side] = NEUTRAL; pair.gunsMod[foe] = B.proto.spoiledRake; // the dash spoils the rake
+      }
+    }
+    if (B.proto.kite === 1 && style(side) === "Skirmisher" && moves[side] === "openRange" && pair.gunsMod[side] === C.weakened) pair.gunsMod[side] = NEUTRAL;
+    if ((style(side) === "Coward" || style(side) === "Gunline") && moves[side] === "hold") {
+      // Braced: a Gunline that Holds takes a rake as a flank shot and does not count as weakened.
+      if (style(side) === "Gunline" && pair.row === "crossHold") { pair.gunsMod[foe] = Math.min(pair.gunsMod[foe], B.proto.bracedRake); pair.gunsMod[side] = NEUTRAL; }
+      pair.gunsMod[side] *= B.proto.steady;
+    }
+  }
 
   // Kelp: the range never goes beyond Medium, so nobody escapes by range.
   if (terrain === "kelp") position = Math.max(position, MEDIUM);
@@ -249,6 +276,6 @@ export function resolveHelm(input: HelmInput, rng: Rng): HelmResult {
   // Reef: every Cross or Close In scrapes the hull, unless the water is Charted for that captain.
   for (const side of BATTLE_SIDES) scrape[side] = reefScrape(terrain, ships[side], moves[side]);
 
-  const escaped = position < LONG;
-  return { row: pair.row, moves, scores, range: escaped ? band(LONG) : band(position), escaped, gunsMod: pair.gunsMod, scrape, contests };
+  const escaped = position < 0;
+  return { row: pair.row, moves, scores, range: escaped ? band(0) : band(position), escaped, gunsMod: pair.gunsMod, scrape, contests };
 }

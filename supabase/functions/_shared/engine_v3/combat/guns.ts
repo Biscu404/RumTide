@@ -20,6 +20,8 @@ const AMMO: Partial<Record<GunsOrder, Ammo>> = {
   roundShot: { key: "round", track: "hull" },
   chainShot: { key: "chain", track: "rigging" },
   grapeshot: { key: "grape", track: "hands" },
+  // PROTOTYPE: the Bombardier's Mortar and the Firebrand's Hot Shot.
+  ...({ mortar: { key: "mortar", track: "hull" }, hotShot: { key: "hot", track: "hull" } } as any),
 };
 
 const TRACK_FIELD = { hull: "hullPoints", rigging: "riggingPoints", hands: "hands" } as const;
@@ -109,6 +111,11 @@ export function fireGuns(
   ctx: GunsContext = OPEN_WATER,
 ): GunsResult {
   const ammo = AMMO[order];
+  // PROTOTYPE: a Volley fires the muskets and swivels in the melee. It burns Powder like a round of guns and hits nothing here.
+  if ((order as string) === "volley") {
+    const used = attacker.powder > 0 ? Math.min(attacker.powder, B.hulls[attacker.hull].powderPerRound) : 0;
+    return { order, track: null, raw: 0, damage: 0, powderUsed: used, factors: null };
+  }
   if (!ammo) return { order, track: null, raw: 0, damage: 0, powderUsed: 0, factors: null };
 
   const dry = attacker.powder <= 0;
@@ -121,7 +128,7 @@ export function fireGuns(
     exposed: ammo.key === "round" ? ctx.exposed ?? NEUTRAL : NEUTRAL,
     powder: dry ? C.outOfPowder : NEUTRAL,
     charged: attacker.guns.charged ? C.holdFireNext : NEUTRAL,
-    stale: staleNow(attacker.guns, order) ? C.stale : NEUTRAL,
+    stale: staleNow(attacker.guns, order) && (order as string) !== "mortar" ? C.stale : NEUTRAL, // PROTOTYPE: Zeroing In replaces staleness for the Mortar
     luck: rng.stream("guns", attacker.shipId).range(C.luckMin, C.luckMax),
   };
   const raw = Object.values(factors).reduce((product, f) => product * f, NEUTRAL);
@@ -132,7 +139,8 @@ export function fireGuns(
     track: ammo.track,
     raw,
     damage: Math.max(0, Math.min(Math.round(points), available)),
-    powderUsed: dry ? 0 : Math.min(attacker.powder, B.hulls[attacker.hull].powderPerRound),
+    // PROTOTYPE: heating shot in the galley fire burns hotPowder times the Powder.
+    powderUsed: dry ? 0 : Math.min(attacker.powder, B.hulls[attacker.hull].powderPerRound * ((order as string) === "hotShot" ? B.proto.hotPowder : 1)),
     factors,
   };
 }

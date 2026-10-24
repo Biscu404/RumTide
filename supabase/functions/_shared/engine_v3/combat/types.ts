@@ -8,8 +8,8 @@ import type { Carried, SalvagePile } from "./loot.ts";
 // ---------- Range, Helm moves and Guns orders (8.2, 8.4, 8.5) ----------
 
 /** The four range bands, from far to near. Grappled comes from a mutual Close In at Close or from Board (8.4, 8.6). */
-export type Range = "long" | "medium" | "close" | "grappled";
-export const RANGES: readonly Range[] = ["long", "medium", "close", "grappled"];
+export type Range = "far" | "long" | "medium" | "short" | "close" | "grappled"; // SCRATCH: far and short only exist when LADDER is 5 or 6
+export const RANGES: readonly Range[] = process.env.LADDER === "6" ? ["far", "long", "medium", "short", "close", "grappled"] : process.env.LADDER === "5" ? ["long", "medium", "short", "close", "grappled"] : ["long", "medium", "close", "grappled"];
 
 /** What a Lurker who springs an ambush may choose as the starting range (8.1). */
 export type AmbushRange = "long" | "medium";

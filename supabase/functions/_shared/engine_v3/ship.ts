@@ -24,8 +24,12 @@ export const carriesCargo = (ship: Pick<Ship, "hold" | "plunder">) => ship.plund
  * Power Rating (D26), for parley, fairness and NPC scaling: (max Hull / 10 + Cannons + Sails + Hands / 3) / 4.
  * A fresh sloop is 10. Hands are the Hands aboard now, so a ship that has lost its crew rates lower (D74).
  */
-export const powerRating = (ship: Built & Pick<Ship, "hands">): number =>
-  (maxHullPoints(ship) / B.power.hullPer + cannonsOf(ship) + sailsOf(ship) + ship.hands / B.power.handsPer) / B.power.divisor;
+export const powerRating = (ship: Built & Pick<Ship, "hands">): number => {
+  const raw = (maxHullPoints(ship) / B.power.hullPer + cannonsOf(ship) + sailsOf(ship) + ship.hands / B.power.handsPer) / B.power.divisor;
+  // PROTOTYPE: the rating grows faster than the stats, so twice the rating means the odds check 4 asks for. A fresh sloop stays 10.
+  const p = (B.power as any).exponent ?? 1;
+  return p === 1 ? raw : 10 * (raw / 10) ** p;
+};
 
 /** Upgrade cost for buying the next level of a stat (v0.2 5.3), with the season's cost multiplier. */
 export const upgradeCost = (currentLevel: number, costMult = 1) =>

@@ -1,0 +1,8 @@
+{
+ "shellback.hull": 200,
+ "shellback.clawHands": 40,
+ "shellback.cannons": 12,
+ "shellback.helm": 10,
+ "shellback.rearUpRoundShot": 1.5,
+ "shellback.grappleFromRound": 4
+}
