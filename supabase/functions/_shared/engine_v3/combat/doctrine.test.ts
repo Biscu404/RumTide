@@ -5,8 +5,9 @@ import type { RoundView } from "./battle.ts";
 import { runBattle } from "./battle.ts";
 import {
   ABILITIES, DOCTRINE_SLOT_PERK, FALLBACK_PLAY, JETTISON_PLAY, NO_RULE, TEMPLATE_NAMES, conditionHolds, doctrineChooser,
-  doctrineSlots, evaluateDoctrine, templateDoctrine, templateDoctrines, validateDoctrine, validateDoctrines,
+  doctrineSlots, evaluateDoctrine, styleTemplate, templateDoctrine, templateDoctrines, validateDoctrine, validateDoctrines,
 } from "./doctrine.ts";
+import { FIGHTING_STYLES } from "../types.ts";
 import type { AbilityRegistry, DoctrineContext, ValidateOptions } from "./doctrine.ts";
 import { battleOf, deepFreeze, testShip } from "./testing.ts";
 import type { BattleShip, Doctrine, DoctrineAction, DoctrineCondition, DoctrineRule, GunsOrder, HelmMove, Range } from "./types.ts";
@@ -33,11 +34,13 @@ describe("conditions (GAMEPLAY 8.8)", () => {
   const holds = (c: DoctrineCondition, v: RoundView = view(), side: "hunter" | "target" = "hunter", x: DoctrineContext = ctx) =>
     conditionHolds(c, v, side, x);
 
-  it("range is, at least and at most read the range as a distance: Long is far and Grappled is near (D69)", () => {
+  it("range is, at least and at most read the range as a distance over the six: Far is farthest and Grappled is nearest (D69)", () => {
     const table: [Range, boolean, boolean, boolean][] = [
       // range, is Medium, at least Medium, at most Medium
+      ["far", false, true, false],
       ["long", false, true, false],
       ["medium", true, true, true],
+      ["short", false, false, true],
       ["close", false, false, true],
       ["grappled", false, false, true],
     ];
@@ -48,8 +51,21 @@ describe("conditions (GAMEPLAY 8.8)", () => {
     }
     for (const range of RANGES) {
       expect(holds({ kind: "range", op: "atLeast", range: "grappled" }, view({ range }))).toBe(true); // any distance is at least none
-      expect(holds({ kind: "range", op: "atMost", range: "long" }, view({ range }))).toBe(true);
+      expect(holds({ kind: "range", op: "atMost", range: "far" }, view({ range }))).toBe(true);
     }
+    expect(holds({ kind: "range", op: "atMost", range: "short" }, view({ range: "short" }))).toBe(true);
+    expect(holds({ kind: "range", op: "atMost", range: "short" }, view({ range: "medium" }))).toBe(false);
+    expect(holds({ kind: "range", op: "atLeast", range: "long" }, view({ range: "far" }))).toBe(true);
+    expect(holds({ kind: "range", op: "is", range: "far" }, view({ range: "far" }))).toBe(true);
+  });
+
+  it("their style is X reads the enemy ship's Fighting Style, and is false against a ship with no style (D128)", () => {
+    const rammer = view({}, {}, { style: "rammer" });
+    expect(holds({ kind: "theirStyle", style: "rammer" }, rammer)).toBe(true);
+    expect(holds({ kind: "theirStyle", style: "gunline" }, rammer)).toBe(false);
+    expect(holds({ kind: "theirStyle", style: "rammer" }, view({}, { style: "rammer" }))).toBe(false); // my own style is not theirs
+    expect(holds({ kind: "theirStyle", style: "bombardier" }, view({ side: "target" }, { style: "bombardier" }), "target")).toBe(true);
+    for (const style of FIGHTING_STYLES) expect(holds({ kind: "theirStyle", style }, view()), style).toBe(false); // Old Shellback has none
   });
 
   it("round is N, or at least N", () => {
@@ -374,7 +390,9 @@ describe("validation", () => {
 
   it("rejects badly formed conditions", () => {
     const bad = (c: unknown) => problems({ name: "J", rules: [rule([c as DoctrineCondition], fight("hold", "roundShot")), otherwise()] });
-    expect(bad({ kind: "range", op: "is", range: "far" })).toEqual(["rule 1: unknown range far"]);
+    expect(bad({ kind: "range", op: "is", range: "horizon" })).toEqual(["rule 1: unknown range horizon"]);
+    expect(bad({ kind: "theirStyle", style: "pirate" })).toEqual(["rule 1: unknown Fighting Style pirate"]);
+    expect(bad({ kind: "theirStyle" })).toEqual(["rule 1: unknown Fighting Style undefined"]);
     expect(bad({ kind: "range", op: "near", range: "close" })).toEqual(["rule 1: unknown range test near"]);
     expect(bad({ kind: "round", op: "is", n: 0 })).toEqual([`rule 1: the round must be a whole number from 1 to ${B.combat.rounds}`]);
     expect(bad({ kind: "round", op: "atLeast", n: B.combat.rounds + 1 })).toHaveLength(1);
@@ -403,8 +421,14 @@ describe("validation", () => {
       { kind: "theirLastHelm", move: "crossTheirBow" }, { kind: "theirLastGuns", order: "repel" }, { kind: "enemyType", type: "brethren" },
       { kind: "enemyCaptain", captainId: "cap_x" }, { kind: "terrain", terrain: "strongCurrent" }, { kind: "windGauge", holder: "theirs" },
       { kind: "havePowder" }, { kind: "abilityUnused", ability: "fake.flare" },
+      { kind: "range", op: "is", range: "far" }, { kind: "range", op: "atMost", range: "short" }, { kind: "theirLastGuns", order: "mortar" },
+      ...FIGHTING_STYLES.map((style): DoctrineCondition => ({ kind: "theirStyle", style })),
     ];
     for (const c of conditions) expect(validateDoctrine({ name: "K", rules: [rule([c], fight("hold", "roundShot")), otherwise()] }, { slots: 3, abilities: FAKE })).toEqual([]);
+  });
+
+  it("accepts the Mortar in any captain's doctrine, because a copied doctrine always plays (it fires Round shot without the style)", () => {
+    expect(validateDoctrine({ name: "Copied", rules: [otherwise(fight("hold", "mortar"))] }, { slots: 3 })).toEqual([]);
   });
 
   it("names the rule number the way the screen counts them", () => {
@@ -423,9 +447,9 @@ describe("validation", () => {
   });
 });
 
-describe("the four templates (GAMEPLAY 8.8)", () => {
-  it("are Brawler, Skirmisher, Runner and Coward, and each is valid for a captain with the base slots", () => {
-    expect([...TEMPLATE_NAMES]).toEqual(["Brawler", "Skirmisher", "Runner", "Coward"]);
+describe("the templates (GAMEPLAY 8.8, Fighting Styles spec section 6)", () => {
+  it("are the Bombardier, Gunline, Skirmisher, Rammer, Brawler and Smuggler, and each is valid for a captain with the base slots", () => {
+    expect([...TEMPLATE_NAMES]).toEqual(["Bombardier", "Gunline", "Skirmisher", "Rammer", "Brawler", "Smuggler"]);
     expect(templateDoctrines().map((d) => d.name)).toEqual([...TEMPLATE_NAMES]);
     for (const name of TEMPLATE_NAMES) {
       const d = templateDoctrine(name);
@@ -443,19 +467,78 @@ describe("the four templates (GAMEPLAY 8.8)", () => {
     a.name = "Mine";
     a.rules.pop();
     expect(b).toEqual(templateDoctrine("Brawler"));
-    expect(templateDoctrines()[0]).toEqual(templateDoctrine("Brawler"));
+    expect(templateDoctrines()[TEMPLATE_NAMES.indexOf("Brawler")]).toEqual(templateDoctrine("Brawler"));
+    // Even a deep edit of one copy, inside a rule that several templates have, leaves every other template whole.
+    const pristine = structuredClone(templateDoctrines());
+    for (const mine of templateDoctrines()) {
+      for (const r of mine.rules) {
+        r.if.pop();
+        if (r.then.kind === "fight") r.then.helm = "hold";
+      }
+    }
+    expect(templateDoctrines()).toEqual(pristine);
   });
 
   it("use only the thresholds in balance.ts", () => {
     const T = D.templates;
     const hands = templateDoctrine("Brawler").rules[2]!.if[0];
     expect(hands).toMatchObject({ kind: "track", track: "hands", pct: T.brawlerBoardHandsPct });
-    expect(templateDoctrine("Skirmisher").rules[1]!.if[0]).toMatchObject({ pct: T.skirmisherChainRiggingPct });
-    expect(templateDoctrine("Runner").rules[1]!.if[0]).toMatchObject({ pct: T.runnerChainRiggingPct });
-    expect(templateDoctrine("Coward").rules[0]!.if[0]).toMatchObject({ who: "mine", track: "hull", pct: T.cowardStrikesHullPct });
+    expect(templateDoctrine("Smuggler").rules[0]!.if[0]).toMatchObject({ who: "mine", track: "hull", pct: B.styles.smuggler.strikeHullPct });
+    expect(B.styles.smuggler.strikeHullPct).toBe(40);
+  });
+
+  it("are the template each Fighting Style gives; the Boarder and the Firebrand start with the Brawler for now", () => {
+    expect(FIGHTING_STYLES.map(styleTemplate)).toEqual(["Bombardier", "Gunline", "Skirmisher", "Rammer", "Brawler", "Brawler", "Smuggler"]);
+    expect(styleTemplate(undefined)).toBe("Brawler");
   });
 
   const play = (name: Parameters<typeof templateDoctrine>[0], v: RoundView) => evaluateDoctrine(templateDoctrine(name), v, ctx);
+  const at = (name: Parameters<typeof templateDoctrine>[0], range: Range) => {
+    const c = play(name, view({ range }));
+    return c.kind === "fight" ? [c.rule, c.helm, c.guns] : [c.rule, "surrender"];
+  };
+
+  it("Bombardier shells with the Mortar from Long and Far, turns away at Medium, and runs with Round shot when they come near", () => {
+    expect(at("Bombardier", "far")).toEqual([3, "hold", "mortar"]);
+    expect(at("Bombardier", "long")).toEqual([3, "hold", "mortar"]);
+    expect(at("Bombardier", "medium")).toEqual([2, "openRange", "mortar"]);
+    expect(at("Bombardier", "short")).toEqual([1, "openRange", "roundShot"]);
+    expect(at("Bombardier", "close")).toEqual([1, "openRange", "roundShot"]);
+    expect(at("Bombardier", "grappled")).toEqual([0, "openRange", "repel"]);
+  });
+
+  it("Gunline closes from Long and Far, holds with Round shot at Medium and Short, and with Grapeshot at Close", () => {
+    expect(at("Gunline", "far")).toEqual([2, "closeIn", "roundShot"]);
+    expect(at("Gunline", "long")).toEqual([2, "closeIn", "roundShot"]);
+    expect(at("Gunline", "medium")).toEqual([3, "hold", "roundShot"]);
+    expect(at("Gunline", "short")).toEqual([3, "hold", "roundShot"]);
+    expect(at("Gunline", "close")).toEqual([1, "hold", "grapeshot"]);
+    expect(at("Gunline", "grappled")).toEqual([0, "openRange", "repel"]);
+  });
+
+  it("Skirmisher closes while they are far, crosses their bow at Short and Close, and the moment they charge", () => {
+    expect(at("Skirmisher", "far")).toEqual([2, "closeIn", "roundShot"]);
+    expect(at("Skirmisher", "medium")).toEqual([2, "closeIn", "roundShot"]);
+    expect(at("Skirmisher", "short")).toEqual([3, "crossTheirBow", "roundShot"]);
+    expect(at("Skirmisher", "close")).toEqual([3, "crossTheirBow", "roundShot"]);
+    expect(at("Skirmisher", "grappled")).toEqual([0, "openRange", "repel"]);
+    const charged = view({ range: "long", last: { hunter: null, target: { helm: "closeIn", guns: "roundShot" } } });
+    expect(play("Skirmisher", charged)).toMatchObject({ rule: 1, helm: "crossTheirBow", guns: "roundShot" });
+  });
+
+  it("Rammer closes in every round, and backs off from a ship that crossed its bow", () => {
+    for (const range of ["far", "long", "medium", "short", "close"] as const) expect(at("Rammer", range)).toEqual([2, "closeIn", "roundShot"]);
+    expect(at("Rammer", "grappled")).toEqual([0, "openRange", "repel"]);
+    const crossed = view({ range: "close", last: { hunter: null, target: { helm: "crossTheirBow", guns: "roundShot" } } });
+    expect(play("Rammer", crossed)).toMatchObject({ rule: 1, helm: "openRange", guns: "roundShot" });
+  });
+
+  it("Smuggler opens the range with Chain shot, cuts free when grappled, and strikes its colours below 40% Hull", () => {
+    expect(at("Smuggler", "long")).toEqual([2, "openRange", "chainShot"]);
+    expect(at("Smuggler", "grappled")).toEqual([1, "openRange", "repel"]);
+    expect(play("Smuggler", view({}, { hullPoints: 40 }))).toMatchObject({ kind: "fight", rule: 2 });
+    expect(play("Smuggler", view({ range: "grappled" }, { hullPoints: 39 }))).toEqual({ kind: "surrender", rule: 0, abilities: [] });
+  });
 
   it("Brawler closes in, boards at Close and grapes the crew once Grappled", () => {
     expect(play("Brawler", view({ range: "long" }))).toMatchObject({ rule: 3, helm: "closeIn", guns: "roundShot" });
@@ -465,67 +548,50 @@ describe("the four templates (GAMEPLAY 8.8)", () => {
     expect(play("Brawler", view({ range: "long" }, {}, { hands: 14 }))).toMatchObject({ rule: 2, helm: "closeIn", guns: "board" }); // a thin crew: go and take them
   });
 
-  it("Skirmisher crosses their bow, shoots the Rigging first and chases a runner", () => {
-    expect(play("Skirmisher", view())).toMatchObject({ rule: 1, helm: "crossTheirBow", guns: "chainShot" });
-    expect(play("Skirmisher", view({}, {}, { riggingPoints: 40 }))).toMatchObject({ rule: 2, helm: "crossTheirBow", guns: "roundShot" });
-    expect(play("Skirmisher", view({ last: { hunter: null, target: { helm: "openRange", guns: "roundShot" } } }))).toMatchObject({ rule: 0, helm: "closeIn", guns: "chainShot" });
-  });
-
-  it("Runner opens the range every round and tries to cut free when grappled", () => {
-    expect(play("Runner", view())).toMatchObject({ rule: 1, helm: "openRange", guns: "chainShot" });
-    expect(play("Runner", view({}, {}, { riggingPoints: 10 }))).toMatchObject({ rule: 2, helm: "openRange", guns: "roundShot" });
-    expect(play("Runner", view({ range: "grappled" }))).toMatchObject({ rule: 0, helm: "openRange", guns: "repel" });
-  });
-
-  it("Coward holds and fires, and strikes the colours when its Hull falls below half", () => {
-    expect(play("Coward", view())).toMatchObject({ kind: "fight", rule: 1, helm: "hold", guns: "roundShot" });
-    expect(play("Coward", view({}, { hullPoints: 50 }))).toMatchObject({ kind: "fight", rule: 1 });
-    expect(play("Coward", view({}, { hullPoints: 49 }))).toEqual({ kind: "surrender", rule: 0, abilities: [] });
-  });
-
-  const duel = (hunter: Parameters<typeof templateDoctrine>[0], target: Parameters<typeof templateDoctrine>[0], seed = 1234, over: Partial<BattleShip> = {}) =>
+  const duel = (
+    hunter: Parameters<typeof templateDoctrine>[0], target: Parameters<typeof templateDoctrine>[0], seed = 1234, over: Partial<BattleShip> = {},
+    input: Partial<Parameters<typeof battleOf>[3]> = {},
+  ) =>
     runBattle(battleOf(
       testShip("hunter", "sloop", over), testShip("target"),
       { hunter: doctrineChooser(templateDoctrine(hunter), ctx), target: doctrineChooser(templateDoctrine(target), ctx) },
-      { seed, doctrines: { hunter, target } },
+      { seed, doctrines: { hunter, target }, ...input },
     ));
 
-  it("play out in a battle: the Brawler closes on a Coward who holds, and boards at Close", () => {
-    const r = duel("Brawler", "Coward");
-    expect(r.doctrines).toEqual({ hunter: "Brawler", target: "Coward" });
-    expect(r.rounds[0]!.ships.map((s) => [s.helm, s.guns])).toEqual([["closeIn", "roundShot"], ["hold", "roundShot"]]);
-    expect(r.rounds[0]!.rangeAfter).toBe("medium"); // Close In against Hold: one band
+  it("play out in a battle: the Brawler closes on a Gunline that holds near, and boards it at Close", () => {
+    const r = duel("Brawler", "Gunline");
+    expect(r.doctrines).toEqual({ hunter: "Brawler", target: "Gunline" });
+    expect(r.rounds[0]!.ships.map((s) => [s.helm, s.guns])).toEqual([["closeIn", "roundShot"], ["closeIn", "roundShot"]]);
+    expect(r.rounds[0]!.rangeAfter).toBe("short"); // both Close In from Long: two bands
+    expect(r.rounds[1]!.ships[1]).toMatchObject({ rule: 3, helm: "hold", guns: "roundShot" });
     expect(r.rounds[1]!.rangeAfter).toBe("close");
-    expect(r.rounds[2]!.ships[0]).toMatchObject({ rule: 1, helm: "closeIn", guns: "board" });
+    expect(r.rounds[2]!.ships.map((s) => [s.rule, s.helm, s.guns])).toEqual([[1, "closeIn", "board"], [1, "hold", "grapeshot"]]);
     expect(r.rounds[2]!.grapples).toEqual([{ side: "hunter", ok: true, why: "helm" }]);
     expect(r.rounds[2]!.rangeAfter).toBe("grappled");
-    expect(r.outcome.winner).toBe("hunter");
   });
 
-  it("play out in a battle: the Runner escapes a Coward in the first round", () => {
-    const r = duel("Runner", "Coward");
-    expect(r.outcome).toEqual({ kind: "escaped", winner: null, loser: null, round: 1 });
-    expect(r.rounds[0]!.row).toBe("holdOpen");
-  });
-
-  it("play out in a battle: the Skirmisher rakes a Brawler that closes in and shoots its Rigging", () => {
+  it("play out in a battle: the Skirmisher crosses the bow of a Brawler that charges, and rakes it", () => {
     const r = duel("Skirmisher", "Brawler");
-    expect(r.rounds[0]!.row).toBe("crossClose");
-    expect(r.rounds[0]!.ships[0]).toMatchObject({ rule: 1, helm: "crossTheirBow", guns: "chainShot" });
-    expect(r.rounds[0]!.ships[0]!.shot.track).toBe("rigging");
-    expect(r.rounds[0]!.ships[0]!.shot.damage).toBeGreaterThan(r.rounds[0]!.ships[1]!.shot.damage); // the raked ship's guns are weaker
-    expect(r.outcome.winner).toBe("hunter");
+    expect(r.rounds[0]!.ships[0]).toMatchObject({ rule: 2, helm: "closeIn", guns: "roundShot" }); // far apart: close in
+    expect(r.rounds[0]!.rangeAfter).toBe("short");
+    expect(r.rounds[1]!.row).toBe("crossClose");
+    expect(r.rounds[1]!.ships[0]).toMatchObject({ rule: 1, helm: "crossTheirBow", guns: "roundShot" }); // it charged last round
+    expect(r.rounds[1]!.ships[0]!.shot.damage).toBeGreaterThan(r.rounds[1]!.ships[1]!.shot.damage); // the raked ship's guns are weaker
   });
 
-  it("play out in a battle: a Coward strikes its colours once its Hull falls below half", () => {
-    const r = duel("Brawler", "Coward", 1234, { cannons: 30 });
-    expect(r.outcome.kind).toBe("struckColours");
-    expect(r.outcome).toMatchObject({ winner: "hunter", loser: "target" });
-    const last = r.rounds.at(-1)!;
-    expect(last.struck).toEqual(["target"]);
-    expect(last.ships[1]!.rule).toBe(0);
-    expect(r.rounds.at(-2)!.ships[1]!.hullPoints).toBeLessThan(50);
+  it("play out in a battle: a Smuggler that cannot run strikes its colours once its Hull falls below 40%", () => {
+    // In Kelp the range never goes beyond Medium, so the Smuggler cannot get away from a ship that holds and shoots.
+    const r = runBattle(battleOf(
+      testShip("hunter", "sloop", { cannons: 25 }), testShip("target"),
+      { hunter: doctrineChooser({ name: "Gunner", rules: [otherwise(fight("hold", "roundShot"))] }, ctx), target: doctrineChooser(templateDoctrine("Smuggler"), ctx) },
+      { terrain: "kelp" },
+    ));
+    expect(r.outcome).toMatchObject({ kind: "struckColours", winner: "hunter", loser: "target" });
+    expect(r.rounds.at(-1)!.ships[1]!.rule).toBe(0);
+    expect(r.rounds.at(-2)!.ships[1]!.hullPoints).toBeLessThan(40);
+    expect(r.rounds.at(-2)!.ships[1]!.helm).toBe("openRange");
   });
+
 
   it("every template against every template ends sanely over many seeds, and the same seed gives the same BattleRecord", () => {
     const kinds = new Set<string>();

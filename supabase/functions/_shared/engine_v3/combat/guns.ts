@@ -15,11 +15,12 @@ const NEUTRAL = 1; // a factor that changes nothing
 
 type Ammo = { key: keyof typeof C.range; track: DamageTrack };
 
-/** The three orders that fire the guns, and the track each one hits. Hold Fire, Board and Repel fire nothing. */
+/** The orders that fire the guns, and the track each one hits. Hold Fire, Board and Repel fire nothing. Only a Bombardier fires the Mortar. */
 const AMMO: Partial<Record<GunsOrder, Ammo>> = {
   roundShot: { key: "round", track: "hull" },
   chainShot: { key: "chain", track: "rigging" },
   grapeshot: { key: "grape", track: "hands" },
+  mortar: { key: "mortar", track: "hull" },
 };
 
 const TRACK_FIELD = { hull: "hullPoints", rigging: "riggingPoints", hands: "hands" } as const;
@@ -42,9 +43,9 @@ export function gunnery(ship: BattleShip): number {
   return full > 0 ? Math.min(NEUTRAL, ship.hands / full) : NEUTRAL;
 }
 
-/** Playing `order` now would make it the staleAfterRepeats-th round in a row with the same order (8.5). */
+/** Playing `order` now would make it the staleAfterRepeats-th round in a row with the same order (8.5). The Mortar never goes stale. */
 export const staleNow = (memory: GunsMemory, order: GunsOrder): boolean =>
-  (memory.order === order ? memory.repeats + 1 : 1) >= C.staleAfterRepeats;
+  order !== "mortar" && (memory.order === order ? memory.repeats + 1 : 1) >= C.staleAfterRepeats;
 
 /** What a ship remembers after playing `order`: the streak, and Hold Fire's bonus for the next round only. */
 export const nextGunsMemory = (memory: GunsMemory, order: GunsOrder): GunsMemory => ({
@@ -53,9 +54,9 @@ export const nextGunsMemory = (memory: GunsMemory, order: GunsOrder): GunsMemory
   charged: order === "holdFire",
 });
 
-/** Long range shots are weaker in Rocky water (cover) and in Fog (2.2). */
+/** Long range shots are weaker in Rocky water (cover) and in Fog (2.2), at Long and at Far (spec section 1). */
 function terrainFactor(range: Range, terrain: Terrain): number {
-  if (range !== "long") return NEUTRAL;
+  if (range !== "long" && range !== "far") return NEUTRAL;
   if (terrain === "rocky") return C.terrainGuns.rockyLong;
   if (terrain === "fog") return C.terrainGuns.fogLong;
   return NEUTRAL;
@@ -65,6 +66,8 @@ export interface GunsContext {
   terrain: Terrain;
   helmMod: number; // this ship's rake, flank or stern shot, or weakened modifier from resolveHelm (gunsMod); NEUTRAL for none
   exposed?: number; // the defender reared up: Round shot does this many times the damage this round (D102); absent means NEUTRAL
+  zeroing?: number; // the Mortar's Zeroing In factor this round (styles.ts zeroingFactor); absent means NEUTRAL
+  longNines?: boolean; // a Gunline that Holds: its Round shot at Long counts the longNines factor instead of the table's
 }
 
 const OPEN_WATER: GunsContext = { terrain: "open", helmMod: NEUTRAL };
@@ -79,8 +82,15 @@ export interface GunsFactors {
   exposed: number; // Round shot against a monster that has reared up, else neutral
   powder: number; // the out of Powder factor, else neutral
   charged: number; // Hold Fire's bonus the round after it, else neutral
-  stale: number; // the stale factor from the third round in a row with the same order, else neutral
+  stale: number; // the stale factor from the third round in a row with the same order, else neutral (the Mortar never goes stale)
   luck: number; // between luckMin and luckMax
+  zeroing?: number; // only for the Mortar: Zeroing In
+}
+
+/** A Mortar shell's own roll (D137): it hits `mortarHit` of the time, and a shell that misses does nothing. */
+export interface MortarShell {
+  roll: number;
+  hit: boolean;
 }
 
 export interface GunsResult {
@@ -90,6 +100,7 @@ export interface GunsResult {
   damage: number; // points taken off the track (Hands lost for Grapeshot), whole, never negative, never more than the target has
   powderUsed: number;
   factors: GunsFactors | null; // null when the order fires nothing, and then no luck is rolled
+  shell?: MortarShell; // only for the Mortar
 }
 
 /**
@@ -99,6 +110,10 @@ export interface GunsResult {
  * Grapeshot Hands at grapeDamagePerHand damage each. Damage is rounded to whole points and capped at what the target
  * has on that track. A ship out of Powder still fires, at the out of Powder factor, and burns none (D27).
  * `rng` is the round's stream; luck is drawn from its child "guns/<attacker id>".
+ *
+ * The Mortar hits Hull, never goes stale, takes the Zeroing In factor, and draws its hit roll from "mortar/<attacker id>":
+ * a shell that misses does no damage but still burns its Powder. Only a Bombardier fires it; runBattle sees to that
+ * (styles.ts playableOrder). Long Nines changes the range factor of a Gunline's Round shot at Long.
  */
 export function fireGuns(
   attacker: BattleShip,
@@ -112,9 +127,10 @@ export function fireGuns(
   if (!ammo) return { order, track: null, raw: 0, damage: 0, powderUsed: 0, factors: null };
 
   const dry = attacker.powder <= 0;
+  const mortar = ammo.key === "mortar";
   const factors: GunsFactors = {
     base: C.k * (attacker.cannons / B.baseStat) ** C.exponent,
-    range: C.range[ammo.key][range],
+    range: ctx.longNines && ammo.key === "round" && range === "long" ? B.styles.gunline.longNines : C.range[ammo.key][range],
     gunnery: gunnery(attacker),
     helm: ctx.helmMod,
     terrain: terrainFactor(range, ctx.terrain),
@@ -123,8 +139,14 @@ export function fireGuns(
     charged: attacker.guns.charged ? C.holdFireNext : NEUTRAL,
     stale: staleNow(attacker.guns, order) ? C.stale : NEUTRAL,
     luck: rng.stream("guns", attacker.shipId).range(C.luckMin, C.luckMax),
+    ...(mortar ? { zeroing: ctx.zeroing ?? NEUTRAL } : {}),
   };
-  const raw = Object.values(factors).reduce((product, f) => product * f, NEUTRAL);
+  let shell: MortarShell | undefined;
+  if (mortar) {
+    const roll = rng.stream("mortar", attacker.shipId).next();
+    shell = { roll, hit: roll < B.styles.bombardier.mortarHit };
+  }
+  const raw = shell && !shell.hit ? 0 : Object.values(factors).reduce((product, f) => product * f, NEUTRAL);
   const points = shotPoints(ammo.track, raw);
   const available = defender[TRACK_FIELD[ammo.track]];
   return {
@@ -134,8 +156,10 @@ export function fireGuns(
     damage: Math.max(0, Math.min(Math.round(points), available)),
     powderUsed: dry ? 0 : Math.min(attacker.powder, B.hulls[attacker.hull].powderPerRound),
     factors,
+    ...(shell ? { shell } : {}),
   };
 }
+
 
 const copyShip = (ship: BattleShip): BattleShip => ({ ...ship, abilities: [...ship.abilities], guns: { ...ship.guns } });
 

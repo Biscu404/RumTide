@@ -2,11 +2,12 @@
 // returns plain numbers. Keeping them JSON means the same job runs on the main thread (tests) or on a worker (pool.ts).
 
 import {
-  GUNS_ORDERS, HELM_MOVES, battleShipOf, doctrineChooser, hash32, newSeason, resolveTide, runBattle,
+  HELM_MOVES, battleShipOf, doctrineChooser, hash32, newSeason, resolveTide, runBattle,
 } from "../../../supabase/functions/_shared/engine_v3/index.ts";
 import type { Chooser, Doctrine, GunsOrder, HelmMove } from "../../../supabase/functions/_shared/engine_v3/index.ts";
 import { cradle, SIX_SHIPS_WIND } from "../sixShips.ts";
 import { buildShip, duel, sceneByName, scoreOf, seedFor, shareLead, verdictFor } from "./arena.ts";
+import { SIM_GUNS_ORDERS } from "./plans.ts";
 import type { Fighter, ShipSpec } from "./arena.ts";
 import { addVerdict, emptyTally } from "./stats.ts";
 import type { Tally } from "./stats.ts";
@@ -53,8 +54,8 @@ export interface Play {
   guns: GunsOrder;
 }
 
-/** Every play there is, the Helm moves in order, each with every Guns order. */
-export const ALL_PLAYS: readonly Play[] = HELM_MOVES.flatMap((helm) => GUNS_ORDERS.map((guns) => ({ helm, guns })));
+/** Every play there is for a ship with no style, the Helm moves in order, each with every Guns order of SIM_GUNS_ORDERS. */
+export const ALL_PLAYS: readonly Play[] = HELM_MOVES.flatMap((helm) => SIM_GUNS_ORDERS.map((guns) => ({ helm, guns })));
 
 export interface SituationJob {
   scene: string;

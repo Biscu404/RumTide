@@ -45,7 +45,7 @@ describe("a battle in words (P2.4)", () => {
     const lines = describeBattle(fight(), none, words);
     expect(lines).toContain("  Round 1, at Long range.");
     expect(lines).toContain("    The hunter plays Close In and Round shot (rule 1).");
-    expect(lines).toContain("    The range goes from Long to Close.");
+    expect(lines).toContain("    The range goes from Long to Short."); // both Close In: two bands of the six
     expect(lines.some((l) => /^ {4}The hunter's Round shot takes \d+ Hull off The target\.$/.test(l))).toBe(true);
   });
 
@@ -72,7 +72,7 @@ describe("a battle in words (P2.4)", () => {
     expect(struck).toContain("The target strikes its colours. Nothing else happens this round.");
     expect(struck).toContain("The target has struck its colours. The hunter wins.");
     const apart = describeBattle(fight(always("openRange", "roundShot"), always("openRange", "roundShot")), none, words).join("\n");
-    expect(apart).toContain("Both ships turn away past Long range, and the fight is over.");
+    expect(apart).toContain("Both ships turn away past Far range, and the fight is over.");
     expect(apart).toContain("Escaped: the ships part in round 1.");
   });
 

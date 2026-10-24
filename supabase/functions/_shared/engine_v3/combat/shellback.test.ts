@@ -11,7 +11,7 @@ import type { Orders, ReplayEvent, SeasonState } from "../types.ts";
 import { runBattle } from "./battle.ts";
 import { battleShipOf, combatEncounter } from "./encounter.ts";
 import { doctrineChooser, evaluateDoctrine, templateDoctrine, validateDoctrine } from "./doctrine.ts";
-import { fireGuns } from "./guns.ts";
+import { ammoFactor, fireGuns } from "./guns.ts";
 import { helmScore } from "./helm.ts";
 import {
   SHELLBACK_DOCTRINE, SHELLBACK_ID, bossAtStrait, bossPlan, hasBeaten, isBoss, mayCross, recordBossWin, shellbackDoctrine,
@@ -109,7 +109,8 @@ describe("Old Shellback in the season (2.5)", () => {
     expect(maxHands(ship)).toBe(40);
     expect(ship.hands).toBe(40);
     expect([cannonsOf(ship), sailsOf(ship)]).toEqual([S.cannons, S.sails]);
-    expect(powerRating(ship)).toBeCloseTo((300 / B.power.hullPer + S.cannons + S.sails + 40 / B.power.handsPer) / B.power.divisor);
+    const sum = (300 / B.power.hullPer + S.cannons + S.sails + 40 / B.power.handsPer) / B.power.divisor;
+    expect(powerRating(ship)).toBeCloseTo(10 * (sum / 10) ** B.power.exponent); // D136
   });
 
   it("is at home in the Narrows: the water is Charted for him, so he has Local Knowledge there (D79)", () => {
@@ -269,7 +270,8 @@ describe("the statline in a battle (2.5)", () => {
     const [r1, r3] = [shotOf(1), shotOf(3)];
     expect(r1.shot.track).toBe("hull");
     expect(r3.shot.track).toBe("hull");
-    expect(record.rounds[0]!.rangeAfter).toBe(record.rounds[2]!.rangeAfter); // the same range
+    // Short in round 1 and Close in round 3: Round shot does the same at both (spec section 1).
+    expect(ammoFactor("roundShot", record.rounds[0]!.rangeAfter)).toBe(ammoFactor("roundShot", record.rounds[2]!.rangeAfter));
     expect(r3.shot.damage / r1.shot.damage).toBeGreaterThan(1.6);
     expect(r3.shot.damage / r1.shot.damage).toBeLessThan(2.5);
   });

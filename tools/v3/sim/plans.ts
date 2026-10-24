@@ -1,10 +1,16 @@
 // Doctrines for the simulator that the game does not ship (P3.1): random plans, random doctrines for the search, and
 // plain words for printing a doctrine. Nothing here is a rule. The randomness is the simulator's own and is seeded.
 
-import { GUNS_ORDERS, HELM_MOVES, rngFor, validateDoctrine } from "../../../supabase/functions/_shared/engine_v3/index.ts";
+import { HELM_MOVES, RANGES, rngFor, validateDoctrine } from "../../../supabase/functions/_shared/engine_v3/index.ts";
 import type {
   Chooser, Doctrine, DoctrineAction, DoctrineCondition, DoctrineRule, GunsOrder, HelmMove, Range, Rng,
 } from "../../../supabase/functions/_shared/engine_v3/index.ts";
+
+/**
+ * The Guns orders the simulator plays, tries and writes into doctrines: the six every ship can give. It is kept explicit so the
+ * Mortar, which only a Bombardier fires, is not tried for ships that have no style. The simulator learns the styles in P3.B3.
+ */
+export const SIM_GUNS_ORDERS: readonly GunsOrder[] = ["roundShot", "chainShot", "grapeshot", "holdFire", "board", "repel"];
 
 // ---------- Random plans (the "random plans" of GAME_DESIGN 7.3, carried into v0.3) ----------
 
@@ -33,7 +39,7 @@ export function randomPlan(seed: number, side: string): Chooser {
 
 // ---------- Random doctrines, for the search for a good one ----------
 
-const RANGES_USED: readonly Range[] = ["long", "medium", "close", "grappled"];
+const RANGES_USED: readonly Range[] = RANGES; // the six distances
 const PCTS = [25, 50, 75] as const;
 
 const pick = <T>(rng: Rng, xs: readonly T[]): T => xs[Math.floor(rng.next() * xs.length)]!;
@@ -46,11 +52,11 @@ export function randomCondition(rng: Rng): DoctrineCondition {
     case 3: return { kind: "track", who: "mine", track: pick(rng, ["hull", "rigging", "hands"] as const), op: pick(rng, ["above", "below"] as const), pct: pick(rng, PCTS) };
     case 4: return { kind: "track", who: "theirs", track: pick(rng, ["hull", "rigging", "hands"] as const), op: pick(rng, ["above", "below"] as const), pct: pick(rng, PCTS) };
     case 5: return { kind: "theirLastHelm", move: pick(rng, HELM_MOVES) };
-    default: return { kind: "theirLastGuns", order: pick(rng, GUNS_ORDERS) };
+    default: return { kind: "theirLastGuns", order: pick(rng, SIM_GUNS_ORDERS) };
   }
 }
 
-export const randomAction = (rng: Rng): DoctrineAction => ({ kind: "fight", helm: pick(rng, HELM_MOVES), guns: pick(rng, GUNS_ORDERS) });
+export const randomAction = (rng: Rng): DoctrineAction => ({ kind: "fight", helm: pick(rng, HELM_MOVES), guns: pick(rng, SIM_GUNS_ORDERS) });
 
 export function randomRule(rng: Rng): DoctrineRule {
   const conditions = rng.next() < 0.35 ? 2 : 1;
@@ -102,9 +108,9 @@ export function mutateDoctrine(rng: Rng, d: Doctrine, name: string, slots = 3): 
 
 const HELM_WORDS: Record<HelmMove, string> = { closeIn: "Close In", hold: "Hold", openRange: "Open Range", crossTheirBow: "Cross Their Bow" };
 const GUNS_WORDS: Record<GunsOrder, string> = {
-  roundShot: "Round shot", chainShot: "Chain shot", grapeshot: "Grapeshot", holdFire: "Hold Fire", board: "Board", repel: "Repel",
+  roundShot: "Round shot", chainShot: "Chain shot", grapeshot: "Grapeshot", holdFire: "Hold Fire", board: "Board", repel: "Repel", mortar: "Mortar",
 };
-const RANGE_WORDS: Record<Range, string> = { long: "Long", medium: "Medium", close: "Close", grappled: "Grappled" };
+const RANGE_WORDS: Record<Range, string> = { far: "Far", long: "Long", medium: "Medium", short: "Short", close: "Close", grappled: "Grappled" };
 
 export const helmWord = (m: HelmMove): string => HELM_WORDS[m];
 export const gunsWord = (g: GunsOrder): string => GUNS_WORDS[g];
@@ -118,6 +124,7 @@ export function conditionText(c: DoctrineCondition): string {
     case "theirLastGuns": return `their last Guns order was ${GUNS_WORDS[c.order]}`;
     case "enemyType": return `enemy type is ${c.type}`;
     case "enemyCaptain": return `enemy captain is ${c.captainId}`;
+    case "theirStyle": return `their style is ${c.style}`;
     case "terrain": return `terrain is ${c.terrain}`;
     case "windGauge": return `the wind gauge is ${c.holder}`;
     case "havePowder": return "I have Powder";

@@ -6,19 +6,21 @@ import { B } from "../balance.ts";
 import { rngFor } from "../rng.ts";
 import type { Rng } from "../rng.ts";
 import type { HullId, ShipId, Terrain, WindKind } from "../types.ts";
+import { canSpoilRake, dashBands, spoiledRake, styleGunsMods, styleHelmFactor } from "./styles.ts";
 import { BATTLE_SIDES, RANGES } from "./types.ts";
 import type { AmbushRange, BattleShip, BattleSide, ContestRecord, HelmMove, HelmRow, Range } from "./types.ts";
 
 const C = B.combat;
-const LONG = RANGES.indexOf("long");
+const FAR = RANGES.indexOf("far");
 const MEDIUM = RANGES.indexOf("medium");
+const SHORT = RANGES.indexOf("short");
 const CLOSE = RANGES.indexOf("close");
 const GRAPPLED = RANGES.indexOf("grappled");
 const NEUTRAL = 1; // a guns modifier that changes nothing
 const SHALLOWS_BIG: readonly HullId[] = ["brigantine", "frigate"]; // hulls that must win a contest to reach Close in Shallows (2.2)
 
 const other = (side: BattleSide): BattleSide => (side === "hunter" ? "target" : "hunter");
-const band = (position: number): Range => RANGES[position] ?? "long";
+const band = (position: number): Range => RANGES[position] ?? "far";
 
 /** The stream for one round of one battle. Combat draws only from labelled children of it. */
 export const battleRng = (tideSeed: number, hunterId: ShipId, targetId: ShipId, round: number): Rng =>
@@ -62,10 +64,15 @@ export function windGauge(hunter: BattleShip, target: BattleShip, terrain: Terra
   return h > t ? "hunter" : "target";
 }
 
-/** Long, or Medium in Fog; a Lurker who springs an ambush chooses (8.1). Kelp never lets the range pass Medium (8.4). */
-export function startingRange(terrain: Terrain, ambush?: AmbushRange): Range {
-  const start: Range = ambush ?? (terrain === "fog" ? "medium" : "long");
-  return terrain === "kelp" && start === "long" ? "medium" : start;
+/**
+ * Long, or Medium in Fog; a Lurker who springs an ambush chooses (8.1). Spotters (a Bombardier flagship) turn a start at Long
+ * into a start at Far, as the prototype did, so Fog and an ambush at Medium still start at Medium. Kelp never lets the range
+ * pass Medium (8.4).
+ */
+export function startingRange(terrain: Terrain, ambush?: AmbushRange, spotted = false): Range {
+  let start: Range = ambush ?? (terrain === "fog" ? "medium" : "long");
+  if (spotted && start === "long") start = "far";
+  return terrain === "kelp" && RANGES.indexOf(start) < MEDIUM ? "medium" : start;
 }
 
 // ---------- The Helm contest ----------
@@ -104,7 +111,7 @@ export const pairRow = (a: HelmMove, b: HelmMove): HelmRow => ROWS[a][b];
 
 export interface PairOutcome {
   row: HelmRow;
-  position: number; // index in RANGES; below Long means the range went past Long
+  position: number; // index in RANGES; below Far means the range went past Far
   gunsMod: Record<BattleSide, number>; // rake, flank or stern shot, weakened; NEUTRAL for a ship with none
 }
 
@@ -195,25 +202,28 @@ export interface HelmResult {
   row: HelmRow;
   moves: Record<BattleSide, HelmMove>; // what was played, after the Crippled rule
   scores: Record<BattleSide, number>;
-  range: Range; // after the round; Long when the ships escaped
-  escaped: boolean; // the range went past Long. The guns of that round are for the caller to skip
+  range: Range; // after the round; Far when the ships escaped
+  escaped: boolean; // the range went past Far. The guns of that round are for the caller to skip
   gunsMod: Record<BattleSide, number>;
   scrape: Record<BattleSide, number>; // Hull lost to a Reef scrape
   contests: ContestRecord[]; // every Helm contest rolled, in order
 }
 
 /**
- * Step 3 of a round (8.3): both Helm scores, the pair table, then the terrain overrides.
- * `rng` is the round's stream; the rolls come from its children "helm/chase" and "helm/shallows/<side>".
+ * Step 3 of a round (8.3): both Helm scores, the pair table, the Fighting Style traits, then the terrain overrides.
+ * `rng` is the round's stream; the rolls come from its children "helm/chase", "helm/dash/<side>" and "helm/shallows/<side>".
  * While Grappled the table does not apply (Cut Free is boarding, 8.6).
+ *
+ * The traits: Slippery (a Smuggler that Opens Range scores more, in every contest of the round), Dash (a Rammer's Close In
+ * moves one band further, and a Rammer whose bow is crossed may spoil the rake), Kite, Braced and Steady Deck (styles.ts).
  */
 export function resolveHelm(input: HelmInput, rng: Rng): HelmResult {
   const { range, terrain, hunter, target, gauge } = input;
   const ships: Record<BattleSide, BattleShip> = { hunter, target };
   const moves = { hunter: playableMove(hunter, input.moves.hunter), target: playableMove(target, input.moves.target) };
   const scores = {
-    hunter: helmScore(hunter, target, terrain, gauge === "hunter"),
-    target: helmScore(target, hunter, terrain, gauge === "target"),
+    hunter: helmScore(hunter, target, terrain, gauge === "hunter") * styleHelmFactor(hunter, moves.hunter),
+    target: helmScore(target, hunter, terrain, gauge === "target") * styleHelmFactor(target, moves.target),
   };
   const contests: ContestRecord[] = [];
   const scrape = { hunter: 0, target: 0 };
@@ -230,12 +240,27 @@ export function resolveHelm(input: HelmInput, rng: Rng): HelmResult {
   }
   const pair = applyPair(moves, range, chaseWinner);
   let position = pair.position;
+  let gunsMod = styleGunsMods(pair.row, ships, moves, pair.gunsMod);
+
+  // Dash: a Rammer's Close In that brings the ships nearer moves one band further, never past Close.
+  const here = RANGES.indexOf(range);
+  for (const side of BATTLE_SIDES) {
+    const extra = dashBands(ships[side], moves[side]);
+    if (extra > 0 && position > here && position < GRAPPLED) position = Math.min(position + extra, CLOSE);
+  }
+  // The dash spoils a rake: a Rammer whose bow is crossed while it Closes In wins a Helm contest to spoil it.
+  for (const side of BATTLE_SIDES) {
+    if (!canSpoilRake(pair.row, ships[side], moves[side])) continue;
+    const spoil = contestRecord(rng.stream("helm", "dash", side), "dash", side, scores);
+    contests.push(spoil);
+    if (spoil.winner === side) gunsMod = spoiledRake(side, gunsMod);
+  }
 
   // Kelp: the range never goes beyond Medium, so nobody escapes by range.
   if (terrain === "kelp") position = Math.max(position, MEDIUM);
 
   // Shallows: each Brigantine or Frigate without Local Knowledge must win a Helm contest for the range to reach Close.
-  if (terrain === "shallows" && position === CLOSE && RANGES.indexOf(range) < CLOSE) {
+  if (terrain === "shallows" && position === CLOSE && here < CLOSE) {
     let reached = true;
     for (const side of BATTLE_SIDES) {
       if (!SHALLOWS_BIG.includes(ships[side].hull) || hasLocalKnowledge(ships[side], ships[other(side)])) continue;
@@ -243,12 +268,12 @@ export function resolveHelm(input: HelmInput, rng: Rng): HelmResult {
       contests.push(roll);
       if (roll.winner !== side) reached = false;
     }
-    if (!reached) position = MEDIUM; // the range stops one band short of Close
+    if (!reached) position = SHORT; // the range stops one band short of Close (D42)
   }
 
   // Reef: every Cross or Close In scrapes the hull, unless the water is Charted for that captain.
   for (const side of BATTLE_SIDES) scrape[side] = reefScrape(terrain, ships[side], moves[side]);
 
-  const escaped = position < LONG;
-  return { row: pair.row, moves, scores, range: escaped ? band(LONG) : band(position), escaped, gunsMod: pair.gunsMod, scrape, contests };
+  const escaped = position < FAR;
+  return { row: pair.row, moves, scores, range: escaped ? band(FAR) : band(position), escaped, gunsMod, scrape, contests };
 }

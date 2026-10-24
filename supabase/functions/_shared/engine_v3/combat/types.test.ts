@@ -1,23 +1,34 @@
 import { describe, expect, it } from "vitest";
 import { B } from "../balance.ts";
+import { FIGHTING_STYLES } from "../types.ts";
 import { BATTLE_SIDES, GUNS_ORDERS, HELM_MOVES, RANGES } from "./types.ts";
 import type { BattleOutcome, Doctrine, OutcomeKind } from "./types.ts";
 
 describe("combat types (P2.1)", () => {
-  it("lists the four range bands from far to near", () => {
-    expect(RANGES).toEqual(["long", "medium", "close", "grappled"]);
+  it("lists the six distances from far to near (D121)", () => {
+    expect(RANGES).toEqual(["far", "long", "medium", "short", "close", "grappled"]);
   });
 
-  it("lists the four Helm moves and the six Guns orders", () => {
+  it("lists the four Helm moves and the seven Guns orders, the Mortar last", () => {
     expect(HELM_MOVES).toEqual(["closeIn", "hold", "openRange", "crossTheirBow"]);
-    expect(GUNS_ORDERS).toEqual(["roundShot", "chainShot", "grapeshot", "holdFire", "board", "repel"]);
+    expect(GUNS_ORDERS).toEqual(["roundShot", "chainShot", "grapeshot", "holdFire", "board", "repel", "mortar"]);
     expect(BATTLE_SIDES).toEqual(["hunter", "target"]);
   });
 
-  it("agrees with the ammo table in balance.ts", () => {
-    for (const row of Object.values(B.combat.range)) expect(Object.keys(row)).toEqual([...RANGES]);
-    expect(Object.keys(B.combat.range)).toEqual(["round", "chain", "grape"]);
+  it("names all seven Fighting Styles", () => {
+    expect(FIGHTING_STYLES).toEqual(["bombardier", "gunline", "skirmisher", "rammer", "boarder", "firebrand", "smuggler"]);
   });
+
+  it("agrees with the ammo table in balance.ts, which is the table of the Fighting Styles spec", () => {
+    for (const row of Object.values(B.combat.range)) expect(Object.keys(row)).toEqual([...RANGES]);
+    expect(Object.keys(B.combat.range)).toEqual(["round", "chain", "grape", "mortar"]);
+    const at = (row: keyof typeof B.combat.range) => RANGES.slice(0, 5).map((r) => B.combat.range[row][r]);
+    expect(at("round")).toEqual([0.2, 0.6, 1.0, 1.0, 1.0]);
+    expect(at("chain")).toEqual([0.4, 1.0, 0.8, 0.6, 0.4]);
+    expect(at("grape")).toEqual([0, 0, 0.5, 0.85, 1.2]);
+    expect(at("mortar")).toEqual([1.1, 1.1, 0.85, 0, 0]);
+  });
+
 
   it("covers the seven outcomes of GAMEPLAY 8.7", () => {
     const kinds: OutcomeKind[] = ["sunk", "captured", "struckColours", "crippled", "escaped", "victory", "draw"];

@@ -10,7 +10,7 @@ import { applyBattle, battleShipOf, combatEncounter } from "./encounter.ts";
 import { runBattle } from "./battle.ts";
 import { describeBattle } from "./describe.ts";
 import { doctrineChooser, templateDoctrine } from "./doctrine.ts";
-import type { BattleAftermath, BattleRecord, BattleSide, OutcomeKind } from "./types.ts";
+import type { BattleAftermath, BattleRecord, BattleSide, Doctrine, OutcomeKind } from "./types.ts";
 import type { Rng } from "../rng.ts";
 
 const WEST_BREEZE = { cradle: { kind: "breeze" as const, from: 270 } };
@@ -109,12 +109,12 @@ describe("a fleet in an encounter (P2.5, v0.2 7.5)", () => {
 
   it("gives every ship its own captain's doctrine", () => {
     const state = fleets(season(captains4(), 6));
-    state.captains.m!.doctrines = [templateDoctrine("Runner")];
-    state.captains.m!.defaultDoctrine = "Runner";
-    state.captains.u!.doctrines = [templateDoctrine("Coward")];
-    state.captains.u!.defaultDoctrine = "Coward";
+    state.captains.m!.doctrines = [templateDoctrine("Rammer")];
+    state.captains.m!.defaultDoctrine = "Rammer";
+    state.captains.u!.doctrines = [templateDoctrine("Smuggler")];
+    state.captains.u!.defaultDoctrine = "Smuggler";
     const battle = battleIn(combatEncounter(ctxOf(state, { hunterMates: ["m"], targetMates: ["u"], mutual: true })).events)!;
-    expect(battle.record.fleet!.doctrines).toEqual({ ship_h: "Brawler", ship_m: "Runner", ship_t: "Brawler", ship_u: "Coward" });
+    expect(battle.record.fleet!.doctrines).toEqual({ ship_h: "Brawler", ship_m: "Rammer", ship_t: "Brawler", ship_u: "Smuggler" });
   });
 
   it("lets a mate follow its own step or plan doctrine", () => {
@@ -153,6 +153,11 @@ describe("a fleet in an encounter (P2.5, v0.2 7.5)", () => {
     state.captains.m!.shieldUntilTide = 8;
     state.captains.u!.shieldUntilTide = 8;
     state.captains.t!.shieldUntilTide = 8;
+    // Everyone holds fire, so the battle is a Draw and no loser is shielded again afterwards.
+    for (const c of Object.values(state.captains)) {
+      c.doctrines = [{ name: "Quiet", rules: [{ if: [], then: { kind: "fight", helm: "hold", guns: "holdFire" } }] }];
+      c.defaultDoctrine = "Quiet";
+    }
     combatEncounter(ctxOf(state, { hunterMates: ["m"], targetMates: ["u"], mutual: false }));
     expect(state.captains.m!.shieldUntilTide).toBe(5);
     expect(state.captains.u!.shieldUntilTide).toBe(5);
@@ -180,6 +185,14 @@ describe("a fleet in an encounter (P2.5, v0.2 7.5)", () => {
 // ---------- What a fleet battle does to the world ----------
 
 describe("applying a fleet battle (P2.5, GAME_DESIGN 9 rule 4)", () => {
+  /** Holds and fires, and strikes below half its Hull: the old Coward template, which these records were written with. */
+  const HOLD_AND_FIRE: Doctrine = {
+    name: "Hold and fire",
+    rules: [
+      { if: [{ kind: "track", who: "mine", track: "hull", op: "below", pct: 50 }], then: { kind: "surrender" } },
+      { if: [], then: { kind: "fight", helm: "hold", guns: "roundShot" } },
+    ],
+  };
   /** A finished battle with its outcome and each ship's share of the damage set by hand. */
   function finished(
     state: SeasonState, hunters: string[], targets: string[], kind: OutcomeKind, winner: BattleSide | null,
@@ -188,7 +201,7 @@ describe("applying a fleet battle (P2.5, GAME_DESIGN 9 rule 4)", () => {
     const mk = (ids: string[], role: BattleSide) => ids.map((id) => battleShipOf(ship(state, id), state.captains[id]!, role, { charted: true, withCurrent: false, lurker: false }));
     const [h, ...hm] = mk(hunters, "hunter");
     const [t, ...tm] = mk(targets, "target");
-    const choose = doctrineChooser(templateDoctrine("Coward"), { enemyType: "player" });
+    const choose = doctrineChooser(HOLD_AND_FIRE, { enemyType: "player" });
     const base = runBattle({
       tide: state.tide, seed: 5, at: "gh_lee", terrain: "open", wind: "breeze", hunter: h!, target: t!,
       doctrines: { hunter: "x", target: "y" }, choosers: { hunter: choose, target: choose },

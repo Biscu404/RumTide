@@ -6,13 +6,17 @@ import type { Terrain } from "../types.ts";
 import type { Carried } from "./loot.ts";
 import { BATTLE_SIDES, DAMAGE_TRACKS } from "./types.ts";
 import type {
-  BattleAftermath, BattleRecord, BattleSide, DamageTrack, GunsOrder, HelmMove, Range, RoundRecord, SideBonus,
+  BattleAftermath, BattleRecord, BattleSide, ContestRecord, DamageTrack, GunsOrder, HelmMove, Range, RoundRecord, SideBonus,
 } from "./types.ts";
 
-const RANGE: Record<Range, string> = { long: "Long", medium: "Medium", close: "Close", grappled: "Grappled" };
+// The Fighting Styles have plain names only here; their replay lines (rams, mortar arcs, style badges) are P3.B2 piece 3.
+const RANGE: Record<Range, string> = { far: "Far", long: "Long", medium: "Medium", short: "Short", close: "Close", grappled: "Grappled" };
 const HELM: Record<HelmMove, string> = { closeIn: "Close In", hold: "Hold", openRange: "Open Range", crossTheirBow: "Cross Their Bow" };
 const GUNS: Record<GunsOrder, string> = {
-  roundShot: "Round shot", chainShot: "Chain shot", grapeshot: "Grapeshot", holdFire: "Hold Fire", board: "Board", repel: "Repel",
+  roundShot: "Round shot", chainShot: "Chain shot", grapeshot: "Grapeshot", holdFire: "Hold Fire", board: "Board", repel: "Repel", mortar: "Mortar",
+};
+const CONTEST: Record<ContestRecord["kind"], string> = {
+  chase: "the chase", shallows: "reaching Close in the Shallows", cutFree: "cutting free", ram: "the ram", dash: "spoiling the rake",
 };
 const TRACK: Record<DamageTrack, string> = { hull: "Hull", rigging: "Rigging", hands: "Hands" };
 const TERRAIN: Record<Terrain, string> = {
@@ -89,16 +93,16 @@ function roundLines(record: BattleRecord, round: RoundRecord): string[] {
     lines.push(`  ${nameOf(s.ship)} plays ${HELM[s.helm]} and ${GUNS[s.guns]} (${rule}).${jettison}${rears}`);
   }
   for (const c of round.contests) {
-    const what = c.kind === "chase" ? "the chase" : c.kind === "shallows" ? "reaching Close in the Shallows" : "cutting free";
     const mine = c.ship ? nameOf(c.ship) : flagName(c.side);
     const winner = c.winner === c.side ? mine : flagName(other(c.side));
-    lines.push(`  Helm contest for ${what}: ${winner} wins (${mine} had a ${percent(c.chance)} chance).`);
+    lines.push(`  Helm contest for ${CONTEST[c.kind]}: ${winner} wins (${mine} had a ${percent(c.chance)} chance).`);
   }
   for (const s of round.ships) {
     if (s.scrape > 0) lines.push(`  ${nameOf(s.ship)} scrapes the reef and loses ${s.scrape} Hull.`);
   }
   if (round.escaped) {
-    lines.push("  Both ships turn away past Long range, and the fight is over.");
+    lines.push("  Both ships turn away past Far range, and the fight is over.");
+
   } else {
     lines.push(
       round.rangeAfter === round.rangeBefore

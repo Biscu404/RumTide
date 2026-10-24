@@ -1,4 +1,5 @@
-// Checks 1 and 3 of GAMEPLAY 8.9 (P3.1): the four templates against each other, and equal ships in either seat.
+// Checks 1 and 3 of GAMEPLAY 8.9 (P3.1): the templates (TEMPLATE_NAMES) against each other, and equal ships in either seat.
+// The ships have no Fighting Style yet, so no trait counts: the simulator learns the styles in P3.B3.
 //
 // Check 1: no template doctrine wins more than 60% against the field of the others. The ships are equal fresh sloops.
 // Every template meets every other template in every scene, once as the hunter and once as the target. A win is a

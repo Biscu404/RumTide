@@ -10,6 +10,11 @@
 // Chooser sees its own state and the enemy flagship, and nothing else of the enemy. The flagships' Helm moves move the
 // range. A side's damage is its ships' added up, times the fleet bonus and Desperate Defence, and shared out between the
 // enemy ships by max Hull. A battle with one ship a side runs exactly as it did before fleets existed.
+//
+// Fighting Styles (docs/specs/fighting-styles.md): each ship's style trait counts in the rounds its own move or order is
+// played (styles.ts). Spotters set the starting range, the Helm step holds Slippery, Dash, Kite, Braced and Steady Deck, the
+// Ram lands after the Helm step and before the guns, and the guns hold the Mortar, Zeroing In and Long Nines. A ship given an
+// order its style cannot give (the Mortar, for anyone but a Bombardier) plays Round shot, and the record says so.
 
 import { B } from "../balance.ts";
 import type { ShipId, Terrain, WaterId, WindKind } from "../types.ts";
@@ -20,15 +25,17 @@ import {
 import type { Shot } from "./fleet.ts";
 import { fireGuns, recordFiring, shotPoints } from "./guns.ts";
 import type { GunsResult } from "./guns.ts";
-import { battleRng, isCrippled, helmScore, resolveHelm, startingRange, windGauge } from "./helm.ts";
+import { battleRng, contestRecord, isCrippled, helmScore, resolveHelm, startingRange, windGauge } from "./helm.ts";
+import { firesLongNines, isRam, playableOrder, ramHull, ramSelf, spotters, zeroingFactor } from "./styles.ts";
 import { BATTLE_SIDES, DAMAGE_TRACKS } from "./types.ts";
 import type {
   AmbushRange, BattleOutcome, BattleRecord, BattleShip, BattleSide, ContestRecord, DamageTrack, FleetRecord, FleetRoundRecord,
-  GrappleRecord, GunsOrder, HelmMove, MeleeRecord, Range, RoundRecord, RoundShipRecord,
+  GrappleRecord, GunsOrder, HelmMove, MeleeRecord, RamRecord, Range, RoundRecord, RoundShipRecord,
 } from "./types.ts";
 
 const C = B.combat;
-const EPSILON = 1e-9; // a lead of exactly 10 points counts, whatever the floating point sum says
+const EPSILON = 1e-9; // a lead of exactly the margin counts, whatever the floating point sum says
+const NEUTRAL = 1; // a factor that changes nothing
 
 const other = (side: BattleSide): BattleSide => (side === "hunter" ? "target" : "hunter");
 
@@ -146,6 +153,7 @@ function shipRecord(
   score: number,
   shot: Pick<GunsResult, "track" | "damage" | "powderUsed">,
   scrape: number,
+  extra: { asked?: GunsOrder; mortar?: RoundShipRecord["mortar"] | undefined } = {}, // the order the doctrine gave; the Mortar's shell
 ): RoundShipRecord {
   return {
     ship: ship.shipId,
@@ -153,6 +161,8 @@ function shipRecord(
     abilities: choice.abilities.map((a) => ({ ...a })),
     helm,
     guns,
+    ...(extra.asked !== undefined && extra.asked !== guns ? { asked: extra.asked } : {}),
+    ...(extra.mortar ? { mortar: { ...extra.mortar } } : {}),
     ...(choice.kind === "fight" && choice.exposed !== undefined && choice.exposed !== 1 ? { exposed: choice.exposed } : {}),
     helmScore: score,
     shot: { track: shot.track, damage: shot.damage, powderUsed: shot.powderUsed },
@@ -166,8 +176,8 @@ function shipRecord(
 }
 
 /**
- * After the last round: one side leads by the margin (10 points) in damage share and wins Victory on points,
- * exactly 10 included. Otherwise it is a Draw (8.7).
+ * After the last round: one side leads by the margin (5 points, D132) in damage share and wins Victory on points,
+ * exactly the margin included. Otherwise it is a Draw (8.7).
  */
 export function pointsOutcome(dealt: Record<BattleSide, number>, round: number): BattleOutcome {
   const lead = dealt.hunter - dealt.target;
@@ -229,7 +239,8 @@ export function runBattle(input: BattleInput): BattleRecord {
   const sideOf = (id: ShipId): BattleSide => (ids.hunter.includes(id) ? "hunter" : "target");
 
   const gauge = windGauge(ships[flag.hunter]!, ships[flag.target]!, terrain, wind);
-  const startRange = startingRange(terrain, input.ambush);
+  // Spotters: a battle with a Bombardier flagship starts at Far.
+  const startRange = startingRange(terrain, input.ambush, spotters([ships[flag.hunter]!, ships[flag.target]!]));
   const initial = all.map((id) => copyShip(ships[id]!, sideOf(id)));
   const bonus = {
     hunter: sideBonus(ids.hunter.length, ids.target.length, input.playerSide?.hunter ?? false),
@@ -243,6 +254,8 @@ export function runBattle(input: BattleInput): BattleRecord {
   const jettisoned = new Set<ShipId>();
   const rounds: RoundRecord[] = [];
   let outcome: BattleOutcome | null = null;
+  // Zeroing In: the rounds in a row each Bombardier has fired the Mortar with the range unchanged.
+  let zeroing: Record<ShipId, number> = Object.fromEntries(all.map((id) => [id, 0]));
 
   for (let round = 1; round <= C.rounds && outcome === null; round++) {
     const rng = battleRng(seed, flag.hunter, flag.target, round);
@@ -288,7 +301,8 @@ export function runBattle(input: BattleInput): BattleRecord {
     }
 
     const fights = choices as Record<ShipId, Extract<RoundChoice, { kind: "fight" }>>;
-    const orders: Record<ShipId, GunsOrder> = Object.fromEntries(all.map((id) => [id, fights[id]!.guns]));
+    // The order each ship really gives: a doctrine copied from another style may name an order this ship cannot give.
+    const orders: Record<ShipId, GunsOrder> = Object.fromEntries(all.map((id) => [id, playableOrder(ships[id]!, fights[id]!.guns)]));
 
     // 3. Helm resolves: range changes, rakes and flank shots, terrain overrides (8.4). The flagships move the range.
     const helm = resolveHelm(
@@ -304,6 +318,7 @@ export function runBattle(input: BattleInput): BattleRecord {
     const scores: Record<ShipId, number> = {};
     const gunsMod: Record<ShipId, number> = {};
     const scrape: Record<ShipId, number> = {};
+    const outrun = new Set<ShipId>(); // fleet mates that lost their chase of the enemy flagship this round
     for (const side of BATTLE_SIDES) {
       moves[flag[side]] = helm.moves[side];
       scores[flag[side]] = helm.scores[side];
@@ -315,14 +330,18 @@ export function runBattle(input: BattleInput): BattleRecord {
       if (id === flag.hunter || id === flag.target) continue;
       const side = sideOf(id);
       const m = mateHelm(
-        ships[id]!, fights[id]!.helm, scoresNow[id]!, { move: helm.moves[other(side)], score: helm.scores[other(side)] },
+        ships[id]!, fights[id]!.helm, scoresNow[id]!,
+        { move: helm.moves[other(side)], score: helm.scores[other(side)], ship: ships[flag[other(side)]]! },
         range, terrain, rng,
       );
       moves[id] = m.move;
-      scores[id] = scoresNow[id]!;
+      scores[id] = m.score;
       gunsMod[id] = m.gunsMod;
       scrape[id] = m.scrape;
-      if (m.contest) contests.push(m.contest);
+      if (m.contest) {
+        contests.push(m.contest);
+        if (m.contest.winner !== side) outrun.add(id);
+      }
     }
     if (range === "grappled") {
       const free = cutFree(rng, helm.moves, helm.scores);
@@ -338,12 +357,59 @@ export function runBattle(input: BattleInput): BattleRecord {
       }
       if (freed) after = "close";
     }
+
+    // The Ram (spec section 3): at Close, a Rammer's Close In strikes the enemy flagship (D91), after the Helm step and
+    // before the guns. It misses when the flagship crossed its bow or got away (it won the chase, or the range opened), and
+    // otherwise a Helm contest from "ram/<ship id>" decides. On a hit the flagship loses ramHull (less against a Braced
+    // Gunline) and the Rammer ramSelf. Two Rammers can both Ram. A Ram that lands never grapples, but a Board can still.
+    const rams: RamRecord[] = [];
+    const ramLoss: Record<ShipId, number> = Object.fromEntries(all.map((id) => [id, 0]));
+    if (!helm.escaped && range === "close") {
+      const hullLeft = (id: ShipId): number => Math.max(0, ships[id]!.hullPoints - scrape[id]! - ramLoss[id]!);
+      for (const id of all) {
+        if (!isRam(ships[id]!, moves[id]!, range)) continue;
+        const side = sideOf(id);
+        const foeSide = other(side);
+        const foe = flag[foeSide];
+        const mate = id === flag[side] ? {} : { ship: id };
+        const theirMove = helm.moves[foeSide];
+        if (theirMove === "crossTheirBow") {
+          rams.push({ side, ...mate, hit: false, why: "crossed", hull: 0, self: 0 });
+          continue;
+        }
+        if ((after !== "close" && after !== "grappled") || outrun.has(id)) {
+          rams.push({ side, ...mate, hit: false, why: "outrun", hull: 0, self: 0 });
+          continue;
+        }
+        const contest = contestRecord(rng.stream("ram", id), "ram", side, { [side]: scores[id]!, [foeSide]: helm.scores[foeSide] } as Record<BattleSide, number>);
+        contests.push({ ...contest, ...mate });
+        if (contest.winner !== side) {
+          rams.push({ side, ...mate, hit: false, why: "contest", hull: 0, self: 0 });
+          continue;
+        }
+        const hull = Math.min(ramHull(ships[foe]!, theirMove), hullLeft(foe));
+        const self = Math.min(ramSelf(), hullLeft(id));
+        ramLoss[foe]! += hull;
+        ramLoss[id]! += self;
+        // The struck hull counts for the Rammer's side, and the Rammer's own hull for the other side, as the prototype did.
+        const blow = sideShare(shipsOf(foeSide, ships), "hull", hull);
+        const recoil = sideShare(shipsOf(side, ships), "hull", self);
+        dealt[side] += blow;
+        dealtBy[id]! += blow;
+        dealt[foeSide] += recoil;
+        dealtBy[foe]! += recoil;
+        rams.push({ side, ...mate, hit: true, why: "contest", hull, self });
+      }
+      if (after === "grappled" && rams.some((r) => r.hit && r.ship === undefined)) after = "close";
+    }
     const working: Record<ShipId, BattleShip> = Object.fromEntries(
-      all.map((id) => [id, withLosses(ships[id]!, { ...noLosses(), hull: scrape[id]! })]),
+      all.map((id) => [id, withLosses(ships[id]!, { ...noLosses(), hull: scrape[id]! + ramLoss[id]! })]),
     );
 
     let next = working;
     let grapples: GrappleRecord[] = [];
+    const fired: Record<ShipId, GunsResult> = {};
+    const zeroingNext: Record<ShipId, number> = {};
     let melee: MeleeRecord | null = null;
     const shots: Record<ShipId, Pick<GunsResult, "track" | "damage" | "powderUsed">> = Object.fromEntries(all.map((id) => [id, NO_SHOT]));
     const taken: Record<ShipId, Record<DamageTrack, number>> = Object.fromEntries(all.map((id) => [id, noLosses()]));
@@ -360,10 +426,19 @@ export function runBattle(input: BattleInput): BattleRecord {
         hunter: fights[flag.hunter]!.exposed ?? 1,
         target: fights[flag.target]!.exposed ?? 1,
       };
-      const fired: Record<ShipId, GunsResult> = {};
+      // The Mortar takes the rake, flank and weakened factors (D137), and Zeroing In grows while the range holds. A Gunline
+      // that Holds fires Long Nines.
       for (const id of all) {
         const foe = other(sideOf(id));
-        fired[id] = fireGuns(working[id]!, working[flag[foe]!]!, after, orders[id]!, rng, { terrain, helmMod: gunsMod[id]!, exposed: exposure[foe] });
+        const mortar = orders[id] === "mortar";
+        zeroingNext[id] = mortar && range === after ? zeroing[id]! + 1 : 0;
+        fired[id] = fireGuns(working[id]!, working[flag[foe]!]!, after, orders[id]!, rng, {
+          terrain,
+          helmMod: mortar && !B.styles.bombardier.mortarTakesRakes ? NEUTRAL : gunsMod[id]!,
+          exposed: exposure[foe],
+          ...(mortar ? { zeroing: zeroingFactor(zeroingNext[id]!) } : {}),
+          ...(firesLongNines(ships[id]!, moves[id]!) ? { longNines: true } : {}),
+        });
       }
       // A side's guns are added up per track, times the fleet bonus and Desperate Defence, and shared out between the
       // enemy ships by max Hull (7.5). With one ship a side this is just each ship's shot against the other.
@@ -416,10 +491,16 @@ export function runBattle(input: BattleInput): BattleRecord {
           struck: [],
         }
       : null;
+    const shellOf = (id: ShipId): RoundShipRecord["mortar"] | undefined => {
+      const shell = fired[id]?.shell;
+      return shell ? { roll: shell.roll, hit: shell.hit, zeroing: fired[id]!.factors?.zeroing ?? NEUTRAL } : undefined;
+    };
     rounds.push({
       round, rangeBefore: range, rangeAfter: after, escaped: helm.escaped, row: helm.row,
-      contests, grapples, melee, crippled, struck: [],
-      ships: all.map((id) => shipRecord(next[id]!, fights[id]!, moves[id]!, orders[id]!, scores[id]!, shots[id]!, scrape[id]!)),
+      contests, grapples, ...(rams.length > 0 ? { rams } : {}), melee, crippled, struck: [],
+      ships: all.map((id) => shipRecord(next[id]!, fights[id]!, moves[id]!, orders[id]!, scores[id]!, shots[id]!, scrape[id]!, {
+        asked: fights[id]!.guns, mortar: shellOf(id),
+      })),
       ...(fleetRound ? { fleet: fleetRound } : {}),
     });
 
@@ -439,8 +520,10 @@ export function runBattle(input: BattleInput): BattleRecord {
 
     ships = next;
     range = after;
+    zeroing = Object.fromEntries(all.map((id) => [id, zeroingNext[id] ?? 0]));
     last = Object.fromEntries(all.map((id) => [id, { helm: moves[id]!, guns: orders[id]! }]));
   }
+
 
   // After the last round: Victory on points or a Draw (8.7).
   if (outcome === null) outcome = pointsOutcome(dealt, rounds.length);

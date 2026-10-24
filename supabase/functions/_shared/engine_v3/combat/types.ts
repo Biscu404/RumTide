@@ -2,14 +2,17 @@
 // Section numbers point at docs/GAMEPLAY.md. The rules for these shapes live next to them:
 // helm.ts and guns.ts (P2.1), boarding.ts, battle.ts and loot.ts (P2.2), doctrine.ts (P2.3).
 
-import type { CaptainId, HullId, ShipId, Terrain, WaterId, WindKind } from "../types.ts";
+import type { CaptainId, FightingStyle, HullId, ShipId, Terrain, WaterId, WindKind } from "../types.ts";
 import type { Carried, SalvagePile } from "./loot.ts";
 
 // ---------- Range, Helm moves and Guns orders (8.2, 8.4, 8.5) ----------
 
-/** The four range bands, from far to near. Grappled comes from a mutual Close In at Close or from Board (8.4, 8.6). */
-export type Range = "long" | "medium" | "close" | "grappled";
-export const RANGES: readonly Range[] = ["long", "medium", "close", "grappled"];
+/**
+ * The six distances, from far to near (D121). Grappled comes from a mutual Close In at Close or from Board (8.4, 8.6), and a
+ * ship escapes by going past Far.
+ */
+export type Range = "far" | "long" | "medium" | "short" | "close" | "grappled";
+export const RANGES: readonly Range[] = ["far", "long", "medium", "short", "close", "grappled"];
 
 /** What a Lurker who springs an ambush may choose as the starting range (8.1). */
 export type AmbushRange = "long" | "medium";
@@ -17,8 +20,9 @@ export type AmbushRange = "long" | "medium";
 export type HelmMove = "closeIn" | "hold" | "openRange" | "crossTheirBow";
 export const HELM_MOVES: readonly HelmMove[] = ["closeIn", "hold", "openRange", "crossTheirBow"];
 
-export type GunsOrder = "roundShot" | "chainShot" | "grapeshot" | "holdFire" | "board" | "repel";
-export const GUNS_ORDERS: readonly GunsOrder[] = ["roundShot", "chainShot", "grapeshot", "holdFire", "board", "repel"];
+/** The Guns orders. Only a Bombardier can fire the Mortar; any other ship that is given it fires Round shot (spec edge cases). */
+export type GunsOrder = "roundShot" | "chainShot" | "grapeshot" | "holdFire" | "board" | "repel" | "mortar";
+export const GUNS_ORDERS: readonly GunsOrder[] = ["roundShot", "chainShot", "grapeshot", "holdFire", "board", "repel", "mortar"];
 
 /** The three things a ship can lose in battle (6.3). */
 export type DamageTrack = "hull" | "rigging" | "hands";
@@ -50,6 +54,7 @@ export interface BattleShip {
   name: string;
   side: BattleSide;
   hull: HullId;
+  style?: FightingStyle; // the captain's Fighting Style, for its trait and the replay's badge. Absent for a ship with none
   // Fixed for the whole battle.
   cannons: number; // the Cannons stat value (10 for a fresh sloop)
   sails: number; // the Sails stat value (10 for a fresh sloop)
@@ -75,7 +80,9 @@ export interface BattleShip {
 
 /** One Helm contest (8.4, 8.6): `side` won with probability `chance`, by rolling `roll` below it. */
 export interface ContestRecord {
-  kind: "chase" | "shallows" | "cutFree"; // the Close In against Open Range chase, a big ship reaching Close in Shallows, or a Grappled ship trying to get away
+  // The Close In against Open Range chase, a big ship reaching Close in Shallows, a Grappled ship trying to get away, a
+  // Rammer's Ram finding its mark, or a dashing Rammer spoiling the rake of a ship that crosses its bow.
+  kind: "chase" | "shallows" | "cutFree" | "ram" | "dash";
   side: BattleSide; // the ship whose chance this is
   ship?: ShipId; // set for a fleet mate that is not its side's flagship: it contests the enemy flagship (P2.5)
   scores: Record<BattleSide, number>;
@@ -89,7 +96,9 @@ export interface RoundShipRecord {
   rule: number; // index of the doctrine rule that gave the Helm move and Guns order (replays show it, 8.8)
   abilities: { rule: number; ability: string }[]; // ability rules that fired above it, in order
   helm: HelmMove; // the move played, after the Crippled rule
-  guns: GunsOrder;
+  guns: GunsOrder; // the order played: a ship given an order its style cannot give plays Round shot (see `asked`)
+  asked?: GunsOrder; // the order the doctrine gave, only when the ship could not give it and played `guns` instead
+  mortar?: { roll: number; hit: boolean; zeroing: number }; // only when the Mortar was fired: its hit roll, and the Zeroing In factor
   exposed?: number; // a monster reared up this round: Round shot does this many times the damage to it. Absent for every other round (D102)
   helmScore: number;
   shot: { track: DamageTrack | null; damage: number; powderUsed: number }; // what this ship's guns did
@@ -110,6 +119,19 @@ export interface GrappleRecord {
   why: "helm" | "theyBoard" | "theyHold" | "failed"; // the first reason that let it succeed, or "failed"
 }
 
+/**
+ * A Rammer's Close In at Close (spec section 3): it misses when the other ship crossed its bow or won the chase, and otherwise
+ * a Helm contest decides (kind "ram" in the round's contests). A Ram that lands never grapples.
+ */
+export interface RamRecord {
+  side: BattleSide; // the ramming ship's side
+  ship?: ShipId; // set for a fleet mate that is not its side's flagship; every Ram strikes the enemy flagship (D91)
+  hit: boolean;
+  why: "contest" | "crossed" | "outrun"; // the Helm contest decided, or they crossed its bow, or they won the chase
+  hull: number; // Hull the struck ship lost
+  self: number; // Hull the Rammer lost
+}
+
 /** The boarding melee of a Grappled round (8.6). */
 export interface MeleeRecord {
   strength: Record<BattleSide, number>; // boarding strength going in
@@ -122,10 +144,11 @@ export interface RoundRecord {
   round: number; // 1 to B.combat.rounds
   rangeBefore: Range;
   rangeAfter: Range;
-  escaped: boolean; // the range went past Long
+  escaped: boolean; // the range went past Far
   row: HelmRow;
   contests: ContestRecord[]; // in the order they were rolled
   grapples: GrappleRecord[]; // Board orders played at Close, hunter first
+  rams?: RamRecord[]; // only in a round a Rammer played Close In at Close, hunter side first
   melee: MeleeRecord | null; // null unless the ships were Grappled when the guns had fired. In a fleet battle each number is the whole side's
   crippled: BattleSide[]; // sides whose Rigging reached 0 this round (6.3)
   struck: BattleSide[]; // sides whose doctrine said Surrender; nothing else happens in that round
@@ -158,6 +181,7 @@ export type DoctrineCondition =
   | { kind: "theirLastGuns"; order: GunsOrder }
   | { kind: "enemyType"; type: EnemyType }
   | { kind: "enemyCaptain"; captainId: CaptainId }
+  | { kind: "theirStyle"; style: FightingStyle } // false against a ship with no style (D128)
   | { kind: "terrain"; terrain: Terrain }
   | { kind: "windGauge"; holder: "mine" | "theirs" }
   | { kind: "havePowder" }

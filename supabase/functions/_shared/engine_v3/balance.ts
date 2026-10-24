@@ -92,29 +92,51 @@ export const B = {
     gunneryFullShare: 0.6,
     outOfPowder: 0.5,
     grapeDamagePerHand: 3,
+    // The range factor of each Guns order at the six distances (docs/specs/fighting-styles.md section 1). The Grappled
+    // entries stay as they were until the deck fight quiets the great guns (boarding spec). Only a Bombardier fires the Mortar.
     range: {
-      round: { long: 0.6, medium: 1.0, close: 1.0, grappled: 0.5 },
-      chain: { long: 1.0, medium: 0.8, close: 0.4, grappled: 0 },
-      grape: { long: 0, medium: 0.5, close: 1.2, grappled: 1.0 },
+      round: { far: 0.2, long: 0.6, medium: 1.0, short: 1.0, close: 1.0, grappled: 0.5 },
+      chain: { far: 0.4, long: 1.0, medium: 0.8, short: 0.6, close: 0.4, grappled: 0 },
+      grape: { far: 0, long: 0, medium: 0.5, short: 0.85, close: 1.2, grappled: 1.0 },
+      mortar: { far: 1.1, long: 1.1, medium: 0.85, short: 0, close: 0, grappled: 0 },
     },
     terrainHelm: { shallowsSloop: 1.15, localKnowledge: 1.15, withStrongCurrent: 1.15 },
-    terrainGuns: { rockyLong: 0.75, fogLong: 0.5 },
-    // Helm pair table (8.4): how many range bands each row moves. A band is one step of Long, Medium, Close.
+    terrainGuns: { rockyLong: 0.75, fogLong: 0.5 }, // at Long and at Far
+    // Helm pair table (8.4): how many range bands each row moves. A band is one step of the six distances
+    // (Far, Long, Medium, Short, Close, Grappled), and growing past Far is an escape.
     bands: { closeClose: 2, closeHold: 1, chase: 1, holdOpen: 1, openOpen: 2, rakeCloseIn: 1, crossFails: 1 },
     reefScrape: 10,
     kelpBoarding: 1.15,
     boarding: { killShare: 0.2, repel: 1.3, captureRatio: 0.4, captureOwnShare: 0.2 },
-    victoryMargin: 0.1,
+    victoryMargin: 0.05, // D132
     // Doctrines (8.8). Slots count the rules that have conditions; the Otherwise rule is always there and is free (D64).
-    // slotRanks: the Command ranks that each give +1 slot. templates: the thresholds the four beginner doctrines use.
+    // slotRanks: the Command ranks that each give +1 slot. templates: the thresholds of the template doctrines (the
+    // Smuggler's is styles.smuggler.strikeHullPct).
     doctrine: {
       baseSlots: 3, maxSlots: 7, savedDoctrines: 3, slotRanks: [1, 4], maxConditions: 2,
-      templates: { brawlerBoardHandsPct: 50, skirmisherChainRiggingPct: 50, runnerChainRiggingPct: 50, cowardStrikesHullPct: 50 },
+      templates: { brawlerBoardHandsPct: 50 },
     },
   },
 
-  // Power Rating (D26): (max Hull / hullPer + Cannons + Sails + Hands / handsPer) / divisor. A fresh sloop is 10.
-  power: { hullPer: 10, handsPer: 3, divisor: 4 },
+  // Fighting Styles (docs/specs/fighting-styles.md sections 2 and 3, D121 to D141). Each trait pays only in a round its own
+  // move or order is played. The Boarder and the Firebrand arrive with the boarding rework (P3.B2 piece 2).
+  styles: {
+    // The Mortar hits mortarHit of the time and takes the rake, flank and weakened factors (D137). Zeroing In adds zeroStep
+    // for each round in a row the range has not changed, up to zeroMax. The crew is handsShare of the Hands. Spotters: a
+    // battle with a Bombardier flagship starts at Far.
+    bombardier: { mortarHit: 0.8, mortarTakesRakes: true, zeroStep: 0.1, zeroMax: 1.5, handsShare: 0.6, startFar: true },
+    // In a round it Holds: a rake against it is bracedRake instead of the rake, a Ram against it does bracedRam, its guns do
+    // steadyDeck, and its Round shot counts longNines at Long.
+    gunline: { bracedRake: 1.35, bracedRam: 0.7, steadyDeck: 1.4, longNines: 0.8 },
+    skirmisher: { kite: true }, // Opening Range does not weaken its guns
+    // Dash: Close In moves dashBands more. A Ram does ramHull to them and ramSelf to the Rammer (D139). A rake the dash spoils is spoiledRake.
+    rammer: { dashBands: 1, ramHull: 30, ramSelf: 4, spoiledRake: 1.75 },
+    smuggler: { slippery: 1.25, strikeHullPct: 40 }, // Helm times slippery in a round it Opens Range; the template strikes below strikeHullPct
+  },
+
+  // Power Rating (D26, D136): S = (max Hull / hullPer + Cannons + Sails + Hands / handsPer) / divisor, and the rating is
+  // F x (S / F) ^ exponent, where F is S for a fresh sloop, so a fresh sloop is still 10.
+  power: { hullPer: 10, handsPer: 3, divisor: 4, exponent: 1.6 },
 
   // Towing (8.7): a Sunk or Captured ship is towed to the nearest known Harbour with Hull raised to at least this share of its max.
   tow: { hullShare: 0.5 },

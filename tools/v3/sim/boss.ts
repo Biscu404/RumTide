@@ -7,7 +7,7 @@
 // again on fresh fights, and the winner is confirmed on fights nobody has seen. The reported number is that last one, so the
 // search cannot flatter itself. The check passes when it is from 40% to 60%.
 //
-// Alongside it: the four templates, the Crabber of the P2.6 notes, and the gate pace of GAMEPLAY 2.5 (the median captain
+// Alongside it: the templates, the Crabber of the P2.6 notes, and the gate pace of GAMEPLAY 2.5 (the median captain
 // passes by Tide 7 to 9, nobody later than Tide 12) worked out from the win chance on each Tide, with one fight a Tide (D108).
 
 import { Rng, TEMPLATE_NAMES, templateDoctrine, validateDoctrine } from "../../../supabase/functions/_shared/engine_v3/index.ts";
