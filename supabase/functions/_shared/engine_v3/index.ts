@@ -9,7 +9,7 @@ export {
   islandFullyCharted, coverage, setPencil,
 } from "./knowledge.ts";
 export {
-  statValue, maxHullPoints, maxRiggingPoints, maxHands, cannonsOf, sailsOf, holdCapacity, holdUsed, carriesCargo, upgradeCost, powerRating,
+  statValue, maxHullPoints, maxRiggingPoints, maxHands, crewShare, cannonsOf, sailsOf, holdCapacity, holdUsed, carriesCargo, upgradeCost, powerRating,
   newShip, watchesFor, emptyHold, zeroLevels,
 } from "./ship.ts";
 export { windFor, windsFor, hopCost, estimateHop, windPart, terrainPart, chartedAt, type HopCost } from "./wcs.ts";
@@ -30,7 +30,7 @@ export {
 } from "./combat/helm.ts";
 export {
   gunsTrack, ammoFactor, shotPoints, gunnery, staleNow, nextGunsMemory, fireGuns, applyDamage, recordFiring,
-  type GunsContext, type GunsFactors, type GunsResult,
+  type GunsContext, type GunsFactors, type GunsResult, type MortarShell,
 } from "./combat/guns.ts";
 export {
   boardingStrength, meleeRound, lacksHands, surrenders, captureCheck, captureCheckBySide, grappleAttempts, grappleReason, cutFree,
@@ -49,7 +49,7 @@ export {
 export {
   ABILITIES, DOCTRINE_SLOT_PERK, JETTISON_PLAY, FALLBACK_PLAY, NO_RULE, TEMPLATE_NAMES, conditionHolds, evaluateDoctrine, doctrineChooser,
   findDoctrine, pickDoctrine,
-  doctrineSlots, validateDoctrine, validateDoctrines, templateDoctrine, templateDoctrines,
+  doctrineSlots, validateDoctrine, validateDoctrines, templateDoctrine, templateDoctrines, styleTemplate,
   type AbilityDef, type AbilityRegistry, type DoctrineContext, type ValidateOptions, type TemplateName,
 } from "./combat/doctrine.ts";
 export {
@@ -61,6 +61,10 @@ export {
   fleetGrapples, fleetMelee, type FlagshipCandidate, type Shot, type MateHelm, type FleetMelee,
 } from "./combat/fleet.ts";
 export { describeBattle, describeCarried, type BattleWords } from "./combat/describe.ts";
+export {
+  hasStyle, playableOrder, styleHelmFactor, spotters, dashBands, styleGunsMods, canSpoilRake, spoiledRake, isRam, ramHull, ramSelf,
+  zeroingFactor, firesLongNines,
+} from "./combat/styles.ts";
 export {
   SHELLBACK_ID, SHELLBACK_DOCTRINE, isBoss, shellbackStatline, applyStatline, shellbackDoctrine, bossPlan, upkeepBosses, recordBossWin,
   hasBeaten, bossAtStrait, mayCross,

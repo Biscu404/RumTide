@@ -263,14 +263,14 @@ describe("doctrine pick (8.8, D72)", () => {
     const state = season(captains2(), 6);
     for (const c of Object.values(state.captains)) {
       c.doctrines = templateDoctrines();
-      c.defaultDoctrine = "Coward";
+      c.defaultDoctrine = "Smuggler";
     }
     return state;
   };
 
   it("finds a saved doctrine by name and ignores case and padding", () => {
     const state = withAll();
-    expect(findDoctrine(state.captains.h!, " runner ")?.name).toBe("Runner");
+    expect(findDoctrine(state.captains.h!, " rammer ")?.name).toBe("Rammer");
     expect(findDoctrine(state.captains.h!, "Nope")).toBeUndefined();
     expect(findDoctrine(state.captains.h!, undefined)).toBeUndefined();
   });
@@ -278,10 +278,10 @@ describe("doctrine pick (8.8, D72)", () => {
   it("uses the one asked for, else the default, else the first saved, else a fresh Brawler", () => {
     const c = withAll().captains.h!;
     expect(pickDoctrine(c, "Skirmisher").name).toBe("Skirmisher");
-    expect(pickDoctrine(c, undefined).name).toBe("Coward");
-    expect(pickDoctrine(c, "Deleted").name).toBe("Coward");
+    expect(pickDoctrine(c, undefined).name).toBe("Smuggler");
+    expect(pickDoctrine(c, "Deleted").name).toBe("Smuggler");
     c.defaultDoctrine = "Gone";
-    expect(pickDoctrine(c, undefined).name).toBe("Brawler"); // the first saved
+    expect(pickDoctrine(c, undefined).name).toBe("Bombardier"); // the first saved
     c.doctrines = [];
     expect(pickDoctrine(c, undefined)).toEqual(templateDoctrine("Brawler"));
   });
@@ -289,7 +289,7 @@ describe("doctrine pick (8.8, D72)", () => {
   it("fights with the doctrine the side asked for", () => {
     const state = withAll();
     const out = combatEncounter(ctxOf({ state, hunter: { doctrine: "Skirmisher" }, target: { doctrine: undefined } }));
-    expect(battleOfCtx(out.events)!.record.doctrines).toEqual({ hunter: "Skirmisher", target: "Coward" });
+    expect(battleOfCtx(out.events)!.record.doctrines).toEqual({ hunter: "Skirmisher", target: "Smuggler" });
   });
 
   it("maps a captain to the enemy type its opponent's doctrine sees", () => {
@@ -722,15 +722,15 @@ describe("combat inside a Tide (P2.4)", () => {
 
   it("fights with the doctrine the step names, else the plan's, else the captain's default", () => {
     const set = (s: SeasonState) => {
-      for (const c of Object.values(s.captains)) { c.doctrines = templateDoctrines(); c.defaultDoctrine = "Coward"; }
+      for (const c of Object.values(s.captains)) { c.doctrines = templateDoctrines(); c.defaultDoctrine = "Smuggler"; }
     };
     const named = (plan: Partial<Orders["planA"]>, step: Record<string, unknown>) => {
       const { state, orders } = headOn(set, plan, step);
       return firstBattle(state, orders).battle.record.doctrines;
     };
-    expect(named({ doctrine: "Skirmisher" }, { doctrine: "Runner" })).toEqual({ hunter: "Runner", target: "Coward" });
-    expect(named({ doctrine: "Skirmisher" }, {})).toEqual({ hunter: "Skirmisher", target: "Coward" });
-    expect(named({}, {})).toEqual({ hunter: "Coward", target: "Coward" });
+    expect(named({ doctrine: "Skirmisher" }, { doctrine: "Rammer" })).toEqual({ hunter: "Rammer", target: "Smuggler" });
+    expect(named({ doctrine: "Skirmisher" }, {})).toEqual({ hunter: "Skirmisher", target: "Smuggler" });
+    expect(named({}, {})).toEqual({ hunter: "Smuggler", target: "Smuggler" });
   });
 
   it("has the target use its own step's doctrine", () => {

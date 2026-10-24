@@ -2,7 +2,7 @@
 
 import { Rng } from "../rng.ts";
 import { cannonsOf, maxHands, maxHullPoints, maxRiggingPoints, newShip, sailsOf } from "../ship.ts";
-import type { HullId, Ship } from "../types.ts";
+import type { FightingStyle, HullId, Ship } from "../types.ts";
 import type { BattleInput, Chooser } from "./battle.ts";
 import type { BattleShip, BattleSide, GunsOrder, HelmMove } from "./types.ts";
 
@@ -14,6 +14,7 @@ export function battleShipFrom(ship: Ship, side: BattleSide, over: Partial<Battl
     name: ship.name,
     side,
     hull: ship.hull,
+    ...(ship.style ? { style: ship.style } : {}),
     cannons: cannonsOf(ship),
     sails: sailsOf(ship),
     maxHullPoints: maxHullPoints(ship),
@@ -38,6 +39,11 @@ export function battleShipFrom(ship: Ship, side: BattleSide, over: Partial<Battl
 /** A fresh level 0 ship on the given side, full of everything. */
 export function testShip(side: BattleSide, hull: HullId = "sloop", over: Partial<BattleShip> = {}): BattleShip {
   return battleShipFrom(newShip(`ship_${side}`, `cap_${side}`, `The ${side}`, hull, "dw_shallows", false), side, over);
+}
+
+/** A fresh level 0 ship of a Fighting Style on the given side, with the style's crew (a Bombardier sails with 60% of the Hands). */
+export function styleShip(side: BattleSide, style: FightingStyle, hull: HullId = "sloop", over: Partial<BattleShip> = {}): BattleShip {
+  return battleShipFrom(newShip(`ship_${side}`, `cap_${side}`, `The ${side}`, hull, "dw_shallows", false, style), side, over);
 }
 
 /** A fresh level 0 ship with its own id (`ship_<id>`) on the given side: for the ships of a fleet battle. */

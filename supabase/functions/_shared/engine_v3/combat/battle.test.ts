@@ -14,6 +14,8 @@ const idle = always("hold", "holdFire");
 
 const fight = (h: Chooser, t: Chooser, hs: Partial<BattleShip> = {}, ts: Partial<BattleShip> = {}, over: Partial<BattleInput> = {}) =>
   runBattle(battleOf(hunter(hs), target(ts), { hunter: h, target: t }, over));
+/** An ambush sprung at Medium: two ships that both Close In reach Close in one round, as they did from Long with four distances. */
+const NEAR: Partial<BattleInput> = { ambush: "medium" };
 
 /** The first Tide seed from 1 up for which a battle satisfies `wanted`. The engine is pure, so this is a fixed answer. */
 function findSeed(play: (seed: number) => BattleRecord, wanted: (r: BattleRecord) => boolean): number {
@@ -28,13 +30,13 @@ describe("the seven outcomes of GAMEPLAY 8.7 (P2.2)", () => {
     expect(r.outcome).toEqual({ kind: "draw", winner: null, loser: null, round: C.rounds });
   });
 
-  it("Escaped: the range goes past Long, and the guns of that round stay silent", () => {
+  it("Escaped: the range goes past Far, and the guns of that round stay silent", () => {
     const run = always("openRange", "roundShot");
     const r = fight(run, run);
     expect(r.outcome).toEqual({ kind: "escaped", winner: null, loser: null, round: 1 });
     expect(r.rounds).toHaveLength(1);
     expect(r.rounds[0]!.escaped).toBe(true);
-    expect(r.rounds[0]!.rangeAfter).toBe("long");
+    expect(r.rounds[0]!.rangeAfter).toBe("far");
     expect(r.rounds[0]!.ships.map((s) => s.shot)).toEqual([{ track: null, damage: 0, powderUsed: 0 }, { track: null, damage: 0, powderUsed: 0 }]);
     expect(r.final.map((s) => s.powder)).toEqual([6, 6]);
   });
@@ -53,13 +55,13 @@ describe("the seven outcomes of GAMEPLAY 8.7 (P2.2)", () => {
   });
 
   it("Captured: the boarding melee leaves one side too weak to go on", () => {
-    const r = fight(always("closeIn", "board"), always("closeIn", "roundShot"), {}, { hands: 8 });
+    const r = fight(always("closeIn", "board"), always("closeIn", "roundShot"), {}, { hands: 8 }, NEAR);
     expect(r.outcome).toEqual({ kind: "captured", winner: "hunter", loser: "target", round: 1 });
     expect(r.rounds[0]!.grapples).toEqual([{ side: "hunter", ok: true, why: "helm" }]);
     expect(r.rounds[0]!.melee).toMatchObject({ lost: { hunter: 2, target: 6 }, hands: { hunter: 28, target: 2 } });
   });
 
-  it("Victory on points: a 10 point lead in damage share after five rounds", () => {
+  it("Victory on points: a 5 point lead in damage share after five rounds (D132)", () => {
     const r = fight(always("hold", "roundShot"), idle);
     expect(r.rounds).toHaveLength(C.rounds);
     expect(r.outcome).toMatchObject({ kind: "victory", winner: "hunter", loser: "target", round: C.rounds });
@@ -86,7 +88,7 @@ describe("the seven outcomes of GAMEPLAY 8.7 (P2.2)", () => {
       fight(always("openRange", "roundShot"), always("openRange", "roundShot")).outcome.kind,
       fight(idle, surrendersAt(1, idle)).outcome.kind,
       fight(always("closeIn", "roundShot"), idle, {}, { hullPoints: 5 }).outcome.kind,
-      fight(always("closeIn", "board"), always("closeIn", "roundShot"), {}, { hands: 8 }).outcome.kind,
+      fight(always("closeIn", "board"), always("closeIn", "roundShot"), {}, { hands: 8 }, NEAR).outcome.kind,
       fight(always("hold", "roundShot"), idle).outcome.kind,
     ]);
     expect([...kinds].sort()).toEqual(["captured", "draw", "escaped", "struckColours", "sunk", "victory"]);
@@ -94,19 +96,21 @@ describe("the seven outcomes of GAMEPLAY 8.7 (P2.2)", () => {
 });
 
 describe("Victory on points (P2.2, GAMEPLAY 8.7)", () => {
-  it("goes to a lead of exactly 10 points", () => {
-    expect(pointsOutcome({ hunter: 0.1, target: 0 }, 5)).toEqual({ kind: "victory", winner: "hunter", loser: "target", round: 5 });
-    expect(pointsOutcome({ hunter: 0, target: 0.1 }, 5)).toEqual({ kind: "victory", winner: "target", loser: "hunter", round: 5 });
+  it("goes to a lead of exactly 5 points (D132)", () => {
+    expect(C.victoryMargin).toBe(0.05);
+    expect(pointsOutcome({ hunter: 0.05, target: 0 }, 5)).toEqual({ kind: "victory", winner: "hunter", loser: "target", round: 5 });
+    expect(pointsOutcome({ hunter: 0, target: 0.05 }, 5)).toEqual({ kind: "victory", winner: "target", loser: "hunter", round: 5 });
+    expect(pointsOutcome({ hunter: 0.0999, target: 0 }, 5).kind).toBe("victory"); // a draw under the old 10 points
   });
 
   it("does not go to a smaller lead", () => {
-    expect(pointsOutcome({ hunter: 0.0999, target: 0 }, 5).kind).toBe("draw");
-    expect(pointsOutcome({ hunter: 0.4, target: 0.31 }, 5).kind).toBe("draw");
+    expect(pointsOutcome({ hunter: 0.0499, target: 0 }, 5).kind).toBe("draw");
+    expect(pointsOutcome({ hunter: 0.4, target: 0.36 }, 5).kind).toBe("draw");
   });
 
-  it("is not fooled by floating point: 0.3 less 0.2 is still a lead of 10 points", () => {
-    expect(0.3 - 0.2).toBeLessThan(0.1);
-    expect(pointsOutcome({ hunter: 0.3, target: 0.2 }, 5).kind).toBe("victory");
+  it("is not fooled by floating point: 0.25 less 0.2 is still a lead of 5 points", () => {
+    expect(0.25 - 0.2).toBeLessThan(0.05);
+    expect(pointsOutcome({ hunter: 0.25, target: 0.2 }, 5).kind).toBe("victory");
   });
 
   it("measures damage as a share of the victim's whole health, averaged over its tracks (D56)", () => {
@@ -129,7 +133,7 @@ describe("Victory on points (P2.2, GAMEPLAY 8.7)", () => {
   });
 
   it("counts the melee's Hands as damage dealt", () => {
-    const r = fight(always("closeIn", "board"), always("closeIn", "roundShot"), {}, { hands: 8 });
+    const r = fight(always("closeIn", "board"), always("closeIn", "roundShot"), {}, { hands: 8 }, NEAR);
     expect(r.dealt.hunter).toBeGreaterThan(damageShare(target(), "hands", 5));
     expect(r.dealt.target).toBeGreaterThan(0);
   });
@@ -273,14 +277,16 @@ describe("terrain and the Helm in a battle (P2.2)", () => {
 describe("boarding in a battle (P2.2, GAMEPLAY 8.6)", () => {
   it("grapples when both ships Close In at Close, and the melee runs the same round", () => {
     const r = fight(always("closeIn", "grapeshot"), always("closeIn", "grapeshot"));
-    expect(r.rounds[0]!.rangeAfter).toBe("close");
-    expect(r.rounds[0]!.melee).toBeNull();
-    expect(r.rounds[1]!.rangeAfter).toBe("grappled");
-    expect(r.rounds[1]!.melee).not.toBeNull();
+    expect(r.rounds.map((x) => x.rangeAfter).slice(0, 3)).toEqual(["short", "close", "grappled"]); // from Long, two bands a round
+    expect(r.rounds[1]!.melee).toBeNull();
+    expect(r.rounds[2]!.melee).not.toBeNull();
+    const near = fight(always("closeIn", "grapeshot"), always("closeIn", "grapeshot"), {}, {}, NEAR);
+    expect(near.rounds[0]!.rangeAfter).toBe("close");
+    expect(near.rounds[1]!.rangeAfter).toBe("grappled");
   });
 
   it("runs the melee after the guns, on the Hands that are left", () => {
-    const r = fight(always("closeIn", "grapeshot"), always("closeIn", "grapeshot"));
+    const r = fight(always("closeIn", "grapeshot"), always("closeIn", "grapeshot"), {}, {}, NEAR);
     const round = r.rounds[1]!;
     const handsAfterGuns = round.ships.map((s, i) => s.hands + round.melee!.lost[i === 0 ? "hunter" : "target"]);
     expect(round.melee!.strength.hunter).toBe(handsAfterGuns[0]);
@@ -288,13 +294,13 @@ describe("boarding in a battle (P2.2, GAMEPLAY 8.6)", () => {
   });
 
   it("keeps fighting the melee every round while Grappled", () => {
-    const r = fight(always("closeIn", "repel"), always("closeIn", "repel"), { hands: 60, maxHands: 60 }, { hands: 60, maxHands: 60 });
+    const r = fight(always("closeIn", "repel"), always("closeIn", "repel"), { hands: 60, maxHands: 60 }, { hands: 60, maxHands: 60 }, NEAR);
     expect(r.rounds.slice(1).every((round) => round.melee !== null)).toBe(true);
   });
 
   it("makes a Board order grapple at Close, and fire no guns", () => {
-    const r = fight(always("closeIn", "board"), always("hold", "roundShot"), {}, { hands: 60, maxHands: 60 });
-    expect(r.rounds[0]!.rangeAfter).toBe("medium"); // Close In against Hold shrinks one band: Board waits for Close
+    const r = fight(always("closeIn", "board"), always("hold", "roundShot"), {}, { hands: 60, maxHands: 60 }, NEAR);
+    expect(r.rounds[0]!.rangeAfter).toBe("short"); // Close In against Hold shrinks one band: Board waits for Close
     expect(r.rounds[0]!.grapples).toEqual([]);
     expect(r.rounds[1]!.rangeAfter).toBe("grappled");
     expect(r.rounds[1]!.grapples).toEqual([{ side: "hunter", ok: true, why: expect.any(String) }]);
@@ -302,7 +308,7 @@ describe("boarding in a battle (P2.2, GAMEPLAY 8.6)", () => {
   });
 
   it("fails to grapple against a faster ship that does not Board or Hold", () => {
-    const r = fight(always("closeIn", "board"), always("closeIn", "roundShot"), {}, { sails: 20 });
+    const r = fight(always("closeIn", "board"), always("closeIn", "roundShot"), {}, { sails: 20 }, NEAR);
     expect(r.rounds[0]!.grapples).toEqual([{ side: "hunter", ok: false, why: "failed" }]);
     expect(r.rounds[0]!.rangeAfter).toBe("close");
     expect(r.rounds[0]!.melee).toBeNull();
@@ -318,7 +324,7 @@ describe("boarding in a battle (P2.2, GAMEPLAY 8.6)", () => {
     const play = (seed: number) => runBattle(battleOf(hunter({ hands: 60, maxHands: 60 }), target({ hands: 60, maxHands: 60 }), {
       hunter: grapple,
       target: scripted({ 3: ["openRange", "grapeshot"] }, ["closeIn", "grapeshot"]),
-    }, { seed }));
+    }, { seed, ...NEAR }));
     const freed = findSeed(play, (r) => r.rounds[2]?.rangeAfter === "close");
     const record = play(freed);
     expect(record.rounds[1]!.rangeAfter).toBe("grappled");
@@ -330,7 +336,7 @@ describe("boarding in a battle (P2.2, GAMEPLAY 8.6)", () => {
     const play = (seed: number) => runBattle(battleOf(hunter({ hands: 60, maxHands: 60 }), target({ hands: 60, maxHands: 60 }), {
       hunter: always("closeIn", "grapeshot"),
       target: scripted({ 3: ["openRange", "grapeshot"] }, ["closeIn", "grapeshot"]),
-    }, { seed }));
+    }, { seed, ...NEAR }));
     const held = findSeed(play, (r) => r.rounds[2]?.rangeAfter === "grappled");
     const record = play(held);
     expect(record.rounds[2]!.contests.map((c) => [c.kind, c.side, c.winner])).toEqual([["cutFree", "target", "hunter"]]);
@@ -415,7 +421,23 @@ describe("runBattle is pure and reproducible (P2.2)", () => {
     expect(() => runBattle(input)).not.toThrow();
   });
 
+  it("draws the rolls of a battle with no styles from the same streams as before: the chase and the guns' luck (D16)", () => {
+    // The Fighting Styles add their own streams (ram, mortar, helm/dash) and move none of the old ones.
+    const r = fight(always("closeIn", "roundShot"), always("openRange", "roundShot"), {}, {}, NEAR);
+    const rng = battleRng(1234, "ship_hunter", "ship_target", 1);
+    const chase = r.rounds[0]!.contests[0]!;
+    expect(chase.kind).toBe("chase");
+    expect(chase.roll).toBe(battleRng(1234, "ship_hunter", "ship_target", 1).stream("helm", "chase").next());
+    const after = r.rounds[0]!.rangeAfter as "short" | "long";
+    const mods = chase.winner === "hunter" ? { hunter: C.flank, target: 1 } : { hunter: 1, target: 1 };
+    const expected = fireGuns(hunter(), target(), after, "roundShot", rng, { terrain: "open", helmMod: mods.hunter });
+    expect(r.rounds[0]!.ships[0]!.shot.damage).toBe(expected.damage);
+    expect(r.rounds[0]!.contests.map((c) => c.kind)).toEqual(["chase"]);
+    expect(r.rounds.every((x) => x.rams === undefined && x.ships.every((s) => s.mortar === undefined && s.asked === undefined))).toBe(true);
+  });
+
   it("returns ships that are copies, not the ones it was given", () => {
+
     const h = hunter();
     const r = runBattle(battleOf(h, target(), { hunter: idle, target: idle }));
     expect(r.ships[0]).toEqual(h);

@@ -2,17 +2,26 @@
 
 import { B } from "./balance.ts";
 import { CARGO_GOODS, GOODS } from "./types.ts";
-import type { Captain, Good, HullId, Ship, Stat } from "./types.ts";
+import type { Captain, FightingStyle, Good, HullId, Ship, Stat } from "./types.ts";
 
 const hullDef = (hull: HullId) => B.hulls[hull];
 const grow = (level: number) => 1 + B.upgrade.perLevel * level;
+const EPSILON = 1e-9; // keeps a crew that is a whole number in exact arithmetic from rounding down in floating point
 
-type Built = Pick<Ship, "hull" | "levels" | "statline">; // a monster's statline, when it has one, wins over its hull and levels
+// A monster's statline, when it has one, wins over its hull and levels. The style only changes the crew (the Bombardier's).
+type Built = Pick<Ship, "hull" | "levels" | "statline" | "style">;
+
+/** The share of the Hands a style sails with: a Bombardier's mortar takes the deck, so it carries a smaller crew (spec section 3). */
+export const crewShare = (style: FightingStyle | undefined): number => (style === "bombardier" ? B.styles.bombardier.handsShare : 1);
+
+/** Max Hands before the style's share: what the hull and its Berths hold. */
+const berthHands = (ship: Built): number => hullDef(ship.hull).maxHands * grow(ship.levels.berths);
 
 export const statValue = (hull: HullId, level: number) => B.baseStat * hullDef(hull).mult * grow(level);
 export const maxHullPoints = (ship: Built) => ship.statline?.maxHull ?? Math.round(B.baseHull * hullDef(ship.hull).mult * grow(ship.levels.hull));
 export const maxRiggingPoints = (ship: Built) => ship.statline?.maxRigging ?? Math.round(B.baseRigging * hullDef(ship.hull).mult * grow(ship.levels.sails));
-export const maxHands = (ship: Built) => ship.statline?.maxHands ?? Math.floor(hullDef(ship.hull).maxHands * grow(ship.levels.berths));
+/** Max Hands: the hull and Berths, times the style's crew share (the Bombardier sails with 60%). Hiring, wages, healing and Capture all read this. */
+export const maxHands = (ship: Built) => ship.statline?.maxHands ?? Math.floor(berthHands(ship) * crewShare(ship.style) + EPSILON);
 /** The Cannons and Sails stat values of a ship: its statline's if it is a monster, else the hull and level curve (6.2). */
 export const cannonsOf = (ship: Built) => ship.statline?.cannons ?? statValue(ship.hull, ship.levels.cannons);
 export const sailsOf = (ship: Built) => ship.statline?.sails ?? statValue(ship.hull, ship.levels.sails);
@@ -21,11 +30,29 @@ export const holdUsed = (ship: Pick<Ship, "hold">) => GOODS.reduce((n, g) => n +
 export const carriesCargo = (ship: Pick<Ship, "hold" | "plunder">) => ship.plunder > 0 || CARGO_GOODS.some((g) => (ship.hold[g] ?? 0) > 0);
 
 /**
- * Power Rating (D26), for parley, fairness and NPC scaling: (max Hull / 10 + Cannons + Sails + Hands / 3) / 4.
- * A fresh sloop is 10. Hands are the Hands aboard now, so a ship that has lost its crew rates lower (D74).
+ * The Hands the Power Rating counts. A style is equal on paper and does not change the rating (spec section 7), so a ship
+ * whose style sails with a smaller crew counts its Hands against that crew: a full Bombardier counts as a full crew.
  */
-export const powerRating = (ship: Built & Pick<Ship, "hands">): number =>
-  (maxHullPoints(ship) / B.power.hullPer + cannonsOf(ship) + sailsOf(ship) + ship.hands / B.power.handsPer) / B.power.divisor;
+const ratedHands = (ship: Built & Pick<Ship, "hands">): number => {
+  if (ship.statline) return ship.hands;
+  const own = maxHands(ship);
+  return own > 0 ? (ship.hands * berthHands(ship)) / own : ship.hands;
+};
+
+/** The D26 sum, (max Hull / 10 + Cannons + Sails + Hands / 3) / 4, of a ship. */
+const powerSum = (ship: Built & Pick<Ship, "hands">): number =>
+  (maxHullPoints(ship) / B.power.hullPer + cannonsOf(ship) + sailsOf(ship) + ratedHands(ship) / B.power.handsPer) / B.power.divisor;
+
+/** The D26 sum of a fresh sloop, which is where the exponent pivots: 10. */
+const FRESH_SUM = (B.baseHull / B.power.hullPer + 2 * B.baseStat + B.hulls.sloop.maxHands / B.power.handsPer) / B.power.divisor;
+
+/**
+ * Power Rating (D26, D136), for parley, fairness and NPC scaling: 10 x (S / 10) ^ 1.6, where S is the D26 sum
+ * (max Hull / 10 + Cannons + Sails + Hands / 3) / 4. The rating grows faster than the stats, because Hull, guns and crew
+ * multiply in a fight. A fresh sloop is 10. Hands are the Hands aboard now, so a ship that has lost its crew rates lower
+ * (D74), and a style's smaller crew is counted against its own size.
+ */
+export const powerRating = (ship: Built & Pick<Ship, "hands">): number => FRESH_SUM * (powerSum(ship) / FRESH_SUM) ** B.power.exponent;
 
 /** Upgrade cost for buying the next level of a stat (v0.2 5.3), with the season's cost multiplier. */
 export const upgradeCost = (currentLevel: number, costMult = 1) =>
@@ -39,15 +66,17 @@ export function zeroLevels(): Record<Stat, number> {
   return { hull: 0, cannons: 0, sails: 0, berths: 0, hold: 0 };
 }
 
-/** A fresh ship with full hull, rigging and Hands and the starting supplies. */
-export function newShip(id: string, captainId: string, name: string, hull: HullId, waterId: string, docked: boolean): Ship {
+/** A fresh ship with full hull, rigging and Hands and the starting supplies. A style, when given, sails on it (its crew included). */
+export function newShip(
+  id: string, captainId: string, name: string, hull: HullId, waterId: string, docked: boolean, style?: FightingStyle,
+): Ship {
   const levels = zeroLevels();
-  const base = { hull, levels };
+  const base = { hull, levels, ...(style ? { style } : {}) };
   const hold = emptyHold();
   hold.provisions = B.start.provisions;
   hold.powder = B.start.powder;
   return {
-    id, captainId, name, hull, waterId, docked, levels,
+    id, captainId, name, hull, ...(style ? { style } : {}), waterId, docked, levels,
     hullPoints: maxHullPoints(base),
     riggingPoints: maxRiggingPoints(base),
     hands: Math.floor(maxHands(base) * B.start.handsShare),

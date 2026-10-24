@@ -445,7 +445,7 @@ describe("the range in a fleet battle (7.5, 8.4)", () => {
     const stay = fleetFight({ flag: a, mates: [mateOf("b", "hunter", always("closeIn", "roundShot"))] }, { flag: c });
     expect(stay.rounds[0]!.rangeAfter).toBe("long");
     const close = fleetFight({ flag: a, chooser: always("closeIn", "roundShot"), mates: [mateOf("b", "hunter")] }, { flag: c, chooser: always("closeIn", "roundShot") });
-    expect(close.rounds[0]!.rangeAfter).toBe("close");
+    expect(close.rounds[0]!.rangeAfter).toBe("short"); // two bands of the six
   });
 
   it("gives a mate a rake of its own, judged against the enemy flagship's move", () => {
@@ -477,12 +477,14 @@ describe("the range in a fleet battle (7.5, 8.4)", () => {
 describe("boarding in a fleet battle (8.6)", () => {
   const closeIn = always("closeIn", "roundShot");
   const a = fleetShip("a", "hunter"), c = fleetShip("c", "target");
+  const NEAR = { ambush: "medium" } as const; // from Medium two ships that both Close In reach Close in one round
 
   it("grapples the whole battle when a mate's Board order succeeds at Close, and the melee runs that round", () => {
-    // Round 1: the flagships Close In from Long and reach Close. Round 2: the mate plays Board while its flagship only Closes In.
+    // Round 1: the flagships Close In from Medium and reach Close. Round 2: the mate plays Board while its flagship only Closes In.
     const near = fleetFight(
       { flag: a, chooser: closeIn, mates: [mateOf("b", "hunter", scripted({ 1: ["closeIn", "roundShot"] }, ["closeIn", "board"]))] },
       { flag: c, chooser: scripted({ 1: ["closeIn", "roundShot"] }, ["hold", "roundShot"]) },
+      NEAR,
     );
     expect(near.rounds[0]!.rangeAfter).toBe("close");
     expect(near.rounds[1]!.grapples).toMatchObject([{ side: "hunter", ship: "ship_b", ok: true }]);
@@ -494,6 +496,7 @@ describe("boarding in a fleet battle (8.6)", () => {
     const r = fleetFight(
       { flag: a, chooser: closeIn, mates: [mateOf("b", "hunter", always("hold", "roundShot"))] },
       { flag: c, chooser: closeIn, mates: [mateOf("d", "target", scripted({ 1: ["hold", "roundShot"], 2: ["hold", "roundShot"] }, ["openRange", "roundShot"]))] },
+      NEAR,
     );
     // Round 2 both flagships Close In at Close: Grappled. Round 3 the target's mate plays Open Range.
     expect(r.rounds[1]!.rangeAfter).toBe("grappled");
@@ -503,7 +506,7 @@ describe("boarding in a fleet battle (8.6)", () => {
   });
 
   it("adds the crews up, side against side, and records the whole side's numbers", () => {
-    const r = fleetFight({ flag: a, chooser: closeIn, mates: [mateOf("b", "hunter", closeIn)] }, { flag: c, chooser: closeIn });
+    const r = fleetFight({ flag: a, chooser: closeIn, mates: [mateOf("b", "hunter", closeIn)] }, { flag: c, chooser: closeIn }, NEAR);
     const melee = r.rounds[1]!.melee!;
     expect(r.rounds[1]!.rangeAfter).toBe("grappled");
     expect(melee.strength).toEqual({ hunter: 60, target: 30 });
@@ -514,13 +517,13 @@ describe("boarding in a fleet battle (8.6)", () => {
   });
 
   it("captures a whole side whose crews together fall below the line", () => {
-    const r = fleetFight({ flag: a, chooser: closeIn, mates: [mateOf("b", "hunter", closeIn)] }, { flag: fleetShip("c", "target", "sloop", { hands: 8 }), chooser: closeIn });
+    const r = fleetFight({ flag: a, chooser: closeIn, mates: [mateOf("b", "hunter", closeIn)] }, { flag: fleetShip("c", "target", "sloop", { hands: 8 }), chooser: closeIn }, NEAR);
     expect(r.outcome).toMatchObject({ kind: "captured", winner: "hunter", loser: "target", round: 2 });
   });
 
   it("judges the capture on the Hands of the whole side, not of one ship", () => {
     // Ship b has 2 Hands, which is under 20% of its own max, but the side has 32 together: the melee of round 2 does not take it.
-    const r = fleetFight({ flag: a, chooser: closeIn, mates: [mateOf("b", "hunter", closeIn, { hands: 2 })] }, { flag: c, chooser: closeIn });
+    const r = fleetFight({ flag: a, chooser: closeIn, mates: [mateOf("b", "hunter", closeIn, { hands: 2 })] }, { flag: c, chooser: closeIn }, NEAR);
     expect(r.rounds[1]!.melee!.hands.hunter).toBeGreaterThan(20);
     expect(r.rounds.length).toBeGreaterThan(2);
   });

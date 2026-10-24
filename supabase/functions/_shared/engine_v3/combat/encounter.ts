@@ -109,6 +109,7 @@ export function battleShipOf(ship: Ship, captain: Pick<Captain, "id">, side: Bat
     name: ship.name,
     side,
     hull: ship.hull,
+    ...(ship.style ? { style: ship.style } : {}), // the captain's Fighting Style: its trait, and the badge a replay shows
     cannons: cannonsOf(ship),
     sails: sailsOf(ship),
     maxHullPoints: maxHullPoints(ship),

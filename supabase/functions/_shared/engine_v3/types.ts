@@ -118,6 +118,15 @@ export interface Knowledge {
 // ---------- Captains and ships ----------
 
 export type HullId = "sloop" | "brigantine" | "frigate";
+
+/**
+ * A captain's Fighting Style (docs/specs/fighting-styles.md, D122, D123): a trait that pays only when its own move or order is
+ * played, and a template doctrine. Six fight; the Smuggler is the trader's style and sits outside the wheel. The Boarder
+ * and the Firebrand are named here and get their traits with the boarding rework (P3.B2 piece 2).
+ */
+export type FightingStyle = "bombardier" | "gunline" | "skirmisher" | "rammer" | "boarder" | "firebrand" | "smuggler";
+export const FIGHTING_STYLES: readonly FightingStyle[] = ["bombardier", "gunline", "skirmisher", "rammer", "boarder", "firebrand", "smuggler"];
+
 export type Stat = "hull" | "cannons" | "sails" | "berths" | "hold";
 export type Good = "provisions" | "powder" | "timber" | "rum" | "sugar" | "spice";
 export const GOODS: readonly Good[] = ["provisions", "powder", "timber", "rum", "sugar", "spice"];
@@ -175,6 +184,7 @@ export interface Ship {
   name: string;
   hull: HullId; // a monster's hull is `sloop`, the neutral one; its statline replaces what the hull would give
   statline?: Statline; // only monsters have one
+  style?: FightingStyle; // the captain's Fighting Style; absent for a ship with none (Old Shellback, NPCs until P9)
   waterId: WaterId;
   docked: boolean;
   levels: Record<Stat, number>;

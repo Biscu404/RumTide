@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { Rng, TEMPLATE_NAMES, powerRating, templateDoctrine, validateDoctrine } from "../../../supabase/functions/_shared/engine_v3/index.ts";
+import { B, Rng, TEMPLATE_NAMES, powerRating, templateDoctrine, validateDoctrine } from "../../../supabase/functions/_shared/engine_v3/index.ts";
+import type { TemplateName } from "../../../supabase/functions/_shared/engine_v3/index.ts";
 import { OPEN_BREEZE, SCENES, buildShip, duel, evenLevels, ratingOf, sceneByName, seedFor, sloopForRatio, verdictFor } from "./arena.ts";
 import { crabber, gatePace } from "./boss.ts";
 import { chunked } from "./chunks.ts";
@@ -14,7 +15,7 @@ import { failedChecks, render, runChecks } from "./run.ts";
 import { readSituation } from "./situations.ts";
 import { addVerdict, decidedShare, emptyTally, flipTally, mean, mergeTally, pairedError, pct, wilson } from "./stats.ts";
 
-const fighter = (name: "Brawler" | "Skirmisher" | "Runner" | "Coward") => ({ name, doctrine: templateDoctrine(name) });
+const fighter = (name: TemplateName) => ({ name, doctrine: templateDoctrine(name) });
 
 describe("the arena", () => {
   it("builds a fresh sloop full of everything, and the same builds the engine rates", () => {
@@ -24,7 +25,7 @@ describe("the arena", () => {
     expect(ship.hands).toBe(30);
     expect(powerRating(ship)).toBe(10);
     expect(ratingOf()).toBe(10);
-    expect(ratingOf({ levels: evenLevels(5) })).toBeCloseTo(16);
+    expect(ratingOf({ levels: evenLevels(5) })).toBeCloseTo(10 * 1.6 ** B.power.exponent); // a D26 sum of 16 (D136)
   });
 
   it("finds the balanced sloop closest to a Power Rating ratio", () => {
@@ -46,11 +47,11 @@ describe("the arena", () => {
     expect(() => sceneByName("the moon")).toThrow("No scene called the moon");
   });
 
-  it("reads a battle from either side, and the Skirmisher beats the Brawler in the open as the notes of D71 say", () => {
-    const record = duel(fighter("Skirmisher"), fighter("Brawler"), OPEN_BREEZE, 31);
+  it("reads a battle from either side: a much stronger Brawler beats a fresh one, and two Smugglers part at once", () => {
+    const record = duel({ ...fighter("Brawler"), ship: { levels: evenLevels(10) } }, fighter("Brawler"), OPEN_BREEZE, 31);
     expect(verdictFor(record, "hunter")).toBe("win");
     expect(verdictFor(record, "target")).toBe("loss");
-    expect(verdictFor(duel(fighter("Runner"), fighter("Runner"), OPEN_BREEZE, 31), "hunter")).toBe("escape");
+    expect(verdictFor(duel(fighter("Smuggler"), fighter("Smuggler"), OPEN_BREEZE, 31), "hunter")).toBe("escape");
   });
 
   it("draws every sample from its own stream of seeds", () => {
@@ -82,15 +83,18 @@ describe("random plans and doctrines", () => {
     for (let i = 0; i < 300; i++) {
       d = i % 3 === 0 ? randomDoctrine(rng, `r${i}`) : mutateDoctrine(rng, d, `m${i}`);
       expect(validateDoctrine(d, { slots: 3 })).toEqual([]);
+      expect(JSON.stringify(d)).not.toContain("mortar"); // the simulator does not try the Mortar for ships with no style (P3.B3 does)
     }
     expect(validateDoctrine(crabber(), { slots: 3 })).toEqual([]);
   });
 
   it("print a doctrine in the words of GAMEPLAY 8.8", () => {
-    expect(doctrineLines(templateDoctrine("Coward"))).toEqual([
-      "1. IF my hull below 50% THEN Surrender",
-      "2. Otherwise: Hold, Round shot",
+    expect(doctrineLines(templateDoctrine("Smuggler"))).toEqual([
+      "1. IF my hull below 40% THEN Surrender",
+      "2. IF range is Grappled THEN Open Range, Repel",
+      "3. Otherwise: Open Range, Chain shot",
     ]);
+    expect(doctrineLines(templateDoctrine("Bombardier"))[1]).toBe("2. IF range is at most Short THEN Open Range, Round shot");
     expect(doctrineLines(templateDoctrine("Brawler"))[0]).toBe("1. IF range is Grappled THEN Close In, Grapeshot");
   });
 });
@@ -132,6 +136,10 @@ describe("counting", () => {
 
 describe("reading a situation (check 2)", () => {
   const plays = ALL_PLAYS.slice();
+  it("tries the 24 plays a ship with no style has: four Helm moves, six Guns orders, no Mortar", () => {
+    expect(plays).toHaveLength(24);
+    expect(plays.some((p) => p.guns === "mortar")).toBe(false);
+  });
   /** 24 plays, each with the given mean on 12 seeds and a little spread so the paired error is not 0. */
   const result = (means: (i: number) => number): SituationResult => ({
     plays,
@@ -193,7 +201,7 @@ describe("the jobs and the pool", () => {
   });
 
   it("give the same answers on worker threads as on this thread", async () => {
-    const jobs = [job, { ...job, scene: "kelp", label: "test/pool2" }, { ...job, a: fighter("Runner"), label: "test/pool3" }];
+    const jobs = [job, { ...job, scene: "kelp", label: "test/pool2" }, { ...job, a: fighter("Smuggler"), label: "test/pool3" }];
     const here = await inlinePool().run("duels", jobs);
     const pool = workerPool(2);
     try {
@@ -218,9 +226,9 @@ describe("a run of the five checks", () => {
     for (const s of fieldShares(data)) {
       expect(s.share).toBeGreaterThanOrEqual(0);
       expect(s.share).toBeLessThanOrEqual(1);
-      expect(s.battles).toBe(SCENES.length * 6 * effort.fieldPerCell);
+      expect(s.battles).toBe(SCENES.length * 2 * (TEMPLATE_NAMES.length - 1) * effort.fieldPerCell); // every other template, both seats
     }
-    expect(judgeSeats(data).rows.length).toBe(SCENES.length * 5);
+    expect(judgeSeats(data).rows.length).toBe(SCENES.length * (1 + TEMPLATE_NAMES.length)); // the pooled field and each mirror
   });
 
   it("runs all five checks, reports them, and gives the same numbers twice", async () => {

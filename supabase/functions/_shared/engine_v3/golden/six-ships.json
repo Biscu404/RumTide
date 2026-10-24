@@ -4,7 +4,7 @@
       "at": "ln_dw_gh",
       "hunter": "ship_cap_a",
       "onLane": true,
-      "result": "draw",
+      "result": "sunk",
       "t": 0.75,
       "target": "ship_cap_b"
     },
@@ -17,7 +17,7 @@
       "target": "ship_cap_e"
     }
   ],
-  "hash": "d675d052",
+  "hash": "50f6d4af",
   "replay": [
     {
       "kind": "tideStart",
@@ -149,7 +149,7 @@
       "hunter": "ship_cap_a",
       "kind": "encounter",
       "onLane": true,
-      "result": "draw",
+      "result": "sunk",
       "t": 0.75,
       "target": "ship_cap_b"
     },
@@ -169,24 +169,47 @@
           "collected": 0
         },
         "flotsam": [],
-        "loot": null,
-        "loser": null,
+        "loot": {
+          "capped": false,
+          "cradle": 0.5,
+          "fairness": 1,
+          "lost": {
+            "goods": {
+              "rum": 1
+            },
+            "plunder": 0
+          },
+          "share": 0.25,
+          "taken": {
+            "goods": {},
+            "plunder": 0
+          }
+        },
+        "loser": "ship_cap_b",
         "pvp": true,
-        "shieldUntil": null,
-        "towed": false,
-        "winner": null,
-        "wreck": null
+        "shieldUntil": 10,
+        "towed": true,
+        "winner": "ship_cap_a",
+        "wreck": {
+          "goods": {
+            "rum": 1
+          },
+          "id": "wreck_t6_ship_cap_b",
+          "plunder": 0,
+          "untilTide": 10,
+          "water": "ln_dw_gh"
+        }
       },
       "kind": "battle",
       "record": {
         "at": "ln_dw_gh",
         "dealt": {
-          "hunter": 0.37666666666666665,
-          "target": 0.3733333333333333
+          "hunter": 0.33333333333333337,
+          "target": 0.37777777777777777
         },
         "doctrines": {
-          "hunter": "Brawler",
-          "target": "Brawler"
+          "hunter": "Rammer",
+          "target": "Gunline"
         },
         "final": [
           {
@@ -197,23 +220,24 @@
             "charted": true,
             "guns": {
               "charged": false,
-              "order": "grapeshot",
+              "order": "roundShot",
               "repeats": 3
             },
-            "hands": 3,
+            "hands": 5,
             "helmBonus": 0,
             "hull": "sloop",
-            "hullPoints": 78,
+            "hullPoints": 70,
             "lurker": false,
             "maxHands": 30,
             "maxHullPoints": 100,
             "maxRiggingPoints": 100,
             "name": "Salty Gull",
-            "powder": 2,
+            "powder": 3,
             "riggingPoints": 100,
             "sails": 10,
             "shipId": "ship_cap_a",
             "side": "hunter",
+            "style": "rammer",
             "withCurrent": false
           },
           {
@@ -225,22 +249,23 @@
             "guns": {
               "charged": false,
               "order": "grapeshot",
-              "repeats": 3
+              "repeats": 2
             },
-            "hands": 3,
+            "hands": 30,
             "helmBonus": 0,
             "hull": "sloop",
-            "hullPoints": 77,
+            "hullPoints": 0,
             "lurker": false,
             "maxHands": 30,
             "maxHullPoints": 100,
             "maxRiggingPoints": 100,
             "name": "Wet Sock",
-            "powder": 2,
+            "powder": 3,
             "riggingPoints": 100,
             "sails": 10,
             "shipId": "ship_cap_b",
             "side": "target",
+            "style": "gunline",
             "withCurrent": false
           }
         ],
@@ -248,10 +273,10 @@
         "hunter": "ship_cap_a",
         "jettisoned": [],
         "outcome": {
-          "kind": "draw",
-          "loser": null,
-          "round": 5,
-          "winner": null
+          "kind": "sunk",
+          "loser": "target",
+          "round": 3,
+          "winner": "hunter"
         },
         "rounds": [
           {
@@ -275,7 +300,7 @@
                 "jettison": false,
                 "powder": 5,
                 "riggingPoints": 100,
-                "rule": 3,
+                "rule": 2,
                 "scrape": 0,
                 "ship": "ship_cap_a",
                 "shot": {
@@ -294,7 +319,7 @@
                 "jettison": false,
                 "powder": 5,
                 "riggingPoints": 100,
-                "rule": 3,
+                "rule": 2,
                 "scrape": 0,
                 "ship": "ship_cap_b",
                 "shot": {
@@ -307,258 +332,144 @@
             "struck": []
           },
           {
-            "contests": [],
+            "contests": [
+              {
+                "chance": 0.5,
+                "kind": "ram",
+                "roll": 0.05624218448065221,
+                "scores": {
+                  "hunter": 10,
+                  "target": 10
+                },
+                "side": "hunter",
+                "winner": "hunter"
+              }
+            ],
             "crippled": [],
             "escaped": false,
             "grapples": [],
-            "melee": {
-              "hands": {
-                "hunter": 24,
-                "target": 24
-              },
-              "lost": {
-                "hunter": 6,
-                "target": 6
-              },
-              "strength": {
-                "hunter": 30,
-                "target": 30
+            "melee": null,
+            "rams": [
+              {
+                "hit": true,
+                "hull": 21,
+                "self": 4,
+                "side": "hunter",
+                "why": "contest"
               }
-            },
-            "rangeAfter": "grappled",
+            ],
+            "rangeAfter": "close",
             "rangeBefore": "close",
             "round": 2,
-            "row": "closeClose",
+            "row": "closeHold",
             "ships": [
               {
                 "abilities": [],
-                "guns": "board",
-                "hands": 24,
+                "guns": "roundShot",
+                "hands": 17,
                 "helm": "closeIn",
                 "helmScore": 10,
-                "hullPoints": 78,
+                "hullPoints": 74,
                 "jettison": false,
-                "powder": 5,
+                "powder": 4,
                 "riggingPoints": 100,
-                "rule": 1,
+                "rule": 2,
                 "scrape": 0,
                 "ship": "ship_cap_a",
                 "shot": {
-                  "damage": 0,
-                  "powderUsed": 0,
-                  "track": null
+                  "damage": 21,
+                  "powderUsed": 1,
+                  "track": "hull"
                 }
               },
               {
                 "abilities": [],
-                "guns": "board",
-                "hands": 24,
-                "helm": "closeIn",
+                "guns": "grapeshot",
+                "hands": 30,
+                "helm": "hold",
                 "helmScore": 10,
-                "hullPoints": 77,
+                "hullPoints": 35,
                 "jettison": false,
-                "powder": 5,
+                "powder": 4,
                 "riggingPoints": 100,
                 "rule": 1,
                 "scrape": 0,
                 "ship": "ship_cap_b",
                 "shot": {
-                  "damage": 0,
-                  "powderUsed": 0,
-                  "track": null
+                  "damage": 13,
+                  "powderUsed": 1,
+                  "track": "hands"
                 }
               }
             ],
             "struck": []
           },
           {
-            "contests": [],
+            "contests": [
+              {
+                "chance": 0.5,
+                "kind": "ram",
+                "roll": 0.13596026110462844,
+                "scores": {
+                  "hunter": 10,
+                  "target": 10
+                },
+                "side": "hunter",
+                "winner": "hunter"
+              }
+            ],
             "crippled": [],
             "escaped": false,
             "grapples": [],
-            "melee": {
-              "hands": {
-                "hunter": 14,
-                "target": 14
-              },
-              "lost": {
-                "hunter": 3,
-                "target": 3
-              },
-              "strength": {
-                "hunter": 17,
-                "target": 17
+            "melee": null,
+            "rams": [
+              {
+                "hit": true,
+                "hull": 21,
+                "self": 4,
+                "side": "hunter",
+                "why": "contest"
               }
-            },
-            "rangeAfter": "grappled",
-            "rangeBefore": "grappled",
+            ],
+            "rangeAfter": "close",
+            "rangeBefore": "close",
             "round": 3,
-            "row": "grappled",
+            "row": "closeHold",
             "ships": [
               {
                 "abilities": [],
-                "guns": "grapeshot",
-                "hands": 14,
+                "guns": "roundShot",
+                "hands": 5,
                 "helm": "closeIn",
                 "helmScore": 10,
-                "hullPoints": 78,
-                "jettison": false,
-                "powder": 4,
-                "riggingPoints": 100,
-                "rule": 0,
-                "scrape": 0,
-                "ship": "ship_cap_a",
-                "shot": {
-                  "damage": 7,
-                  "powderUsed": 1,
-                  "track": "hands"
-                }
-              },
-              {
-                "abilities": [],
-                "guns": "grapeshot",
-                "hands": 14,
-                "helm": "closeIn",
-                "helmScore": 10,
-                "hullPoints": 77,
-                "jettison": false,
-                "powder": 4,
-                "riggingPoints": 100,
-                "rule": 0,
-                "scrape": 0,
-                "ship": "ship_cap_b",
-                "shot": {
-                  "damage": 7,
-                  "powderUsed": 1,
-                  "track": "hands"
-                }
-              }
-            ],
-            "struck": []
-          },
-          {
-            "contests": [],
-            "crippled": [],
-            "escaped": false,
-            "grapples": [],
-            "melee": {
-              "hands": {
-                "hunter": 6,
-                "target": 6
-              },
-              "lost": {
-                "hunter": 2,
-                "target": 2
-              },
-              "strength": {
-                "hunter": 8,
-                "target": 8
-              }
-            },
-            "rangeAfter": "grappled",
-            "rangeBefore": "grappled",
-            "round": 4,
-            "row": "grappled",
-            "ships": [
-              {
-                "abilities": [],
-                "guns": "grapeshot",
-                "hands": 6,
-                "helm": "closeIn",
-                "helmScore": 10,
-                "hullPoints": 78,
+                "hullPoints": 70,
                 "jettison": false,
                 "powder": 3,
                 "riggingPoints": 100,
-                "rule": 0,
+                "rule": 2,
                 "scrape": 0,
                 "ship": "ship_cap_a",
                 "shot": {
-                  "damage": 6,
+                  "damage": 14,
                   "powderUsed": 1,
-                  "track": "hands"
+                  "track": "hull"
                 }
               },
               {
                 "abilities": [],
                 "guns": "grapeshot",
-                "hands": 6,
-                "helm": "closeIn",
+                "hands": 30,
+                "helm": "hold",
                 "helmScore": 10,
-                "hullPoints": 77,
+                "hullPoints": 0,
                 "jettison": false,
                 "powder": 3,
                 "riggingPoints": 100,
-                "rule": 0,
+                "rule": 1,
                 "scrape": 0,
                 "ship": "ship_cap_b",
                 "shot": {
-                  "damage": 6,
-                  "powderUsed": 1,
-                  "track": "hands"
-                }
-              }
-            ],
-            "struck": []
-          },
-          {
-            "contests": [],
-            "crippled": [],
-            "escaped": false,
-            "grapples": [],
-            "melee": {
-              "hands": {
-                "hunter": 3,
-                "target": 3
-              },
-              "lost": {
-                "hunter": 1,
-                "target": 1
-              },
-              "strength": {
-                "hunter": 4,
-                "target": 4
-              }
-            },
-            "rangeAfter": "grappled",
-            "rangeBefore": "grappled",
-            "round": 5,
-            "row": "grappled",
-            "ships": [
-              {
-                "abilities": [],
-                "guns": "grapeshot",
-                "hands": 3,
-                "helm": "closeIn",
-                "helmScore": 10,
-                "hullPoints": 78,
-                "jettison": false,
-                "powder": 2,
-                "riggingPoints": 100,
-                "rule": 0,
-                "scrape": 0,
-                "ship": "ship_cap_a",
-                "shot": {
-                  "damage": 2,
-                  "powderUsed": 1,
-                  "track": "hands"
-                }
-              },
-              {
-                "abilities": [],
-                "guns": "grapeshot",
-                "hands": 3,
-                "helm": "closeIn",
-                "helmScore": 10,
-                "hullPoints": 77,
-                "jettison": false,
-                "powder": 2,
-                "riggingPoints": 100,
-                "rule": 0,
-                "scrape": 0,
-                "ship": "ship_cap_b",
-                "shot": {
-                  "damage": 2,
+                  "damage": 12,
                   "powderUsed": 1,
                   "track": "hands"
                 }
@@ -594,6 +505,7 @@
             "sails": 10,
             "shipId": "ship_cap_a",
             "side": "hunter",
+            "style": "rammer",
             "withCurrent": false
           },
           {
@@ -621,6 +533,7 @@
             "sails": 10,
             "shipId": "ship_cap_b",
             "side": "target",
+            "style": "gunline",
             "withCurrent": false
           }
         ],
@@ -1143,6 +1056,15 @@
       "t": 4
     },
     {
+      "banked": 0,
+      "from": "dw_harbour",
+      "hullPoints": 50,
+      "kind": "towed",
+      "ship": "ship_cap_b",
+      "t": 9,
+      "to": "dw_harbour"
+    },
+    {
       "banked": 80,
       "from": "gh_reefside",
       "hullPoints": 80,
@@ -1156,14 +1078,6 @@
       "provisionsLeft": 3,
       "provisionsUsed": 1,
       "ship": "ship_cap_a",
-      "shortRations": false,
-      "t": 9
-    },
-    {
-      "kind": "supplies",
-      "provisionsLeft": 3,
-      "provisionsUsed": 1,
-      "ship": "ship_cap_b",
       "shortRations": false,
       "t": 9
     },
@@ -1198,8 +1112,8 @@
       "water": "gh_lee"
     },
     "ship_cap_b": {
-      "docked": false,
-      "provisions": 3,
+      "docked": true,
+      "provisions": 4,
       "rigging": 100,
       "shortRations": false,
       "water": "dw_harbour"

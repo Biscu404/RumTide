@@ -2,10 +2,10 @@
 
 import { B, SEASON_PRESETS, type PresetId } from "./balance.ts";
 import { LEVEL } from "./types.ts";
-import type { Captain, CaptainKind, HullId, MapBoss, NpcRole, SeasonState, Ship, WaterId } from "./types.ts";
+import type { Captain, CaptainKind, FightingStyle, HullId, MapBoss, NpcRole, SeasonState, Ship, WaterId } from "./types.ts";
 import { raise, startKnowledge } from "./knowledge.ts";
 import { newShip } from "./ship.ts";
-import { templateDoctrine } from "./combat/doctrine.ts";
+import { styleTemplate, templateDoctrine } from "./combat/doctrine.ts";
 import { SHELLBACK_DOCTRINE, SHELLBACK_ID, applyStatline, shellbackDoctrine, shellbackStatline } from "./combat/shellback.ts";
 import type { World } from "./map.ts";
 
@@ -16,11 +16,15 @@ export interface NewCaptainSpec {
   kind?: CaptainKind;
   npcRole?: NpcRole;
   hull?: HullId;
+  style?: FightingStyle; // the Fighting Style the captain picks with the starting doctrine (spec section 2); none if absent
   water?: WaterId;
   docked?: boolean;
 }
 
-/** A new captain and ship as they start a season: start knowledge, starting gold, docked at the start water. */
+/**
+ * A new captain and ship as they start a season: start knowledge, starting gold, docked at the start water. A captain who
+ * picks a Fighting Style sails with it and starts with its template doctrine; any other starts with the Brawler.
+ */
 export function newCaptain(world: World, preset: PresetId, spec: NewCaptainSpec): { captain: Captain; ship: Ship } {
   const p = SEASON_PRESETS[preset];
   const shipId = `ship_${spec.id}`;
@@ -39,14 +43,14 @@ export function newCaptain(world: World, preset: PresetId, spec: NewCaptainSpec)
     fleetId: null,
     shieldUntilTide: 0,
     queuedPlan: null,
-    doctrines: [templateDoctrine("Brawler")],
-    defaultDoctrine: "Brawler",
+    doctrines: [templateDoctrine(styleTemplate(spec.style))],
+    defaultDoctrine: styleTemplate(spec.style),
     parley: "off",
     noQuarter: false,
     bounty: 0,
     bossesBeaten: [],
   };
-  const ship = newShip(shipId, spec.id, spec.shipName, spec.hull ?? "sloop", water, docked);
+  const ship = newShip(shipId, spec.id, spec.shipName, spec.hull ?? "sloop", water, docked, spec.style);
   return { captain, ship };
 }
 

@@ -1,8 +1,8 @@
 // The six ship fixture: one Tide in the Cradle that exercises every Phase 1 and encounter rule at once.
 // Used by engine_v3/golden.test.ts, `npm run tide:demo` and `npm run golden:update`.
 //
-//   Salty Gull   hunts ships carrying cargo and meets the Wet Sock head on in the lane to Driftwood
-//   Wet Sock     carries rum from Driftwood to Gullhaven and gets caught on the way
+//   Salty Gull   a Rammer: hunts ships carrying cargo and meets the Wet Sock head on in the lane to Driftwood
+//   Wet Sock     a Gunline: carries rum from Driftwood to Gullhaven and gets caught on the way, then rammed
 //   Inkwell      is on Short Rations and does not know the Tarpot current, so it is becalmed short
 //   Black Gannet lies in wait at Gullhaven Reefside, carrying 100 doubloons and 2 rum
 //   Merry Widow  surveys, then sails into the Gannet's trap; it has a Plan B for the next Tide
@@ -25,8 +25,8 @@ export function sixShips(): { state: SeasonState; orders: Record<string, Orders>
     world: cradle,
     bosses: false, // the fixture is six ships; Old Shellback is shown by `npm run tide:demo -- --shellback`
     captains: [
-      { id: "cap_a", name: "Anna", shipName: "Salty Gull", water: "gh_lee" },
-      { id: "cap_b", name: "Bogdan", shipName: "Wet Sock", water: "dw_harbour" },
+      { id: "cap_a", name: "Anna", shipName: "Salty Gull", water: "gh_lee", style: "rammer" },
+      { id: "cap_b", name: "Bogdan", shipName: "Wet Sock", water: "dw_harbour", style: "gunline" },
       { id: "cap_c", name: "Cami", shipName: "Inkwell", water: "tp_harbour" },
       { id: "cap_d", name: "Dragos", shipName: "Black Gannet", water: "gh_reefside" },
       { id: "cap_e", name: "Elena", shipName: "Merry Widow", water: "gh_harbour" },

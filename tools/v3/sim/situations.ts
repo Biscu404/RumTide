@@ -1,8 +1,9 @@
 // Check 2 of GAMEPLAY 8.9 (P3.1): every Helm move and every Guns order is the best choice in at least one situation.
 //
 // A situation is a battle at the start of round k, reached by two captains who play their doctrines from round 1: any
-// pair of the four templates, in a scene, with k from 1 to 4. In that situation all 24 plays (four Helm moves, each with
-// six Guns orders) are tried for round k on the same seeds, and the captain goes on with its own doctrine afterwards.
+// pair of the templates (TEMPLATE_NAMES), in a scene, with k from 1 to 4. In that situation all 24 plays (four Helm moves, each with
+// six Guns orders of SIM_GUNS_ORDERS, the Mortar left out) are tried for round k on the same seeds, and the captain goes on
+// with its own doctrine afterwards.
 // A play is worth the score of the battle (1 win, 0.5 draw or escape, 0 loss) plus a twentieth of the damage share lead.
 //
 // The best Helm move of a situation is the one in the best play, and it is "clearly best" if that play beats the best play
@@ -10,10 +11,11 @@
 // A situation only counts when the choice matters: its best and worst plays are at least 0.1 apart. The check passes
 // when each of the 4 Helm moves and 6 Guns orders is clearly best in at least one situation.
 
-import { GUNS_ORDERS, HELM_MOVES, TEMPLATE_NAMES, templateDoctrine } from "../../../supabase/functions/_shared/engine_v3/index.ts";
+import { HELM_MOVES, TEMPLATE_NAMES, templateDoctrine } from "../../../supabase/functions/_shared/engine_v3/index.ts";
 import type { GunsOrder, HelmMove, TemplateName } from "../../../supabase/functions/_shared/engine_v3/index.ts";
 import type { Effort } from "./effort.ts";
 import type { Play, SituationJob, SituationResult } from "./jobs.ts";
+import { SIM_GUNS_ORDERS } from "./plans.ts";
 import type { Pool } from "./pool.ts";
 import { mean, pairedError } from "./stats.ts";
 
@@ -117,7 +119,7 @@ export function judgeSituations(data: SituationData): SituationVerdict {
       return { option, clear: rows.length, examples };
     });
   const helm = cover(HELM_MOVES, (r) => r.clearHelm);
-  const guns = cover(GUNS_ORDERS, (r) => r.clearGuns);
+  const guns = cover(SIM_GUNS_ORDERS, (r) => r.clearGuns);
   const missing = [...helm.filter((c) => c.clear === 0).map((c) => c.option as string), ...guns.filter((c) => c.clear === 0).map((c) => c.option as string)];
   return { pass: missing.length === 0, situations: data.rows.length, mattering: data.rows.filter((r) => r.matters).length, helm, guns, missing };
 }

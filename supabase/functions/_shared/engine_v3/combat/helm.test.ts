@@ -139,6 +139,16 @@ describe("starting range (P2.1, GAMEPLAY 8.1)", () => {
   it("never starts beyond Medium in Kelp", () => {
     expect(startingRange("kelp")).toBe("medium");
     expect(startingRange("kelp", "long")).toBe("medium");
+    expect(startingRange("kelp", undefined, true)).toBe("medium");
+  });
+
+  it("is Far when a Bombardier's spotters see them first, which turns only a start at Long into Far", () => {
+    expect(startingRange("open", undefined, true)).toBe("far");
+    expect(startingRange("rocky", undefined, true)).toBe("far");
+    expect(startingRange("open", "long", true)).toBe("far");
+    expect(startingRange("open", "medium", true)).toBe("medium"); // a Lurker who sprang its ambush at Medium
+    expect(startingRange("fog", undefined, true)).toBe("medium"); // Fog still starts at Medium
+    expect(startingRange("open", undefined, false)).toBe("long");
   });
 });
 
@@ -180,29 +190,37 @@ describe("the Helm contest (P2.1, GAMEPLAY 8.4)", () => {
 
 // The pair table of GAMEPLAY 8.4, written out by hand. Each case is a row, read from A's point of view.
 type Pos = Range | "escaped";
+type Open = "far" | "long" | "medium" | "short" | "close"; // the five distances the pair table moves between
 interface PairCase {
   name: string;
   a: HelmMove;
   b: HelmMove;
   row: HelmRow;
   chaseWinner?: "a" | "b"; // only the Close In against Open Range chase has a contest
-  at: Record<"long" | "medium" | "close", Pos>;
+  at: Record<Open, Pos>;
   modA: number;
   modB: number;
 }
 
+// One band nearer, two bands nearer, one band farther, two bands farther, and staying, over the six distances (D121).
+const NEAR1: Record<Open, Pos> = { far: "long", long: "medium", medium: "short", short: "close", close: "close" };
+const NEAR2: Record<Open, Pos> = { far: "medium", long: "short", medium: "close", short: "close", close: "grappled" };
+const FAR1: Record<Open, Pos> = { far: "escaped", long: "far", medium: "long", short: "medium", close: "short" };
+const FAR2: Record<Open, Pos> = { far: "escaped", long: "escaped", medium: "far", short: "long", close: "medium" };
+const STAY: Record<Open, Pos> = { far: "far", long: "long", medium: "medium", short: "short", close: "close" };
+
 const PAIRS: PairCase[] = [
-  { name: "Close In against Close In", a: "closeIn", b: "closeIn", row: "closeClose", at: { long: "close", medium: "close", close: "grappled" }, modA: 1, modB: 1 },
-  { name: "Close In against Hold", a: "closeIn", b: "hold", row: "closeHold", at: { long: "medium", medium: "close", close: "close" }, modA: 1, modB: 1 },
-  { name: "Close In wins the chase against Open Range", a: "closeIn", b: "openRange", row: "closeOpen", chaseWinner: "a", at: { long: "medium", medium: "close", close: "close" }, modA: C.flank, modB: 1 },
-  { name: "Open Range wins the chase against Close In", a: "closeIn", b: "openRange", row: "closeOpen", chaseWinner: "b", at: { long: "escaped", medium: "long", close: "medium" }, modA: 1, modB: 1 },
-  { name: "Hold against Hold", a: "hold", b: "hold", row: "holdHold", at: { long: "long", medium: "medium", close: "close" }, modA: 1, modB: 1 },
-  { name: "Hold against Open Range", a: "hold", b: "openRange", row: "holdOpen", at: { long: "escaped", medium: "long", close: "medium" }, modA: 1, modB: C.weakened },
-  { name: "Open Range against Open Range", a: "openRange", b: "openRange", row: "openOpen", at: { long: "escaped", medium: "escaped", close: "long" }, modA: 1, modB: 1 },
-  { name: "Cross Their Bow against Close In", a: "crossTheirBow", b: "closeIn", row: "crossClose", at: { long: "medium", medium: "close", close: "close" }, modA: C.rake, modB: C.weakened },
-  { name: "Cross Their Bow against Hold", a: "crossTheirBow", b: "hold", row: "crossHold", at: { long: "long", medium: "medium", close: "close" }, modA: C.rake, modB: C.weakened },
-  { name: "Cross Their Bow against Open Range", a: "crossTheirBow", b: "openRange", row: "crossOpen", at: { long: "escaped", medium: "long", close: "medium" }, modA: C.weakened, modB: C.flank },
-  { name: "Cross Their Bow against Cross Their Bow", a: "crossTheirBow", b: "crossTheirBow", row: "crossCross", at: { long: "long", medium: "medium", close: "close" }, modA: C.weakened, modB: C.weakened },
+  { name: "Close In against Close In", a: "closeIn", b: "closeIn", row: "closeClose", at: NEAR2, modA: 1, modB: 1 },
+  { name: "Close In against Hold", a: "closeIn", b: "hold", row: "closeHold", at: NEAR1, modA: 1, modB: 1 },
+  { name: "Close In wins the chase against Open Range", a: "closeIn", b: "openRange", row: "closeOpen", chaseWinner: "a", at: NEAR1, modA: C.flank, modB: 1 },
+  { name: "Open Range wins the chase against Close In", a: "closeIn", b: "openRange", row: "closeOpen", chaseWinner: "b", at: FAR1, modA: 1, modB: 1 },
+  { name: "Hold against Hold", a: "hold", b: "hold", row: "holdHold", at: STAY, modA: 1, modB: 1 },
+  { name: "Hold against Open Range", a: "hold", b: "openRange", row: "holdOpen", at: FAR1, modA: 1, modB: C.weakened },
+  { name: "Open Range against Open Range", a: "openRange", b: "openRange", row: "openOpen", at: FAR2, modA: 1, modB: 1 },
+  { name: "Cross Their Bow against Close In", a: "crossTheirBow", b: "closeIn", row: "crossClose", at: NEAR1, modA: C.rake, modB: C.weakened },
+  { name: "Cross Their Bow against Hold", a: "crossTheirBow", b: "hold", row: "crossHold", at: STAY, modA: C.rake, modB: C.weakened },
+  { name: "Cross Their Bow against Open Range", a: "crossTheirBow", b: "openRange", row: "crossOpen", at: FAR1, modA: C.weakened, modB: C.flank },
+  { name: "Cross Their Bow against Cross Their Bow", a: "crossTheirBow", b: "crossTheirBow", row: "crossCross", at: STAY, modA: C.weakened, modB: C.weakened },
 ];
 
 describe("the Helm pair table (P2.1, GAMEPLAY 8.4)", () => {
@@ -221,13 +239,13 @@ describe("the Helm pair table (P2.1, GAMEPLAY 8.4)", () => {
       // Play it with A as the hunter and again with A as the target.
       for (const aSide of BATTLE_SIDES) {
         const bSide: BattleSide = aSide === "hunter" ? "target" : "hunter";
-        for (const range of ["long", "medium", "close"] as const) {
+        for (const range of ["far", "long", "medium", "short", "close"] as const) {
           it(`moves the range from ${range} (A is the ${aSide})`, () => {
             const moves = { [aSide]: p.a, [bSide]: p.b } as Record<BattleSide, HelmMove>;
             const chaseWinner = p.chaseWinner === "b" ? bSide : aSide;
             const out = applyPair(moves, range, chaseWinner);
             const want = p.at[range];
-            if (want === "escaped") expect(out.position).toBeLessThan(RANGES.indexOf("long"));
+            if (want === "escaped") expect(out.position).toBeLessThan(RANGES.indexOf("far"));
             else expect(RANGES[out.position]).toBe(want);
             expect(out.row).toBe(p.row);
             expect(out.gunsMod[aSide]).toBeCloseTo(p.modA);
@@ -238,12 +256,17 @@ describe("the Helm pair table (P2.1, GAMEPLAY 8.4)", () => {
     });
   }
 
-  it("reports an escape when the range goes past Long, and keeps the range at Long", () => {
+  it("reports an escape when the range goes past Far, and keeps the range at Far", () => {
     const r = helm({ hunter: "openRange", target: "openRange" }, "long");
     expect(r.escaped).toBe(true);
-    expect(r.range).toBe("long");
-    const stays = helm({ hunter: "openRange", target: "openRange" }, "close");
-    expect(stays).toMatchObject({ escaped: false, range: "long" });
+    expect(r.range).toBe("far");
+    const stays = helm({ hunter: "openRange", target: "openRange" }, "medium");
+    expect(stays).toMatchObject({ escaped: false, range: "far" });
+  });
+
+  it("makes a ship that runs need one more good turn: Open Range at Long reaches Far, not freedom", () => {
+    expect(helm({ hunter: "hold", target: "openRange" }, "long")).toMatchObject({ escaped: false, range: "far" });
+    expect(helm({ hunter: "hold", target: "openRange" }, "far")).toMatchObject({ escaped: true, range: "far" });
   });
 
   it("decides the chase with a Helm contest, and only the chase", () => {
@@ -253,7 +276,7 @@ describe("the Helm pair table (P2.1, GAMEPLAY 8.4)", () => {
     expect(chase.range).toBe("long");
     const won = helm({ hunter: "closeIn", target: "openRange" }, "medium", { rng: new ScriptedRng(HUNTER_WINS) });
     expect(won.contests[0]?.winner).toBe("hunter");
-    expect(won.range).toBe("close");
+    expect(won.range).toBe("short");
     expect(helm({ hunter: "closeIn", target: "hold" }, "medium").contests).toEqual([]);
   });
 
@@ -300,89 +323,93 @@ describe("the Crippled rule (P2.1, GAMEPLAY 6.3)", () => {
 describe("terrain overrides: Shallows (P2.1, GAMEPLAY 8.4)", () => {
   const brig = (side: BattleSide, over: Partial<BattleShip> = {}) => testShip(side, "brigantine", over);
 
-  it("makes a Brigantine win a Helm contest to reach Close", () => {
+  it("makes a Brigantine win a Helm contest to reach Close, and stops it at Short when it loses (D42)", () => {
     const moves = { hunter: "closeIn", target: "hold" } as const;
-    const won = helm(moves, "medium", { terrain: "shallows", hunter: brig("hunter"), rng: new ScriptedRng(HUNTER_WINS) });
+    const won = helm(moves, "short", { terrain: "shallows", hunter: brig("hunter"), rng: new ScriptedRng(HUNTER_WINS) });
     expect(won.range).toBe("close");
     expect(won.contests).toHaveLength(1);
     expect(won.contests[0]).toMatchObject({ kind: "shallows", side: "hunter", winner: "hunter" });
-    const lost = helm(moves, "medium", { terrain: "shallows", hunter: brig("hunter"), rng: new ScriptedRng(TARGET_WINS) });
-    expect(lost.range).toBe("medium");
+    const lost = helm(moves, "short", { terrain: "shallows", hunter: brig("hunter"), rng: new ScriptedRng(TARGET_WINS) });
+    expect(lost.range).toBe("short");
     expect(lost.contests[0]).toMatchObject({ kind: "shallows", winner: "target" });
   });
 
   it("holds even against Close In, and even when the Brigantine is the one being closed on", () => {
-    const both = helm({ hunter: "closeIn", target: "closeIn" }, "long", { terrain: "shallows", hunter: brig("hunter"), rng: new ScriptedRng(TARGET_WINS) });
-    expect(both.range).toBe("medium"); // two bands would have reached Close
-    const closedOn = helm({ hunter: "closeIn", target: "hold" }, "medium", { terrain: "shallows", target: brig("target"), rng: new ScriptedRng(TARGET_WINS) });
-    expect(closedOn.range).toBe("medium");
+    const both = helm({ hunter: "closeIn", target: "closeIn" }, "medium", { terrain: "shallows", hunter: brig("hunter"), rng: new ScriptedRng(TARGET_WINS) });
+    expect(both.range).toBe("short"); // two bands would have reached Close
+    const closedOn = helm({ hunter: "closeIn", target: "hold" }, "short", { terrain: "shallows", target: brig("target"), rng: new ScriptedRng(TARGET_WINS) });
+    expect(closedOn.range).toBe("short");
     expect(closedOn.contests[0]).toMatchObject({ kind: "shallows", side: "target", winner: "hunter" });
   });
 
   it("applies to Frigates too, weighing the contest by Helm score", () => {
-    const r = helm({ hunter: "closeIn", target: "hold" }, "medium", { terrain: "shallows", hunter: testShip("hunter", "frigate"), rng: new ScriptedRng(HUNTER_WINS) });
+    const r = helm({ hunter: "closeIn", target: "hold" }, "short", { terrain: "shallows", hunter: testShip("hunter", "frigate"), rng: new ScriptedRng(HUNTER_WINS) });
     expect(r.contests[0]?.chance).toBeCloseTo(18 / (18 + 10 * C.terrainHelm.shallowsSloop));
   });
 
   it("does not trouble Sloops, or a range that stops short of Close", () => {
-    expect(helm({ hunter: "closeIn", target: "closeIn" }, "long", { terrain: "shallows", rng: new ScriptedRng(TARGET_WINS) })).toMatchObject({ range: "close", contests: [] });
-    const short = helm({ hunter: "closeIn", target: "hold" }, "long", { terrain: "shallows", hunter: brig("hunter"), rng: new ScriptedRng(TARGET_WINS) });
-    expect(short).toMatchObject({ range: "medium", contests: [] });
+    expect(helm({ hunter: "closeIn", target: "closeIn" }, "medium", { terrain: "shallows", rng: new ScriptedRng(TARGET_WINS) })).toMatchObject({ range: "close", contests: [] });
+    const short = helm({ hunter: "closeIn", target: "hold" }, "medium", { terrain: "shallows", hunter: brig("hunter"), rng: new ScriptedRng(TARGET_WINS) });
+    expect(short).toMatchObject({ range: "short", contests: [] });
   });
 
   it("does not roll when the ships are already at Close, or in open water", () => {
     const grapple = helm({ hunter: "closeIn", target: "closeIn" }, "close", { terrain: "shallows", hunter: brig("hunter"), rng: new ScriptedRng(TARGET_WINS) });
     expect(grapple).toMatchObject({ range: "grappled", contests: [] });
-    const open = helm({ hunter: "closeIn", target: "hold" }, "medium", { hunter: brig("hunter"), rng: new ScriptedRng(TARGET_WINS) });
+    const open = helm({ hunter: "closeIn", target: "hold" }, "short", { hunter: brig("hunter"), rng: new ScriptedRng(TARGET_WINS) });
     expect(open).toMatchObject({ range: "close", contests: [] });
   });
 
   it("is waived for a ship with Local Knowledge, but not when both ships have the water Charted", () => {
     const moves = { hunter: "closeIn", target: "hold" } as const;
-    const local = helm(moves, "medium", { terrain: "shallows", hunter: brig("hunter", { charted: true }), rng: new ScriptedRng(TARGET_WINS) });
+    const local = helm(moves, "short", { terrain: "shallows", hunter: brig("hunter", { charted: true }), rng: new ScriptedRng(TARGET_WINS) });
     expect(local).toMatchObject({ range: "close", contests: [] });
-    const shared = helm(moves, "medium", {
+    const shared = helm(moves, "short", {
       terrain: "shallows", hunter: brig("hunter", { charted: true }), target: sloopT({ charted: true }), rng: new ScriptedRng(TARGET_WINS),
     });
-    expect(shared.range).toBe("medium");
+    expect(shared.range).toBe("short");
     expect(shared.contests).toHaveLength(1);
   });
 
   it("makes each Brigantine or Frigate win its own contest, hunter first", () => {
     const moves = { hunter: "closeIn", target: "closeIn" } as const;
     const pair = { terrain: "shallows", hunter: brig("hunter"), target: brig("target") } as const;
-    const bothWin = helm(moves, "long", { ...pair, rng: new ScriptedRng(HUNTER_WINS, HUNTER_WINS) });
+    const bothWin = helm(moves, "medium", { ...pair, rng: new ScriptedRng(HUNTER_WINS, HUNTER_WINS) });
     expect(bothWin.range).toBe("close");
     expect(bothWin.contests.map((c) => [c.side, c.winner])).toEqual([["hunter", "hunter"], ["target", "target"]]);
-    const oneLoses = helm(moves, "long", { ...pair, rng: new ScriptedRng(HUNTER_WINS, TARGET_WINS) });
-    expect(oneLoses.range).toBe("medium");
+    const oneLoses = helm(moves, "medium", { ...pair, rng: new ScriptedRng(HUNTER_WINS, TARGET_WINS) });
+    expect(oneLoses.range).toBe("short");
   });
 
   it("rolls the Shallows contest after the chase", () => {
-    const r = helm({ hunter: "closeIn", target: "openRange" }, "medium", {
+    const r = helm({ hunter: "closeIn", target: "openRange" }, "short", {
       terrain: "shallows", hunter: brig("hunter"), rng: new ScriptedRng(HUNTER_WINS, TARGET_WINS),
     });
     expect(r.contests.map((c) => c.kind)).toEqual(["chase", "shallows"]);
-    expect(r.range).toBe("medium"); // the chase was won, the contest to reach Close was lost
+    expect(r.range).toBe("short"); // the chase was won, the contest to reach Close was lost
   });
 });
 
 describe("terrain overrides: Kelp (P2.1, GAMEPLAY 8.4)", () => {
-  it("never lets the range go beyond Medium", () => {
+  it("never lets the range go beyond Medium, over the six distances", () => {
     expect(helm({ hunter: "hold", target: "openRange" }, "medium", { terrain: "kelp" }).range).toBe("medium");
-    expect(helm({ hunter: "hold", target: "openRange" }, "close", { terrain: "kelp" }).range).toBe("medium");
+    expect(helm({ hunter: "hold", target: "openRange" }, "short", { terrain: "kelp" }).range).toBe("medium");
+    expect(helm({ hunter: "hold", target: "openRange" }, "close", { terrain: "kelp" }).range).toBe("short");
+    expect(helm({ hunter: "openRange", target: "openRange" }, "short", { terrain: "kelp" }).range).toBe("medium"); // two bands would be Long
     expect(helm({ hunter: "openRange", target: "openRange" }, "close", { terrain: "kelp" }).range).toBe("medium");
   });
 
   it("does not let anyone escape by range", () => {
     expect(helm({ hunter: "openRange", target: "openRange" }, "medium", { terrain: "kelp" })).toMatchObject({ escaped: false, range: "medium" });
-    expect(helm({ hunter: "openRange", target: "openRange" }, "medium", { terrain: "open" }).escaped).toBe(true);
+    expect(helm({ hunter: "openRange", target: "openRange" }, "long", { terrain: "open" }).escaped).toBe(true);
   });
 
   it("still lets ships close in", () => {
-    expect(helm({ hunter: "closeIn", target: "hold" }, "medium", { terrain: "kelp" }).range).toBe("close");
+    expect(helm({ hunter: "closeIn", target: "hold" }, "short", { terrain: "kelp" }).range).toBe("close");
+    expect(helm({ hunter: "closeIn", target: "closeIn" }, "medium", { terrain: "kelp" }).range).toBe("close");
   });
 });
+
 
 describe("terrain overrides: Reef scrape (P2.1, GAMEPLAY 8.4)", () => {
   it("costs every ship that plays Close In or Cross Their Bow its Hull, whatever the result", () => {

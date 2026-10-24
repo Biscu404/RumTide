@@ -13,6 +13,7 @@ import type { Rng } from "../rng.ts";
 import type { ShipId, Terrain } from "../types.ts";
 import { boardingStrength, grappleReason } from "./boarding.ts";
 import { applyPair, contestRecord, playableMove, pairRow, reefScrape } from "./helm.ts";
+import { styleGunsMods, styleHelmFactor } from "./styles.ts";
 import type {
   BattleShip, BattleSide, ContestRecord, DamageTrack, GrappleRecord, GunsOrder, HelmMove, MeleeRecord, Range, SideBonus,
 } from "./types.ts";
@@ -158,6 +159,7 @@ export const noLosses = (): Record<DamageTrack, number> => ({ hull: 0, rigging: 
 
 export interface MateHelm {
   move: HelmMove; // after the Crippled rule
+  score: number; // its Helm score this round, with its own style's factor (Slippery)
   gunsMod: number; // its rake, flank or weakened shot, from its move against the enemy flagship's
   scrape: number; // Hull lost to a Reef scrape
   contest: ContestRecord | null; // the chase contest of Close In against Open Range, if it was rolled
@@ -167,15 +169,19 @@ export interface MateHelm {
  * A fleet mate's Helm for the round, judged against the enemy flagship (7.5). The pair table of 8.4 gives it its guns
  * modifier; the range itself is moved by the flagships only. While Grappled the table does not apply. `rng` is the
  * round's stream; the chase roll comes from its child "helm/chase/<ship id>".
+ *
+ * Each ship uses its own trait (spec section 7): Slippery, Kite, Steady Deck and Braced count for a mate as for a flagship,
+ * and the enemy flagship's Braced softens a mate's rake of it. A mate's Close In never moves the range, so it does not Dash.
  */
 export function mateHelm(
-  mate: BattleShip, asked: HelmMove, score: number, foe: { move: HelmMove; score: number },
+  mate: BattleShip, asked: HelmMove, score: number, foe: { move: HelmMove; score: number; ship?: Pick<BattleShip, "style"> },
   range: Range, terrain: Terrain, rng: Rng,
 ): MateHelm {
   const move = playableMove(mate, asked);
-  if (range === "grappled") return { move, gunsMod: NEUTRAL, scrape: 0, contest: null };
+  const own = score * styleHelmFactor(mate, move);
+  if (range === "grappled") return { move, score: own, gunsMod: NEUTRAL, scrape: 0, contest: null };
   const side = mate.side;
-  const scores = { [side]: score, [other(side)]: foe.score } as Record<BattleSide, number>;
+  const scores = { [side]: own, [other(side)]: foe.score } as Record<BattleSide, number>;
   let contest: ContestRecord | null = null;
   let chaseWinner: BattleSide = "hunter";
   if (pairRow(move, foe.move) === "closeOpen") {
@@ -184,8 +190,11 @@ export function mateHelm(
   }
   const moves = { [side]: move, [other(side)]: foe.move } as Record<BattleSide, HelmMove>;
   const pair = applyPair(moves, range, chaseWinner);
-  return { move, gunsMod: pair.gunsMod[side], scrape: reefScrape(terrain, mate, move), contest };
+  const ships = { [side]: mate, [other(side)]: foe.ship ?? {} } as Record<BattleSide, Pick<BattleShip, "style">>;
+  const gunsMod = styleGunsMods(pair.row, ships, moves, pair.gunsMod)[side];
+  return { move, score: own, gunsMod, scrape: reefScrape(terrain, mate, move), contest };
 }
+
 
 /** A fleet mate playing Open Range while Grappled tries to cut free of the enemy flagship (8.6). Null if it plays anything else. */
 export function mateCutFree(mate: BattleShip, move: HelmMove, score: number, foeScore: number, rng: Rng): ContestRecord | null {
