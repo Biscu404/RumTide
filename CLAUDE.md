@@ -6,7 +6,7 @@ The full design is in `docs/GAME_DESIGN.md`. It is long, so do not read it all a
 
 ## Current focus
 
-* Next task: P3.B2 piece 3 of 3. Pieces 1 and 2 are built (D142 to D181): six distances, all seven styles and their templates, the deck fight, Drill, Fire Pots, Hot Shot, fire and overtime. Piece 3 reworks Old Shellback (D133, D140), writes the replay and Gazette text, and rewrites GAMEPLAY to match. The scratch prototype behind the numbers is on the branch `proto-fighting-styles`, a reference only (see `tools/proto/README.md` there). Then P3.B3 teaches the simulator the Deck orders and the six Fighting Styles. P3.2, tuning `balance.ts` until the checks of GAMEPLAY 8.9 and the new wheel check pass, is paused until then. Task ids come from the Rumtide Roadmap tracker on claude.ai.
+* Next task: P3.2, tune `balance.ts` until the ten checks of `npm run sim:v3` pass: the five of GAMEPLAY 8.9, the wheel, equal spending, Drill, Lashed fast and the Smuggler. The simulator knows the Deck orders and the six Fighting Styles since P3.B3 (D182 to D200), and the table under D197 in `docs/DECISIONS.md` is the "before": eight of ten pass. Start with check 8, and with a luck roll in the deck fight, because no `drill.perLevel` fixes it (D198). P3.B2 piece 3 is not built yet: the Old Shellback rework (D133, D140), the replay and Gazette text, and GAMEPLAY rewritten to match. Until it is, check 5 stays at 100% and cannot be tuned (D200). The brief is `docs/briefs/P3-combat-testing.md`. Task ids come from the Rumtide Roadmap tracker on claude.ai.
 * Done work is in `git log` and `docs/DECISIONS.md`.
 * Decisions waiting on Biscu are in `docs/STATUS.md`.
 
@@ -89,7 +89,7 @@ A task is done when its own checks pass and all of this is true:
 * Check everything at once: `npm run check` (types and all tests, v0.2 and v0.3)
 * Resolve one v0.3 Tide and print it: `npm run tide:demo` (`npm run tide:demo -- --shellback` plays a challenge to Old Shellback instead)
 * Rewrite the v0.3 golden Tide after an intentional rule change: `npm run golden:update`
-* Run the v0.3 combat simulator, the five checks of GAMEPLAY 8.9: `npm run sim:v3` (about two minutes; `-- --quick` for tuning loops, `-- --check 1,4` for some checks, `-- --json file` to keep the numbers; exits 1 if a check fails)
+* Run the v0.3 combat simulator, ten checks: the five of GAMEPLAY 8.9 (1 field share, 2 best play, 3 seat split, 4 Power Rating, 5 Old Shellback) and five more (6 the wheel, 7 equal spending, 8 Drill, 9 Lashed fast, 10 the Smuggler escapes): `npm run sim:v3` (the full run takes 11 minutes on an idle machine and up to 20 on a busy one, most of it check 2; `-- --quick` takes about 3 minutes, for tuning loops; `-- --check 1,6` for some checks, 1 to 10; `-- --json file` to keep the numbers; `-- --set combat.rake=1.5` tries a number of `balance.ts` for one run without editing the file, and can be repeated; a bad flag exits 2, a failed check exits 1)
 * Run a bot season: `npm run bots` (six scripted captains and a six raider brawl play Season 0 on the real engine over 30 seeds each, `npm run bots -- 100` for more; every season is played twice, directly and through the Edge Function handlers, and the two must end identically; fails on any impossible state, crash, non deterministic season or insane total)
 
 ## Crew (specialist roles)

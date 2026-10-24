@@ -29,15 +29,28 @@ const value = (flag: string): string | undefined => {
 };
 
 const effort = EFFORTS[args.includes("--quick") ? "quick" : "full"];
-const chosen = value("--check");
-const which: CheckId[] = chosen
-  ? chosen.split(",").map(Number).filter((n): n is CheckId => (CHECK_IDS as readonly number[]).includes(n))
-  : [...CHECK_IDS];
-if (chosen && which.length === 0) {
-  console.error(`--check wants numbers from 1 to ${CHECK_IDS.length}, for example --check 1,4. Got ${chosen}.`);
+
+// A flag with a missing or unknown value stops the run with exit code 2, so a typo never runs a different set of checks.
+const fail = (message: string): never => {
+  console.error(message);
   process.exit(2);
+};
+const hasFlag = (flag: string): boolean => args.includes(flag);
+const flagValue = (flag: string): string | undefined => {
+  const v = value(flag);
+  if (hasFlag(flag) && (v === undefined || v.startsWith("--"))) fail(`${flag} wants a value.`);
+  return v;
+};
+
+const chosen = flagValue("--check");
+const ids = chosen ? chosen.split(",") : [];
+const which: CheckId[] = chosen ? ids.map(Number).filter((n): n is CheckId => (CHECK_IDS as readonly number[]).includes(n)) : [...CHECK_IDS];
+if (chosen && (which.length === 0 || which.length !== ids.length)) {
+  fail(`--check wants numbers from 1 to ${CHECK_IDS.length}, for example --check 1,4. Got ${chosen}.`);
 }
-const workers = Number(value("--workers") ?? 0);
+const workersText = flagValue("--workers");
+const workers = workersText === undefined ? 0 : Number(workersText);
+if (!Number.isInteger(workers) || workers < 0) fail(`--workers wants a whole number, for example --workers 4. Got ${workersText}.`);
 
 // A --set that is not path=number, or names a number that is not in balance.ts, stops the run before it starts.
 const patch: Patch = {};

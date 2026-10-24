@@ -927,6 +927,13 @@ describe("a run of the ten checks", () => {
     expect(Object.keys(field.seconds)).toEqual(["6"]);
   }, 30000);
 
+  it("prints the time of the shared battles of checks 1, 3 and 6 once", () => {
+    const line = (seconds: Results["seconds"]): string | undefined =>
+      render({ effort: "tiny", patch: {}, seconds }).find((l) => l.startsWith("Time:"));
+    expect(line({ 1: 37.7, 3: 37.7, 6: 37.7, 4: 3.6 })).toBe("Time: checks 1, 3, 6 37.7s, check 4 3.6s.");
+    expect(line({ 3: 5, 9: 1 })).toBe("Time: check 3 5.0s, check 9 1.0s.");
+  });
+
   it("knows which of the ten checks failed", () => {
     const pass = { pass: true };
     const fail = { pass: false };

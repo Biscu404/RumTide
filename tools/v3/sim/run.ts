@@ -274,6 +274,11 @@ export function render(r: Results): string[] {
   const failed = failedChecks(r);
   const ran = CHECK_IDS.filter((id) => r.seconds[id] !== undefined).length;
   out.push(failed.length === 0 ? `All ${ran} checks run passed.` : `${failed.length} of ${ran} checks run failed: ${failed.join(", ")}.`);
-  out.push(`Time: ${Object.entries(r.seconds).map(([id, s]) => `check ${id} ${s!.toFixed(1)}s`).join(", ")}.`);
+  // Checks 1, 3 and 6 read one set of battles, so their time is printed once.
+  const shared = [1, 3, 6].filter((id) => r.seconds[id as CheckId] !== undefined);
+  const times = Object.entries(r.seconds)
+    .filter(([id]) => !shared.includes(Number(id)) || Number(id) === shared[0])
+    .map(([id, s]) => `check${Number(id) === shared[0] && shared.length > 1 ? `s ${shared.join(", ")}` : ` ${id}`} ${s!.toFixed(1)}s`);
+  out.push(`Time: ${times.join(", ")}.`);
   return out;
 }
