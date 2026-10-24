@@ -125,7 +125,7 @@ describe("the replay in words (P2.4)", () => {
       events.push(...resolveTide({ state, world, orders, seed, windOverride: { cradle: { kind: "breeze", from: 270 } } }).replay);
     }
     const lines = formatReplay(world, state, events);
-    expect(lines.some((l) => /BATTLE at the lane between Driftwood Harbour and Gullhaven Lee: Hunter \(Brawler\) against Target \(Brawler\)\./.test(l))).toBe(true);
+    expect(lines.some((l) => /BATTLE at the lane between Driftwood Harbour and Gullhaven Lee: Hunter \(Boarder\) against Target \(Boarder\)\./.test(l))).toBe(true);
     expect(lines.some((l) => /^ {7}.*Round 1, at Long range\./.test(l))).toBe(true);
     expect(lines.some((l) => l.includes("tries to slip away from Hunter") && l.includes("it is caught"))).toBe(true);
     expect(lines.every((l) => !l.includes("—") && !l.includes("–"))).toBe(true);

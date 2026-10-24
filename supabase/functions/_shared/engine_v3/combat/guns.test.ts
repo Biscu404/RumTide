@@ -27,11 +27,11 @@ describe("the ammo by range table (P2.1, GAMEPLAY 8.5)", () => {
     expect(gunsTrack("roundShot")).toBe("hull");
     expect(gunsTrack("chainShot")).toBe("rigging");
     expect(gunsTrack("grapeshot")).toBe("hands");
-    for (const o of ["holdFire", "board", "repel"] as const) expect(gunsTrack(o)).toBeNull();
+    for (const o of ["holdFire", "board", "repel", "charge", "volley", "firePots"] as const) expect(gunsTrack(o)).toBeNull();
   });
 
   for (const { order, key, track } of SHOTS) {
-    for (const range of RANGES) {
+    for (const range of RANGES.filter((r): r is Exclude<Range, "grappled"> => r !== "grappled")) {
       it(`${order} at ${range} takes ${track} by the table's factor`, () => {
         const factor = C.range[key][range];
         expect(ammoFactor(order, range)).toBe(factor);
@@ -58,11 +58,19 @@ describe("the ammo by range table (P2.1, GAMEPLAY 8.5)", () => {
     expect(ammoFactor("chainShot", "long")).toBeGreaterThan(ammoFactor("roundShot", "long"));
     expect(ammoFactor("grapeshot", "close")).toBeGreaterThan(ammoFactor("roundShot", "close"));
     expect(ammoFactor("grapeshot", "long")).toBe(0);
-    expect(ammoFactor("chainShot", "grappled")).toBe(0);
   });
 
-  it("fires nothing for Hold Fire, Board and Repel", () => {
-    for (const order of ["holdFire", "board", "repel"] as const) {
+  it("is quiet while Grappled: no order fires, no luck is rolled and no Powder is burned (boarding spec section 1)", () => {
+    for (const order of GUNS_ORDERS) {
+      expect(ammoFactor(order, "grappled")).toBe(0);
+      const luck = new ScriptedRng(NO_LUCK);
+      const r = fireGuns(hunter(), target(), "grappled", order, luck);
+      expect(r).toEqual({ order, track: null, raw: 0, damage: 0, powderUsed: 0, factors: null });
+    }
+  });
+
+  it("fires nothing for Hold Fire, Board and the Deck orders: they count in the deck fight, not here", () => {
+    for (const order of ["holdFire", "board", "repel", "charge", "volley", "firePots"] as const) {
       for (const range of RANGES) {
         const r = fireGuns(hunter(), target(), range, order, rng());
         expect(r).toMatchObject({ track: null, damage: 0, raw: 0, powderUsed: 0 });

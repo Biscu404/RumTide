@@ -1,52 +1,44 @@
-// Boarding (GAMEPLAY 8.6): grappling, boarding strength, the melee, Capture, Cut Free, Repel.
-// Pure: no network, no clock, no Math.random. The one roll, Cut Free, comes from a labelled child of the round's stream.
+// Boarding (GAMEPLAY 8.6): grappling, boarding strength, Capture, Cut Free.
+// Pure: no network, no clock, no Math.random. The rolls, Cut Free and the grapnels, come from labelled children of the round's
+// stream. The deck fight itself, the Deck orders and the melee, is deck.ts and fleet.ts.
 //
 // runBattle (battle.ts) calls these in the order of 8.3: Cut Free belongs to the Helm step, a Board order is tried
 // once the range is known, and the melee runs after the guns of a Grappled round.
 
 import { B } from "../balance.ts";
 import type { Rng } from "../rng.ts";
+import { drillFactor } from "../ship.ts";
 import type { Terrain } from "../types.ts";
 import { contestRecord } from "./helm.ts";
+import { fightersFactor, grapnelBonus, tinderboxFactor } from "./styles.ts";
 import { BATTLE_SIDES } from "./types.ts";
-import type { BattleShip, BattleSide, ContestRecord, GrappleRecord, GunsOrder, HelmMove, MeleeRecord, Range } from "./types.ts";
+import type { BattleShip, BattleSide, ContestRecord, GrappleRecord, GunsOrder, HelmMove, Range } from "./types.ts";
 
 const C = B.combat;
 const NEUTRAL = 1; // a factor that changes nothing
 
 const other = (side: BattleSide): BattleSide => (side === "hunter" ? "target" : "hunter");
 
-// ---------- Boarding strength and the melee ----------
+// ---------- Boarding strength ----------
 
-/**
- * Boarding strength = Hands x (1 + Bosun, trait and Background bonuses), x 1.3 for a ship that plays Repel (8.6).
- * Kelp adds 15% to every ship (2.2). A ship with no Hands has none.
- */
-export function boardingStrength(ship: BattleShip, order: GunsOrder, terrain: Terrain): number {
-  let strength = ship.hands * (NEUTRAL + ship.boardingBonus);
-  if (order === "repel") strength *= C.boarding.repel;
-  if (terrain === "kelp") strength *= C.kelpBoarding;
-  return strength;
+export interface StrengthOptions {
+  /** First over the rail: this crew is the boarder's, in the round it grapples. Its strength counts `edge.firstOverTheRail` times. */
+  firstOver?: boolean;
+  /** The ships of the other side, for Tinderbox: a crew fighting a Firebrand on deck fights at less than its strength. */
+  foes?: readonly Pick<BattleShip, "style">[];
 }
 
-/** One Grappled round, both sides at once: each removes Hands equal to 20% of its own boarding strength from the other (8.6). */
-export function meleeRound(
-  ships: Record<BattleSide, BattleShip>,
-  orders: Record<BattleSide, GunsOrder>,
-  terrain: Terrain,
-): MeleeRecord {
-  const strength = {
-    hunter: boardingStrength(ships.hunter, orders.hunter, terrain),
-    target: boardingStrength(ships.target, orders.target, terrain),
-  };
-  const lost = { hunter: 0, target: 0 };
-  const hands = { hunter: ships.hunter.hands, target: ships.target.hands };
-  for (const side of BATTLE_SIDES) {
-    // `side` loses what the other ship's strength removes, never more than it has.
-    lost[side] = Math.min(ships[side].hands, Math.round(C.boarding.killShare * strength[other(side)]));
-    hands[side] = ships[side].hands - lost[side];
-  }
-  return { strength, lost, hands };
+/**
+ * Boarding strength = Hands x (1 + Bosun, trait and Background bonuses) x Drill x Kelp x First over the rail (8.6, boarding
+ * spec section 2). Kelp adds 15% to every ship (2.2). A Boarder's Fighters add 20% and Tinderbox takes 20% off a crew
+ * fighting a Firebrand. A ship with no Hands has none. The Deck order is not part of the strength: it is the hit, pairing
+ * and guard of the deck fight (deck.ts).
+ */
+export function boardingStrength(ship: BattleShip, terrain: Terrain, opts: StrengthOptions = {}): number {
+  let strength = ship.hands * (NEUTRAL + ship.boardingBonus) * drillFactor(ship.drill ?? 0);
+  if (terrain === "kelp") strength *= C.kelpBoarding;
+  if (opts.firstOver) strength *= C.edge.firstOverTheRail;
+  return strength * fightersFactor(ship) * tinderboxFactor(opts.foes ?? []);
 }
 
 // ---------- Capture ----------
@@ -126,16 +118,40 @@ export interface CutFreeResult {
  * A Grappled ship can play Open Range; if it wins a Helm contest, range returns to Close (8.6).
  * `moves` are the moves as played, after the Crippled rule, so a Crippled ship cannot try. Each ship that tries
  * rolls its own contest against the other, from the child stream "helm/cutFree/<side>". If both try, either win frees them.
+ *
+ * Lashed fast: the Helm score of a side marked in `lashed` counts `edge.lashedFast` times in the contest of the ship that tries to
+ * get away from it, because it made the grapple or has Grapnels (boarding spec sections 3 and 4). The record shows the scores
+ * as the contest used them.
  */
 export function cutFree(
   rng: Rng,
   moves: Record<BattleSide, HelmMove>,
   scores: Record<BattleSide, number>,
+  lashed: Record<BattleSide, boolean> = { hunter: false, target: false },
 ): CutFreeResult {
   const contests: ContestRecord[] = [];
   for (const side of BATTLE_SIDES) {
     if (moves[side] !== "openRange") continue;
-    contests.push(contestRecord(rng.stream("helm", "cutFree", side), "cutFree", side, scores));
+    contests.push(contestRecord(rng.stream("helm", "cutFree", side), "cutFree", side, lashedScores(scores, side, lashed)));
   }
   return { freed: contests.some((c) => c.winner === c.side), contests };
+}
+
+/** The scores a ship that tries to cut free faces: the other ship's counts `lashedFast` times when it is lashed fast to it. */
+export function lashedScores(scores: Record<BattleSide, number>, side: BattleSide, lashed: Record<BattleSide, boolean>): Record<BattleSide, number> {
+  const foe = other(side);
+  return lashed[foe] ? ({ ...scores, [foe]: scores[foe] * C.edge.lashedFast } as Record<BattleSide, number>) : scores;
+}
+
+// ---------- Grapnels ----------
+
+/**
+ * A Board that failed on Helm score gets a Helm contest instead (Grapnels, Drill 10, or a Boarder's grapnel lines). The ship's
+ * score counts `grapnelBonus` times for a Boarder, once for any other ship. The roll comes from the child stream "grapnel/<id>".
+ */
+export function grapnelContest(
+  rng: Rng, ship: Pick<BattleShip, "shipId" | "style">, side: BattleSide, mine: number, theirs: number,
+): ContestRecord {
+  const scores = { [side]: mine * grapnelBonus(ship), [other(side)]: theirs } as Record<BattleSide, number>;
+  return contestRecord(rng.stream("grapnel", ship.shipId), "grapnel", side, scores);
 }

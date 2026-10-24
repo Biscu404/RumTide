@@ -11,15 +11,16 @@
 import { B } from "../balance.ts";
 import type { Rng } from "../rng.ts";
 import type { ShipId, Terrain } from "../types.ts";
-import { boardingStrength, grappleReason } from "./boarding.ts";
+import { boardingStrength, grappleReason, grapnelContest } from "./boarding.ts";
+import { deckKill, hasSecondWave, pairing } from "./deck.ts";
 import { applyPair, contestRecord, playableMove, pairRow, reefScrape } from "./helm.ts";
-import { styleGunsMods, styleHelmFactor } from "./styles.ts";
+import { boardsFromShort, hasGrapnels, styleGunsMods, styleHelmFactor } from "./styles.ts";
 import type {
-  BattleShip, BattleSide, ContestRecord, DamageTrack, GrappleRecord, GunsOrder, HelmMove, MeleeRecord, Range, SideBonus,
+  BattleShip, BattleSide, ContestRecord, DamageTrack, DeckOrder, GrappleRecord, GunsOrder, HelmMove, MeleeRecord, Pairing, Range,
+  SideBonus,
 } from "./types.ts";
 
 const F = B.fleet;
-const C = B.combat;
 const NEUTRAL = 1; // a factor that changes nothing
 const EPSILON = 1e-9; // keeps a share that is a whole number in exact arithmetic from rounding down in floating point
 
@@ -213,20 +214,24 @@ export interface FleetGrappleInput {
   orders: Record<ShipId, GunsOrder>;
   moves: Record<ShipId, HelmMove>;
   scores: Record<ShipId, number>;
+  /** The ships, for the traits of the Boarder: its Board works from Short too. Without it a Board only works at Close. */
+  ships?: Record<ShipId, Pick<BattleShip, "style" | "drill">>;
 }
 
 /**
- * Board orders played at Close, one per ship that plays one, hunter side first. Each ship tries against the enemy
- * flagship's score, order and Helm move (8.5). A fleet mate's record names the ship; a flagship's does not, as in a
- * one ship battle. If any attempt succeeds the whole battle is Grappled.
+ * Board orders played at Close, one per ship that plays one, hunter side first. A Boarder's Board also works from Short (grapnel
+ * lines). Each ship tries against the enemy flagship's score, order and Helm move (8.5). A fleet mate's record names the ship;
+ * a flagship's does not, as in a one ship battle. If any attempt succeeds the whole battle is Grappled.
  */
 export function fleetGrapples(i: FleetGrappleInput): GrappleRecord[] {
-  if (i.range !== "close") return [];
+  if (i.range !== "close" && i.range !== "short") return [];
   const attempts: GrappleRecord[] = [];
   for (const side of ["hunter", "target"] as const) {
     const foe = i.flagships[other(side)];
     for (const id of i.ids[side]) {
       if (i.orders[id] !== "board") continue;
+      const ship = i.ships?.[id];
+      if (i.range === "short" && !(ship && boardsFromShort(ship))) continue;
       const why = grappleReason(i.scores[id] as number, i.scores[foe] as number, i.orders[foe] as GunsOrder, i.moves[foe] as HelmMove);
       attempts.push({ side, ok: why !== "failed", why, ...(id === i.flagships[side] ? {} : { ship: id }) });
     }
@@ -234,27 +239,67 @@ export function fleetGrapples(i: FleetGrappleInput): GrappleRecord[] {
   return attempts;
 }
 
+/**
+ * Grapnels (Drill 10, or a Boarder's grapnel lines): a Board that would fail on Helm score gets a Helm contest instead, with a
+ * Boarder's score counted `grapnelBonus` times. Every attempt that failed and belongs to a ship with Grapnels rolls its own
+ * contest from the child stream "grapnel/<ship id>", against the enemy flagship. Returns the attempts with the winners marked
+ * `ok` (why "grapnels"), and the contests in the order they were rolled. The attempts given are not changed.
+ */
+export function grapnelRescue(
+  i: FleetGrappleInput & { ships: Record<ShipId, Pick<BattleShip, "shipId" | "style" | "drill">> }, attempts: readonly GrappleRecord[], rng: Rng,
+): { grapples: GrappleRecord[]; contests: ContestRecord[] } {
+  const contests: ContestRecord[] = [];
+  const grapples = attempts.map((g) => {
+    const id = g.ship ?? i.flagships[g.side];
+    const ship = i.ships[id] as Pick<BattleShip, "shipId" | "style" | "drill">;
+    if (g.ok || !hasGrapnels(ship)) return { ...g };
+    const foe = i.flagships[other(g.side)];
+    const contest = { ...grapnelContest(rng, ship, g.side, i.scores[id] as number, i.scores[foe] as number), ...(g.ship ? { ship: g.ship } : {}) };
+    contests.push(contest);
+    return contest.winner === g.side ? { ...g, ok: true, why: "grapnels" as const } : { ...g };
+  });
+  return { grapples, contests };
+}
+
+export interface MeleeInput {
+  ids: Record<BattleSide, readonly ShipId[]>;
+  flagships: Record<BattleSide, ShipId>;
+  ships: Record<ShipId, BattleShip>; // the ships as they fight: the Hands they have now
+  decks: Record<ShipId, DeckOrder>; // what every crew fights with this round (deck.ts crewOrder)
+  terrain: Terrain;
+  bonus: Record<BattleSide, SideBonus>;
+  firstOver?: readonly ShipId[]; // crews whose Board fights as a Charge with First over the rail
+}
+
 export interface FleetMelee {
   record: MeleeRecord; // strength, Hands lost and Hands left, for each whole side
   lost: Record<ShipId, number>; // Hands each ship lost
   credit: Record<ShipId, number>; // each ship's part in the Hands its side killed, by boarding strength: a side's parts add up to 1
+  pairings: Record<ShipId, Pairing>; // how each crew's Deck order met the enemy flagship's
 }
 
 /**
- * The boarding melee of a Grappled round, side against side. A side's boarding strength is its ships' added up; it removes
- * 20% of that, times its bonus (7.5), from the enemy's Hands, shared out by max Hull and never past the Hands a ship has.
+ * The deck fight of a Grappled round, side against side. A side's boarding strength is its ships' added up. Each crew removes
+ * kill share x its strength x the hit of its Deck order x the pairing x the guard of the enemy flagship's order (deckKill), the
+ * way a Helm move is judged against the enemy flagship (D91), and the side's crews added up, times its bonus (7.5), come off the
+ * enemy's Hands, shared out by max Hull and never past the Hands a ship has.
  */
-export function fleetMelee(
-  ids: Record<BattleSide, readonly ShipId[]>, ships: Record<ShipId, BattleShip>, orders: Record<ShipId, GunsOrder>,
-  terrain: Terrain, bonus: Record<BattleSide, SideBonus>,
-): FleetMelee {
+export function fleetMelee(i: MeleeInput): FleetMelee {
+  const { ids, ships, decks, terrain, bonus } = i;
   const crew = (side: BattleSide) => ids[side].map((id) => ships[id] as BattleShip);
   const strengthOf: Record<ShipId, number> = {};
+  const pairings: Record<ShipId, Pairing> = {};
   const strength = { hunter: 0, target: 0 };
+  const killed = { hunter: 0, target: 0 };
   for (const side of ["hunter", "target"] as const) {
+    const foes = crew(other(side));
+    const theirs = decks[i.flagships[other(side)]] as DeckOrder;
     for (const ship of crew(side)) {
-      strengthOf[ship.shipId] = boardingStrength(ship, orders[ship.shipId] as GunsOrder, terrain);
+      const mine = decks[ship.shipId] as DeckOrder;
+      strengthOf[ship.shipId] = boardingStrength(ship, terrain, { firstOver: i.firstOver?.includes(ship.shipId) ?? false, foes });
+      pairings[ship.shipId] = pairing(mine, theirs);
       strength[side] += strengthOf[ship.shipId] as number;
+      killed[side] += deckKill(strengthOf[ship.shipId] as number, mine, theirs, hasSecondWave(ship));
     }
   }
   const lost: Record<ShipId, number> = {};
@@ -264,17 +309,17 @@ export function fleetMelee(
   for (const side of ["hunter", "target"] as const) {
     const victims = crew(side);
     const have = victims.reduce((n, v) => n + v.hands, 0);
-    sideLost[side] = Math.min(have, Math.round(C.boarding.killShare * strength[other(side)] * bonus[other(side)].total));
+    sideLost[side] = Math.min(have, Math.round(killed[other(side)] * bonus[other(side)].total));
     hands[side] = have - sideLost[side];
     const parts = shareDamage(victims, "hands", sideLost[side]);
-    victims.forEach((v, i) => { lost[v.shipId] = parts[i] as number; });
+    victims.forEach((v, k) => { lost[v.shipId] = parts[k] as number; });
   }
   for (const side of ["hunter", "target"] as const) {
     const killers = crew(side);
     const parts = apportionFloat(1, killers.map((k) => strengthOf[k.shipId] as number));
-    killers.forEach((k, i) => { credit[k.shipId] = parts[i] as number; });
+    killers.forEach((k, j) => { credit[k.shipId] = parts[j] as number; });
   }
-  return { record: { strength, lost: sideLost, hands }, lost, credit };
+  return { record: { strength, lost: sideLost, hands }, lost, credit, pairings };
 }
 
 /** Splits an amount in proportion to weights, not in whole units: for credit that only has to add up. Equal parts if every weight is 0. */

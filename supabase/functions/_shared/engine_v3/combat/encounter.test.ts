@@ -29,7 +29,7 @@ const captains2 = (water = "gh_lee") => [
 
 /** All the upgrade levels set to `level`, and the ship repaired to its new maximum. */
 function boost(s: Ship, level: number): void {
-  s.levels = { hull: level, cannons: level, sails: level, berths: level, hold: s.levels.hold };
+  s.levels = { hull: level, cannons: level, sails: level, berths: level, hold: s.levels.hold, drill: s.levels.drill };
   s.hullPoints = maxHullPoints(s);
   s.riggingPoints = maxRiggingPoints(s);
   s.hands = maxHands(s);
@@ -275,7 +275,7 @@ describe("doctrine pick (8.8, D72)", () => {
     expect(findDoctrine(state.captains.h!, undefined)).toBeUndefined();
   });
 
-  it("uses the one asked for, else the default, else the first saved, else a fresh Brawler", () => {
+  it("uses the one asked for, else the default, else the first saved, else a fresh Boarder", () => {
     const c = withAll().captains.h!;
     expect(pickDoctrine(c, "Skirmisher").name).toBe("Skirmisher");
     expect(pickDoctrine(c, undefined).name).toBe("Smuggler");
@@ -283,7 +283,7 @@ describe("doctrine pick (8.8, D72)", () => {
     c.defaultDoctrine = "Gone";
     expect(pickDoctrine(c, undefined).name).toBe("Bombardier"); // the first saved
     c.doctrines = [];
-    expect(pickDoctrine(c, undefined)).toEqual(templateDoctrine("Brawler"));
+    expect(pickDoctrine(c, undefined)).toEqual(templateDoctrine("Boarder"));
   });
 
   it("fights with the doctrine the side asked for", () => {
@@ -330,6 +330,30 @@ describe("battleShipOf (D49)", () => {
       charted: true, withCurrent: true, lurker: true, helmBonus: 0, boardingBonus: 0, abilities: [],
       guns: { order: null, repeats: 0, charged: false },
     });
+  });
+
+  it("carries the Drill level and the Fire Pots of the ship, and neither field for a ship that has none", () => {
+    const state = season(captains2(), 6);
+    const flags = { charted: false, withCurrent: false, lurker: false };
+    const bare = battleShipOf(ship(state, "h"), state.captains.h!, "hunter", flags);
+    expect(bare).not.toHaveProperty("drill");
+    expect(bare).not.toHaveProperty("firePots");
+    ship(state, "h").levels.drill = 12;
+    ship(state, "h").hold.firePots = 3;
+    expect(battleShipOf(ship(state, "h"), state.captains.h!, "hunter", flags)).toMatchObject({ drill: 12, firePots: 3 });
+  });
+
+  it("gives a Firebrand its 2 Fire Pots and its template, and a Boarder the Boarder, when the captain is made", () => {
+    const state = season([
+      { id: "f", name: "F", shipName: "Brand", style: "firebrand" }, { id: "b", name: "B", shipName: "Board", style: "boarder" },
+      { id: "n", name: "N", shipName: "None" },
+    ], 6);
+    const flags = { charted: false, withCurrent: false, lurker: false };
+    expect(state.captains.f!.defaultDoctrine).toBe("Firebrand");
+    expect(state.captains.b!.defaultDoctrine).toBe("Boarder");
+    expect(state.captains.n!.defaultDoctrine).toBe("Boarder");
+    expect(battleShipOf(ship(state, "f"), state.captains.f!, "hunter", flags)).toMatchObject({ style: "firebrand", firePots: 2 });
+    expect(battleShipOf(ship(state, "b"), state.captains.b!, "hunter", flags)).not.toHaveProperty("firePots");
   });
 
   it("reflects upgrades and damage", () => {
@@ -474,6 +498,28 @@ describe("applying a battle (8.7, v0.2 9, P2.4)", () => {
     expect(applied.aftermath.shieldUntil).toBe(5 + B.shieldTidesAfterPvpLoss);
     expect(state.captains.t!.shieldUntilTide).toBe(9);
     expect(state.captains.h!.shieldUntilTide).toBe(0);
+  });
+
+  it("tows a ship that a fire sank like any Sunk ship, and leaves its Fire Pots in the hold", () => {
+    // A Firebrand's embers set a ship with 13 Hull alight while the ships are Grappled. The fire sinks it in round 3.
+    const { state, input } = setup();
+    ship(state, "h").style = "firebrand";
+    ship(state, "h").hold.firePots = 2;
+    const play = (seed: number) => runBattle(battleOf(
+      testShip("hunter", "sloop", { style: "firebrand", firePots: 2, hands: 60, maxHands: 60 }), testShip("target", "sloop", { hullPoints: 13, hands: 60, maxHands: 60 }),
+      { hunter: always("closeIn", "holdFire"), target: always("closeIn", "holdFire") }, { ambush: "medium", at: "gh_lee", seed },
+    ));
+    let record: BattleRecord | undefined;
+    for (let seed = 1; seed < 400 && !record; seed++) {
+      const r = play(seed);
+      if (r.outcome.kind === "sunk" && r.rounds.some((x) => x.fires?.some((f) => f.source === "embers"))) record = r;
+    }
+    expect(record).toBeDefined();
+    const applied = applyBattle(input(record!));
+    expect(applied.aftermath).toMatchObject({ winner: "ship_h", loser: "ship_t", towed: true });
+    expect(applied.tow).toEqual(["ship_t"]);
+    expect(ship(state, "t").hullPoints).toBe(0); // the tow raises it at the end of the Tide
+    expect(ship(state, "h").hold.firePots).toBe(2); // nobody threw a pot
   });
 
   it("tows a Sunk or Captured loser, and nobody else", () => {
@@ -736,25 +782,25 @@ describe("combat inside a Tide (P2.4)", () => {
   it("has the target use its own step's doctrine", () => {
     const { state, orders } = headOn((s) => { for (const c of Object.values(s.captains)) c.doctrines = templateDoctrines(); });
     orders.t = o(6, [{ kind: "sail", to: "gh_lee", doctrine: "Skirmisher" }]);
-    expect(firstBattle(state, orders).battle.record.doctrines).toEqual({ hunter: "Brawler", target: "Skirmisher" });
+    expect(firstBattle(state, orders).battle.record.doctrines).toEqual({ hunter: "Boarder", target: "Skirmisher" });
   });
 
   it("falls back to the default when a step names a doctrine that is gone", () => {
     const { state, orders } = headOn(() => {}, {}, { doctrine: "Deleted" });
-    expect(firstBattle(state, orders).battle.record.doctrines.hunter).toBe("Brawler");
+    expect(firstBattle(state, orders).battle.record.doctrines.hunter).toBe("Boarder");
   });
 
   it("tells the resolver what it needs to know about each side and the place", () => {
     const seen: EncounterContext[] = [];
     const spy: EncounterResolver = (ctx) => { seen.push(ctx); return { result: "spy", freeze: [ctx.hunter.ship.id, ctx.target.ship.id] }; };
-    const { state, orders } = headOn((s) => { s.captains.t!.knowledge.levels["ln_dw_gh"] = 2; }, { doctrine: "Brawler" }, { stance: "hunt" });
+    const { state, orders } = headOn((s) => { s.captains.t!.knowledge.levels["ln_dw_gh"] = 2; }, { doctrine: "Boarder" }, { stance: "hunt" });
     resolve(state, orders, 7, spy);
     const ctx = seen[0]!;
     expect(ctx).toMatchObject({
       tide: 6, seed: 7, at: "ln_dw_gh", onLane: true, archipelago: "cradle", terrain: null, mutual: false,
       wind: { kind: "breeze", from: 270 },
     });
-    expect(ctx.hunter).toMatchObject({ doctrine: "Brawler", lurking: false, ambushRange: undefined, stance: "hunt", charted: true, withCurrent: false });
+    expect(ctx.hunter).toMatchObject({ doctrine: "Boarder", lurking: false, ambushRange: undefined, stance: "hunt", charted: true, withCurrent: false });
     expect(ctx.target).toMatchObject({ doctrine: undefined, lurking: false, charted: false });
     expect(ctx.state.ships.ship_h).toBe(ctx.hunter.ship);
   });
@@ -765,10 +811,10 @@ describe("combat inside a Tide (P2.4)", () => {
     const state = season(captains2("gh_reefside"), 6);
     state.ships.ship_t!.waterId = "gh_harbour";
     resolve(state, {
-      h: o(6, [{ kind: "lurk", filter: { kind: "anyone" }, ambushRange: "long", doctrine: "Brawler" }]),
+      h: o(6, [{ kind: "lurk", filter: { kind: "anyone" }, ambushRange: "long", doctrine: "Boarder" }]),
       t: o(6, [{ kind: "sail", to: "gh_reefside" }]),
     }, 7, spy);
-    expect(seen[0]!.hunter).toMatchObject({ lurking: true, ambushRange: "long", doctrine: "Brawler", stance: "hunt" });
+    expect(seen[0]!.hunter).toMatchObject({ lurking: true, ambushRange: "long", doctrine: "Boarder", stance: "hunt" });
   });
 
   it("marks a ship moving the way a Strong Current flows", () => {

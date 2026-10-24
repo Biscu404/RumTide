@@ -10,7 +10,7 @@
 // Alongside it: the templates, the Crabber of the P2.6 notes, and the gate pace of GAMEPLAY 2.5 (the median captain
 // passes by Tide 7 to 9, nobody later than Tide 12) worked out from the win chance on each Tide, with one fight a Tide (D108).
 
-import { Rng, TEMPLATE_NAMES, templateDoctrine, validateDoctrine } from "../../../supabase/functions/_shared/engine_v3/index.ts";
+import { Rng, TEMPLATE_NAMES, styleTemplate, templateDoctrine, validateDoctrine } from "../../../supabase/functions/_shared/engine_v3/index.ts";
 import type { Doctrine } from "../../../supabase/functions/_shared/engine_v3/index.ts";
 import type { Effort } from "./effort.ts";
 import type { BossJob, BossResult } from "./jobs.ts";
@@ -66,8 +66,8 @@ export interface BossData {
   finalists: Scored[]; // judged on the held out fights
   references: Scored[]; // the templates and the Crabber, on the same fights as `best`
   trace: SearchTrace[];
-  /** Win chance of the best doctrine and of the starting Brawler on each Tide, from the first Tide he can be fought. */
-  pace: { tide: number; best: number; brawler: number }[];
+  /** Win chance of the best doctrine and of the doctrine a new captain starts with (the Boarder) on each Tide, from the first Tide he can be fought. */
+  pace: { tide: number; best: number; starter: number }[];
   gate: GatePace;
 }
 
@@ -100,11 +100,11 @@ export async function runBoss(pool: Pool, effort: Effort): Promise<BossData> {
   const referenceDoctrines = [...TEMPLATE_NAMES.map((n) => templateDoctrine(n)), crabber()];
   const references = await score(pool, referenceDoctrines, BOSS_TIDE, "boss/confirm", B.reference);
 
-  // Gate pace: the win chance on each Tide, for the best doctrine and for the starting Brawler.
+  // Gate pace: the win chance on each Tide, for the best doctrine and for the starting doctrine.
   const tides = Array.from({ length: 10 }, (_, i) => 5 + i); // Tide 5 to 14
   const bestByTide = await Promise.all(tides.map((t) => score(pool, [winner], t, `boss/pace/${t}`, B.gateSeeds)));
-  const brawlerByTide = await Promise.all(tides.map((t) => score(pool, [templateDoctrine("Brawler")], t, `boss/pace/${t}`, B.gateSeeds)));
-  const pace = tides.map((tide, i) => ({ tide, best: bestByTide[i]![0]!.rate, brawler: brawlerByTide[i]![0]!.rate }));
+  const starterByTide = await Promise.all(tides.map((t) => score(pool, [templateDoctrine(styleTemplate(undefined))], t, `boss/pace/${t}`, B.gateSeeds)));
+  const pace = tides.map((tide, i) => ({ tide, best: bestByTide[i]![0]!.rate, starter: starterByTide[i]![0]!.rate }));
   const gate = gatePace(pace.map((p) => p.best), tides[0]!);
   return { best: best!, finalists, references, trace, pace, gate: gate };
 }

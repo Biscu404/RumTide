@@ -6,7 +6,7 @@ The full design is in `docs/GAME_DESIGN.md`. It is long, so do not read it all a
 
 ## Current focus
 
-* Next task: P3.B2 piece 2 of 3. Piece 1 (six distances, the style on the ship, the Power Rating exponent, and the Bombardier, Gunline, Skirmisher, Rammer and Smuggler) is built (D142 to D159). Piece 2 builds the deck fight of `docs/specs/boarding.md` (Deck orders, the boarder's edge, Drill), the Boarder and the Firebrand, Hot Shot, fire, overtime and quiet guns on cutting free in `engine_v3`. Piece 3 reworks Old Shellback and writes the replay text and GAMEPLAY. The scratch prototype behind the numbers is on the branch `proto-fighting-styles`, a reference only (see `tools/proto/README.md` there). Then P3.B3 teaches the simulator the Deck orders and the six Fighting Styles. P3.2, tuning `balance.ts` until the checks of GAMEPLAY 8.9 and the new wheel check pass, is paused until then. Task ids come from the Rumtide Roadmap tracker on claude.ai.
+* Next task: P3.B2 piece 3 of 3. Pieces 1 and 2 are built (D142 to D181): six distances, all seven styles and their templates, the deck fight, Drill, Fire Pots, Hot Shot, fire and overtime. Piece 3 reworks Old Shellback (D133, D140), writes the replay and Gazette text, and rewrites GAMEPLAY to match. The scratch prototype behind the numbers is on the branch `proto-fighting-styles`, a reference only (see `tools/proto/README.md` there). Then P3.B3 teaches the simulator the Deck orders and the six Fighting Styles. P3.2, tuning `balance.ts` until the checks of GAMEPLAY 8.9 and the new wheel check pass, is paused until then. Task ids come from the Rumtide Roadmap tracker on claude.ai.
 * Done work is in `git log` and `docs/DECISIONS.md`.
 * Decisions waiting on Biscu are in `docs/STATUS.md`.
 

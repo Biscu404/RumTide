@@ -9,14 +9,17 @@ import type {
   BattleAftermath, BattleRecord, BattleSide, ContestRecord, DamageTrack, GunsOrder, HelmMove, Range, RoundRecord, SideBonus,
 } from "./types.ts";
 
-// The Fighting Styles have plain names only here; their replay lines (rams, mortar arcs, style badges) are P3.B2 piece 3.
+// The Fighting Styles and the deck fight have plain names only here; their replay lines (rams, mortar arcs, style badges, Deck
+// orders, the edge and fires) are P3.B2 piece 3.
 const RANGE: Record<Range, string> = { far: "Far", long: "Long", medium: "Medium", short: "Short", close: "Close", grappled: "Grappled" };
 const HELM: Record<HelmMove, string> = { closeIn: "Close In", hold: "Hold", openRange: "Open Range", crossTheirBow: "Cross Their Bow" };
 const GUNS: Record<GunsOrder, string> = {
   roundShot: "Round shot", chainShot: "Chain shot", grapeshot: "Grapeshot", holdFire: "Hold Fire", board: "Board", repel: "Repel", mortar: "Mortar",
+  hotShot: "Hot Shot", charge: "Charge", volley: "Volley", firePots: "Fire Pots",
 };
 const CONTEST: Record<ContestRecord["kind"], string> = {
   chase: "the chase", shallows: "reaching Close in the Shallows", cutFree: "cutting free", ram: "the ram", dash: "spoiling the rake",
+  grapnel: "the grapnels",
 };
 const TRACK: Record<DamageTrack, string> = { hull: "Hull", rigging: "Rigging", hands: "Hands" };
 const TERRAIN: Record<Terrain, string> = {

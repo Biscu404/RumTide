@@ -144,7 +144,7 @@ export function render(r: Results): string[] {
     for (const line of doctrineLines(data.best.doctrine)) out.push(`      ${line}`);
     out.push(`   Reference doctrines (${data.references[0]!.seeds} fights each):`);
     for (const ref of data.references) out.push(`      ${pad(ref.doctrine.name, 12)}${pctWithRange(ref.result.beaten, ref.seeds)} beaten  ${Object.entries(ref.result.kinds).map(([k, v]) => `${k} ${v}`).join(", ")}`);
-    out.push(`   Win chance by Tide (best doctrine, starting Brawler): ${data.pace.map((p) => `T${p.tide} ${pct(p.best)}/${pct(p.brawler)}`).join("  ")}`);
+    out.push(`   Win chance by Tide (best doctrine, starting doctrine): ${data.pace.map((p) => `T${p.tide} ${pct(p.best)}/${pct(p.starter)}`).join("  ")}`);
     const g = data.gate;
     out.push(`   The gate (D108, one fight a Tide): ${g.captains} captains at his door from Tide ${g.firstTide}. The median captain passes on Tide ${g.medianTide.toFixed(1)} (target 7 to 9), the last on Tide ${g.lastTide.toFixed(1)}, by Tide 12 in ${pct(g.lastByTwelve)} of seasons (target: nobody later).`);
     out.push("");

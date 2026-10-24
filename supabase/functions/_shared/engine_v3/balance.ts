@@ -5,7 +5,7 @@
 
 export const B = {
   // Starting kit for a new captain (5.1, 6.5).
-  start: { gold: 120, provisions: 4, powder: 6, handsShare: 1.0 },
+  start: { gold: 120, provisions: 4, powder: 6, firePots: 0, handsShare: 1.0 },
 
   // Hulls (6.1). Watches per Tide, crewmate slots, max Hands at Berths 0, rig type, cost in doubloons.
   hulls: {
@@ -20,8 +20,8 @@ export const B = {
   baseRigging: 100, // Rigging points on a level 0 sloop
   upgrade: { baseCost: 60, growth: 1.35, perLevel: 0.12, maxLevel: 10, materialsDiscount: 0.3 },
 
-  // Hold space each unit takes (6.5). Supplies pack small; cargo is a full unit.
-  holdSpace: { provisions: 0.5, powder: 0.5, timber: 1, rum: 1, sugar: 1, spice: 1 },
+  // Hold space each unit takes (6.5). Supplies pack small, Fire Pots too; cargo is a full unit.
+  holdSpace: { provisions: 0.5, powder: 0.5, firePots: 0.5, timber: 1, rum: 1, sugar: 1, spice: 1 },
 
   // Watches (3.1).
   watches: {
@@ -92,13 +92,15 @@ export const B = {
     gunneryFullShare: 0.6,
     outOfPowder: 0.5,
     grapeDamagePerHand: 3,
-    // The range factor of each Guns order at the six distances (docs/specs/fighting-styles.md section 1). The Grappled
-    // entries stay as they were until the deck fight quiets the great guns (boarding spec). Only a Bombardier fires the Mortar.
+    // The range factor of each Guns order at the five distances where the great guns fire (docs/specs/fighting-styles.md
+    // section 1). While Grappled the great guns are quiet and the deck fight decides, so there is no Grappled column
+    // (boarding spec, D116 to D118). Only a Bombardier fires the Mortar and only a Firebrand fires Hot Shot.
     range: {
-      round: { far: 0.2, long: 0.6, medium: 1.0, short: 1.0, close: 1.0, grappled: 0.5 },
-      chain: { far: 0.4, long: 1.0, medium: 0.8, short: 0.6, close: 0.4, grappled: 0 },
-      grape: { far: 0, long: 0, medium: 0.5, short: 0.85, close: 1.2, grappled: 1.0 },
-      mortar: { far: 1.1, long: 1.1, medium: 0.85, short: 0, close: 0, grappled: 0 },
+      round: { far: 0.2, long: 0.6, medium: 1.0, short: 1.0, close: 1.0 },
+      chain: { far: 0.4, long: 1.0, medium: 0.8, short: 0.6, close: 0.4 },
+      grape: { far: 0, long: 0, medium: 0.5, short: 0.85, close: 1.2 },
+      mortar: { far: 1.1, long: 1.1, medium: 0.85, short: 0, close: 0 },
+      hot: { far: 0, long: 0.3, medium: 0.3, short: 1.0, close: 1.0 },
     },
     terrainHelm: { shallowsSloop: 1.15, localKnowledge: 1.15, withStrongCurrent: 1.15 },
     terrainGuns: { rockyLong: 0.75, fogLong: 0.5 }, // at Long and at Far
@@ -107,31 +109,70 @@ export const B = {
     bands: { closeClose: 2, closeHold: 1, chase: 1, holdOpen: 1, openOpen: 2, rakeCloseIn: 1, crossFails: 1 },
     reefScrape: 10,
     kelpBoarding: 1.15,
-    boarding: { killShare: 0.2, repel: 1.3, captureRatio: 0.4, captureOwnShare: 0.2 },
+    boarding: { killShare: 0.2, captureRatio: 0.4, captureOwnShare: 0.2 },
+    // The deck fight while Grappled (boarding spec section 2). Each side removes killShare of its boarding strength, times
+    // the hit of its Deck order, times the pairing of the cycle (Charge beats Volley, Volley beats Repel, Repel beats
+    // Charge: pairWin for the winning order, pairLose for the losing one), times the guard of the other crew's order. Fire
+    // Pots ignore the guard of Repel. A thrown Fire Pot catches fireChance of the time; when its thrower is not a Firebrand
+    // the fire costs the throwing ship and the enemy flagship fireHull at once, and never takes a ship below 1 Hull.
+    deck: {
+      hit: { charge: 1.5, volley: 1.1, repel: 0.6, firePots: 1.4, fists: 1.0 },
+      guard: { charge: 1.25, volley: 1.0, repel: 0.6, firePots: 1.0, fists: 1.0 },
+      pairWin: 1.8, pairLose: 0.75,
+      fireChance: 0.3, fireHull: 8,
+    },
+    // The boarder is the ship whose Board order made the grapple (boarding spec section 3). First over the rail: its Board
+    // fights as a Charge with this strength bonus in the grapple round. Lashed fast: its Helm score counts this many times in
+    // every Cut Free contest while the grapple lasts.
+    edge: { firstOverTheRail: 1.25, lashedFast: 2 },
+    // Fire (fighting styles spec section 3): a burning ship loses hull Hull at the end of each round for rounds rounds
+    // (styles.firebrand.extraFireRounds more when a Firebrand started it).
+    fire: { hull: 12, rounds: 2 },
+    quietCutFree: true, // D135: in the round a ship cuts free the great guns of both ships stay quiet
+    overtime: 2, // D127: a deck fight still going after the last round goes on for up to this many more
     victoryMargin: 0.05, // D132
     // Doctrines (8.8). Slots count the rules that have conditions; the Otherwise rule is always there and is free (D64).
-    // slotRanks: the Command ranks that each give +1 slot. templates: the thresholds of the template doctrines (the
-    // Smuggler's is styles.smuggler.strikeHullPct).
-    doctrine: {
-      baseSlots: 3, maxSlots: 7, savedDoctrines: 3, slotRanks: [1, 4], maxConditions: 2,
-      templates: { brawlerBoardHandsPct: 50 },
-    },
+    // slotRanks: the Command ranks that each give +1 slot. The thresholds of the templates are in `styles` (the Smuggler's
+    // is styles.smuggler.strikeHullPct).
+    doctrine: { baseSlots: 3, maxSlots: 7, savedDoctrines: 3, slotRanks: [1, 4], maxConditions: 2 },
   },
 
   // Fighting Styles (docs/specs/fighting-styles.md sections 2 and 3, D121 to D141). Each trait pays only in a round its own
-  // move or order is played. The Boarder and the Firebrand arrive with the boarding rework (P3.B2 piece 2).
+  // move or order is played.
   styles: {
     // The Mortar hits mortarHit of the time and takes the rake, flank and weakened factors (D137). Zeroing In adds zeroStep
     // for each round in a row the range has not changed, up to zeroMax. The crew is handsShare of the Hands. Spotters: a
     // battle with a Bombardier flagship starts at Far.
-    bombardier: { mortarHit: 0.8, mortarTakesRakes: true, zeroStep: 0.1, zeroMax: 1.5, handsShare: 0.6, startFar: true },
+    // A Mortar hit starts a fire mortarFire of the time, which burns mortarFireRounds.
+    bombardier: { mortarHit: 0.8, mortarFire: 0.4, mortarFireRounds: 2, mortarTakesRakes: true, zeroStep: 0.1, zeroMax: 1.5, handsShare: 0.6, startFar: true },
     // In a round it Holds: a rake against it is bracedRake instead of the rake, a Ram against it does bracedRam, its guns do
-    // steadyDeck, and its Round shot counts longNines at Long.
-    gunline: { bracedRake: 1.35, bracedRam: 0.7, steadyDeck: 1.4, longNines: 0.8 },
+    // steadyDeck, and its Round shot counts longNines at Long. Fire drill: a burning Gunline loses fireDrill of the fire's Hull.
+    gunline: { bracedRake: 1.35, bracedRam: 0.7, steadyDeck: 1.4, longNines: 0.8, fireDrill: 0.6 },
     skirmisher: { kite: true }, // Opening Range does not weaken its guns
     // Dash: Close In moves dashBands more. A Ram does ramHull to them and ramSelf to the Rammer (D139). A rake the dash spoils is spoiledRake.
     rammer: { dashBands: 1, ramHull: 30, ramSelf: 4, spoiledRake: 1.75 },
+    // Fighters: its crew fights with fighters times the boarding strength. The chase: its Helm score counts chase times in a
+    // round it Closes In. A Ram against a Boarder that plays Board does ramWhileBoarding (its grapnels are on the prow).
+    // Grapnel lines: Board works from Short too, and a Board that fails on Helm score becomes a Helm contest with its score
+    // counted grapnelBonus times. The Drill 10 Grapnels unlock (drill.unlocks) is the contest alone, for any style.
+    boarder: { grapnelLines: true, grapnelBonus: 3, fighters: 1.2, ramWhileBoarding: 0.5, chase: 1.3 },
+    // Hot Shot starts a fire hotShotFire of its hits and burns hotShotPowder times the Powder. A Firebrand starts with
+    // startPots Fire Pots and its fires burn extraFireRounds longer. Fireship: a ship that Rams a Firebrand catches a blaze of
+    // ramBlazeRounds, and while Grappled with a Firebrand the enemy deck catches fire emberChance of the time each round.
+    // Tinderbox: a crew fighting a Firebrand on deck fights at tinderbox of its strength, and a burning Firebrand loses ownFire
+    // times the fire's Hull.
+    firebrand: { hotShotFire: 0.3, hotShotPowder: 2, startPots: 2, extraFireRounds: 1, ramBlazeRounds: 2, emberChance: 0.4, tinderbox: 0.8, ownFire: 2 },
     smuggler: { slippery: 1.25, strikeHullPct: 40 }, // Helm times slippery in a round it Opens Range; the template strikes below strikeHullPct
+  },
+
+  // Drill, the sixth ship upgrade (boarding spec section 4, D119, D120, D141). Three stages of stageSize levels, perLevel
+  // boarding strength for each level of a stage (Deckhands, Cutthroats, Sea Wolves). A level costs what the same level of any
+  // other upgrade costs (`upgrade`), so there is no price here. Finishing a stage unlocks Fire Pots, Grapnels and Second
+  // Wave: after the exchange the crew strikes once more at secondWaveShare of its strength. The cap is a season preset number.
+  drill: {
+    stageSize: 5, perLevel: [0.04, 0.06, 0.08],
+    unlocks: { firePots: 5, grapnels: 10, secondWave: 15 },
+    secondWaveShare: 0.25,
   },
 
   // Power Rating (D26, D136): S = (max Hull / hullPer + Cannons + Sails + Hands / handsPer) / divisor, and the rating is
@@ -151,7 +192,7 @@ export const B = {
 
   // Economy (9). Used from P5. Every number here is retuned for two Tides a day in P6.3.
   economy: { boomPerTide: 0.02, basePrice: 20, madeMult: 0.6, wantedMult: 1.6, priceKeptPerUnitSold: 0.985, driftBackShare: 0.5, shortageMult: 3, priceSheetTides: 2 },
-  supplies: { provisionsPrice: 4, powderPrice: 6 },
+  supplies: { provisionsPrice: 4, powderPrice: 6, firePotPrice: 8 }, // the Fire Pot price is a placeholder: P5 sets the prices
   repair: { costPerHullPoint: 0.3, villageMaxShare: 0.5 },
 
   // Reputation (5.4). Used from P8.
@@ -214,6 +255,7 @@ export const SEASON_PRESETS = {
     startWater: "gh_harbour",
     cradleTruceUntilTide: 5, // hunting players in the Cradle is allowed from this Tide on
     shellbackDecayFromTide: 9,
+    drillMaxLevel: 15, // D120: all three Drill stages
     bigHotspotTides: [8, 15, 22, 28],
     mediumHotspots: false,
     agendaDrawTide: 3,
@@ -234,6 +276,7 @@ export const SEASON_PRESETS = {
     startWater: "gh_harbour",
     cradleTruceUntilTide: 5,
     shellbackDecayFromTide: 9,
+    drillMaxLevel: 15,
     bigHotspotTides: [7, 14, 21, 28, 35, 42],
     mediumHotspots: true,
     agendaDrawTide: 3,

@@ -34,7 +34,7 @@ function fleets(state: SeasonState): SeasonState {
 }
 
 function boost(s: Ship, level: number): void {
-  s.levels = { hull: level, cannons: level, sails: level, berths: level, hold: s.levels.hold };
+  s.levels = { hull: level, cannons: level, sails: level, berths: level, hold: s.levels.hold, drill: s.levels.drill };
   s.hullPoints = maxHullPoints(s);
   s.riggingPoints = maxRiggingPoints(s);
   s.hands = maxHands(s);
@@ -114,12 +114,12 @@ describe("a fleet in an encounter (P2.5, v0.2 7.5)", () => {
     state.captains.u!.doctrines = [templateDoctrine("Smuggler")];
     state.captains.u!.defaultDoctrine = "Smuggler";
     const battle = battleIn(combatEncounter(ctxOf(state, { hunterMates: ["m"], targetMates: ["u"], mutual: true })).events)!;
-    expect(battle.record.fleet!.doctrines).toEqual({ ship_h: "Brawler", ship_m: "Rammer", ship_t: "Brawler", ship_u: "Smuggler" });
+    expect(battle.record.fleet!.doctrines).toEqual({ ship_h: "Boarder", ship_m: "Rammer", ship_t: "Boarder", ship_u: "Smuggler" });
   });
 
   it("lets a mate follow its own step or plan doctrine", () => {
     const state = fleets(season(captains4(), 6));
-    state.captains.m!.doctrines = [templateDoctrine("Brawler"), templateDoctrine("Skirmisher")];
+    state.captains.m!.doctrines = [templateDoctrine("Boarder"), templateDoctrine("Skirmisher")];
     const ctx = ctxOf(state, { hunterMates: ["m"], mutual: true });
     ctx.joined!.hunter[0]!.doctrine = "Skirmisher";
     const battle = battleIn(combatEncounter(ctx).events)!;
@@ -482,7 +482,7 @@ describe("a fleet battle in words (P2.5)", () => {
   it("names every ship with its doctrine, and says what the fleet bonus and Desperate Defence are worth", () => {
     const battle = battleIn(record().events)!;
     const lines = describeBattle(battle.record, none, words);
-    expect(lines[0]).toContain("BATTLE at <gh_lee>: Hunter (Brawler) and Mate (Brawler) against Target (Brawler).");
+    expect(lines[0]).toContain("BATTLE at <gh_lee>: Hunter (Boarder) and Mate (Boarder) against Target (Boarder).");
     expect(lines).toContain("  The fleet of Hunter and Mate deals 10% more damage (fleet bonus 10%).");
     expect(lines).toContain("  Target deals 25% more damage (Desperate Defence 25%).");
   });

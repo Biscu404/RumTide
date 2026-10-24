@@ -59,12 +59,15 @@ export function applyStatline(ship: Ship, line: Statline): void {
 
 /**
  * Rounds 1 and 2 he closes in. In round 3 he rears up and exposes his soft underside, so Round shot does double damage to
- * him. In rounds 4 and 5 he grapples. It is a doctrine like a captain's: round conditions, a Helm move and a Guns order.
- * The rear up is the one thing a captain's doctrine cannot say (D102). Every number is in `B.shellback`.
+ * him. In rounds 4 and 5 he grapples. Once he holds a ship his claws Charge (the great guns are quiet while Grappled, and he has
+ * no Powder to Volley). Because he Boards he is the boarder, so he has the boarder's edge: once he holds you, he is hard to shake.
+ * It is a doctrine like a captain's: round conditions, a Helm move and a Guns order. The rear up is the one thing a captain's
+ * doctrine cannot say (D102). Every number is in `B.shellback`.
  */
 export const shellbackDoctrine = (): Doctrine => ({
   name: SHELLBACK_DOCTRINE,
   rules: [
+    { if: [{ kind: "range", op: "is", range: "grappled" }], then: { kind: "fight", helm: "closeIn", guns: "charge" } },
     { if: [{ kind: "round", op: "atLeast", n: S.grappleFromRound }], then: { kind: "fight", helm: "closeIn", guns: "board" } },
     { if: [{ kind: "round", op: "is", n: S.rearUpRound }], then: { kind: "fight", helm: "hold", guns: "holdFire", exposed: S.rearUpRoundShot } },
     { if: [], then: { kind: "fight", helm: "closeIn", guns: "roundShot" } },

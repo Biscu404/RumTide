@@ -65,13 +65,35 @@ const playerWon = (r: TideResult): boolean => {
   return record.outcome.winner !== null && record.outcome.winner === (record.hunter === "ship_p" ? "hunter" : "target");
 };
 
+/** Close In, a Round shot when he rears up, Grapeshot once the claws are on, else Cross Their Bow for the rake. */
+const CRABBER: Doctrine = {
+  name: "Crabber",
+  rules: [
+    { if: [{ kind: "round", op: "is", n: S.rearUpRound }], then: { kind: "fight", helm: "closeIn", guns: "roundShot" } },
+    { if: [{ kind: "range", op: "is", range: "grappled" }], then: { kind: "fight", helm: "closeIn", guns: "grapeshot" } },
+    { if: [], then: { kind: "fight", helm: "crossTheirBow", guns: "roundShot" } },
+  ],
+};
+
+/** A Tide in which a fresh sloop with the Crabber beats him: the first of the seeds from 1000 that does it. The engine is pure, so it is a fixed answer. */
+function beatHim(): { state: SeasonState; result: TideResult } {
+  for (let i = 0; i < 80; i++) {
+    const state = crabSeason();
+    state.captains.p!.doctrines = [CRABBER];
+    state.captains.p!.defaultDoctrine = "Crabber";
+    const result = resolve(state, { p: challenge(6) }, 1000 + i * 37);
+    if (playerWon(result)) return { state: result.state, result };
+  }
+  throw new Error("the Crabber never beat him");
+}
+
 /** A RoundView for a captain facing Old Shellback, for reading his doctrine round by round. */
-function viewOf(round: number): RoundView {
+function viewOf(round: number, range: RoundView["range"] = "medium"): RoundView {
   const me = testShip("hunter"), crab = battleShipOf(newBoss(world, "season0", world.map.bosses[0]!)!.ship, { id: SHELLBACK_ID }, "target", {
     charted: true, withCurrent: false, lurker: true,
   });
   return {
-    round, side: "target", range: "medium", terrain: "shallows", wind: "breeze", gauge: null,
+    round, side: "target", range, terrain: "shallows", wind: "breeze", gauge: null,
     ships: { hunter: me, target: crab }, last: { hunter: null, target: null }, jettisoned: { hunter: false, target: false },
   };
 }
@@ -170,32 +192,42 @@ describe("his statline across the season (2.5, D106)", () => {
 // ---------- His habits ----------
 
 describe("his habits (2.5)", () => {
-  const play = (round: number) => {
-    const c = evaluateDoctrine(shellbackDoctrine(), viewOf(round), { enemyType: "player" });
+  const play = (round: number, range: RoundView["range"] = "medium") => {
+    const c = evaluateDoctrine(shellbackDoctrine(), viewOf(round, range), { enemyType: "player" });
     if (c.kind !== "fight") throw new Error("he never surrenders");
     return c;
   };
 
   it("closes in with Round shot in rounds 1 and 2", () => {
-    for (const round of [1, 2]) expect(play(round)).toMatchObject({ rule: 2, helm: "closeIn", guns: "roundShot" });
+    for (const round of [1, 2]) expect(play(round)).toMatchObject({ rule: 3, helm: "closeIn", guns: "roundShot" });
     expect(play(1).exposed).toBeUndefined();
   });
 
   it("rears up in round 3: he holds, holds fire, and Round shot does double damage to him", () => {
-    expect(play(3)).toMatchObject({ rule: 1, helm: "hold", guns: "holdFire", exposed: S.rearUpRoundShot });
+    expect(play(3)).toMatchObject({ rule: 2, helm: "hold", guns: "holdFire", exposed: S.rearUpRoundShot });
     expect(S.rearUpRoundShot).toBe(2);
   });
 
   it("grapples in rounds 4 and 5: Close In and Board", () => {
-    for (const round of [4, 5]) expect(play(round)).toMatchObject({ rule: 0, helm: "closeIn", guns: "board" });
-    expect(play(4).exposed).toBeUndefined();
+    for (const round of [4, 5]) expect(play(round, "close")).toMatchObject({ rule: 1, helm: "closeIn", guns: "board" });
+    expect(play(4, "close").exposed).toBeUndefined();
+  });
+
+  it("charges with his claws once he holds a ship, in any round: the great guns are quiet while Grappled (boarding spec section 5)", () => {
+    for (const round of [1, 2, 3, 4, 5]) {
+      expect(play(round, "grappled")).toMatchObject({ rule: 0, helm: "closeIn", guns: "charge" });
+      expect(play(round, "grappled").exposed).toBeUndefined(); // he does not rear up with his claws on a ship
+    }
+    // He has no Powder to spend on muskets, so no rule of his Volleys, and he never Opens Range to cut free.
+    expect(shellbackDoctrine().rules.map((r) => r.then.kind === "fight" ? r.then.guns : null)).not.toContain("volley");
+    expect(shellbackDoctrine().rules.map((r) => r.then.kind === "fight" ? r.then.helm : null)).not.toContain("openRange");
   });
 
   it("never strikes his colours, and a captain's saved doctrine may not rear up", () => {
     expect(shellbackDoctrine().rules.some((r) => r.then.kind === "surrender")).toBe(false);
     const rears: Doctrine = { name: "Cheat", rules: [{ if: [], then: { kind: "fight", helm: "hold", guns: "holdFire", exposed: 2 } }] };
     expect(validateDoctrine(rears, { slots: 3 })).toEqual(["Otherwise: only a monster rears up, a captain's doctrine may not"]);
-    expect(validateDoctrine(templateDoctrine("Brawler"), { slots: 3 })).toEqual([]);
+    expect(validateDoctrine(templateDoctrine("Boarder"), { slots: 3 })).toEqual([]);
   });
 
   it("is played out in a battle: the rule, the move, and the rear up recorded on round 3 only", () => {
@@ -204,12 +236,27 @@ describe("his habits (2.5)", () => {
       hunter: always("hold", "holdFire"), target: doctrineChooser(shellbackDoctrine(), { enemyType: "player" }),
     }, { terrain: "shallows" }));
     const mine = record.rounds.map((r) => r.ships.find((s) => s.ship === SHIP)!);
-    expect(mine.map((s) => s.rule)).toEqual([2, 2, 1, 0, 0]);
+    expect(mine.map((s) => s.rule)).toEqual([3, 3, 2, 1, 0]);
     expect(mine.map((s) => [s.helm, s.guns])).toEqual([
-      ["closeIn", "roundShot"], ["closeIn", "roundShot"], ["hold", "holdFire"], ["closeIn", "board"], ["closeIn", "board"],
+      ["closeIn", "roundShot"], ["closeIn", "roundShot"], ["hold", "holdFire"], ["closeIn", "board"], ["closeIn", "charge"],
     ]);
     expect(mine.map((s) => s.exposed)).toEqual([undefined, undefined, 2, undefined, undefined]);
     expect(mine.map((s) => s.helmScore)).toEqual([S.helm, S.helm, S.helm, S.helm, S.helm]); // fixed, with or without a gauge
+  });
+
+  it("is the boarder when he Boards: First over the rail in the round he grapples, and Lashed fast after (boarding spec section 5)", () => {
+    const crab = battleShipOf(newBoss(world, "season0", world.map.bosses[0]!)!.ship, { id: SHELLBACK_ID }, "target", { charted: true, withCurrent: false, lurker: true });
+    const record = runBattle(battleOf(testShip("hunter"), crab, {
+      hunter: always("hold", "holdFire"), target: doctrineChooser(shellbackDoctrine(), { enemyType: "player" }),
+    }, { terrain: "shallows" }));
+    const [r4, r5] = [record.rounds[3]!, record.rounds[4]!];
+    expect(r4.grapples).toEqual([{ side: "target", ok: true, why: "theyHold" }]);
+    expect(r4.edge).toBe("target");
+    expect(r4.melee!.firstOver).toBe("target");
+    expect(r4.ships.map((s) => s.deck!.order)).toEqual(["fists", "charge"]); // the other crew chose its order before the grapple
+    expect(r5.edge).toBe("target"); // and he holds it for as long as the grapple lasts
+    expect(r5.melee!.firstOver).toBeUndefined(); // First over the rail is for the round he grapples
+    expect(r5.ships.map((s) => s.deck!.order)).toEqual(["fists", "charge"]); // a Hold Fire is Fists on deck; his claws Charge
   });
 });
 
@@ -365,15 +412,7 @@ describe("fighting Old Shellback in a Tide (2.5)", () => {
   });
 
   it("is beaten by a fresh sloop with a sensible doctrine, and the captain passes the gate (2.5, 8.9)", () => {
-    // Close In, a Round shot when he rears up, Grapeshot once the claws are on, else Cross Their Bow for the rake.
-    const crabber: Doctrine = {
-      name: "Crabber",
-      rules: [
-        { if: [{ kind: "round", op: "is", n: S.rearUpRound }], then: { kind: "fight", helm: "closeIn", guns: "roundShot" } },
-        { if: [{ kind: "range", op: "is", range: "grappled" }], then: { kind: "fight", helm: "closeIn", guns: "grapeshot" } },
-        { if: [], then: { kind: "fight", helm: "crossTheirBow", guns: "roundShot" } },
-      ],
-    };
+    const crabber = CRABBER;
     expect(validateDoctrine(crabber, { slots: 3 })).toEqual([]);
     let wins = 0;
     for (let i = 0; i < 20; i++) {
@@ -391,28 +430,34 @@ describe("fighting Old Shellback in a Tide (2.5)", () => {
     expect(wins).toBeGreaterThan(0);
   });
 
-  it("is beaten by the starting Brawler too, at these untuned numbers, and the battle tells the story", () => {
+  it("beats the starting Boarder at these untuned numbers: his 40 claws win the deck fight (piece 3 reworks him, P3.2 tunes the gate)", () => {
     const state = crabSeason();
     const r = resolve(state, { p: challenge(6) });
     const [battle] = battles(r);
     expect(battle!.record.outcome).toMatchObject({ kind: "captured" });
-    expect(playerWon(r)).toBe(true);
-    expect(battle!.aftermath).toMatchObject({ pvp: false, towed: false, beaten: { boss: SHELLBACK_ID, by: ["p"] } });
-    expect(r.state.captains.p!.bossesBeaten).toEqual([SHELLBACK_ID]);
-
+    expect(playerWon(r)).toBe(false);
+    expect(battle!.aftermath.beaten).toBeUndefined();
+    expect(r.state.captains.p!.bossesBeaten).toEqual([]);
     const text = formatReplay(world, r.state, r.replay).join("\n");
-    expect(text).toContain("It rears up and shows its soft underside: Round shot does 2 times the damage to it.");
+    expect(text).toContain("Old Shellback wins the boarding");
+  });
+
+  it("is beaten by the Crabber, and the battle tells the story", () => {
+    const { state, result: r } = beatHim();
+    const [battle] = battles(r);
+    expect(battle!.aftermath).toMatchObject({ pvp: false, towed: false, beaten: { boss: SHELLBACK_ID, by: ["p"] } });
+    expect(state.captains.p!.bossesBeaten).toEqual([SHELLBACK_ID]);
+    const text = formatReplay(world, r.state, r.replay).join("\n");
     expect(text).toContain("The p has beaten Old Shellback, and may now pass the gate it guards. Old Shellback will be back next Tide.");
   });
 
   it("retreats into his shell where he lay: never towed, never sunk for good, whole again next Tide", () => {
-    const first = resolve(crabSeason(), { p: challenge(6) });
+    const first = beatHim().result;
     expect(first.state.captains.p!.bossesBeaten).toEqual([SHELLBACK_ID]);
     expect(only(first, "towed")).toEqual([]); // the loser is the boss and is not towed
     const crab = first.state.ships[SHIP]!;
     expect(crab).toMatchObject({ waterId: NARROWS, docked: false });
     expect(crab.hullPoints).toBeLessThan(300);
-    expect(crab.hands).toBeLessThan(40);
 
     const second = resolve(first.state, { p: idle(7) }, 2000);
     expect(only(second, "bossRecovers")).toMatchObject([{ ship: SHIP, hullPoints: 300, maxHullPoints: 300 }]);

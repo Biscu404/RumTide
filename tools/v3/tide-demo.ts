@@ -2,7 +2,7 @@
 // Resolves the six ship fixture Tide and prints the replay in plain words, the final positions,
 // and a fingerprint. Run it twice: the fingerprint must never change unless the rules did.
 
-// `npm run tide:demo -- --shellback` shows a fresh sloop with the starting Brawler challenging Old Shellback in the Narrows
+// `npm run tide:demo -- --shellback` shows a fresh sloop with the starting Boarder challenging Old Shellback in the Narrows
 // instead (GAMEPLAY 2.5). `-- --shellback 9` or any other Tide shows how tired he is by then.
 
 import { canonicalJson, coverage, formatReplay, hash32, newSeason, replayHash, resolveTide } from "../../supabase/functions/_shared/engine_v3/index.ts";
@@ -18,7 +18,7 @@ if (crabAt >= 0) {
   crab.tide = tide;
   const challenge = { tide, planA: { steps: [{ kind: "lurk" as const, filter: { kind: "npcs" as const } }] } };
   const fight = resolveTide({ state: crab, world: cradle, orders: { cap_p: challenge }, seed: hash32(`shellback/tide/${tide}`), windOverride: SIX_SHIPS_WIND });
-  console.log(`Rumtide engine demo: The Gull (a fresh sloop, the starting Brawler) challenges Old Shellback, Tide ${tide}\n`);
+  console.log(`Rumtide engine demo: The Gull (a fresh sloop, the starting Boarder) challenges Old Shellback, Tide ${tide}\n`);
   for (const line of formatReplay(cradle, fight.state, fight.replay)) console.log("  " + line);
   const beaten = fight.state.captains.cap_p!.bossesBeaten;
   console.log(`\nPip has beaten: ${beaten.length ? beaten.join(", ") : "nobody yet"}. Replay fingerprint: ${replayHash(fight.replay)}`);

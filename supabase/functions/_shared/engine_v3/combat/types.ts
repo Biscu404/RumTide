@@ -20,9 +20,27 @@ export type AmbushRange = "long" | "medium";
 export type HelmMove = "closeIn" | "hold" | "openRange" | "crossTheirBow";
 export const HELM_MOVES: readonly HelmMove[] = ["closeIn", "hold", "openRange", "crossTheirBow"];
 
-/** The Guns orders. Only a Bombardier can fire the Mortar; any other ship that is given it fires Round shot (spec edge cases). */
-export type GunsOrder = "roundShot" | "chainShot" | "grapeshot" | "holdFire" | "board" | "repel" | "mortar";
-export const GUNS_ORDERS: readonly GunsOrder[] = ["roundShot", "chainShot", "grapeshot", "holdFire", "board", "repel", "mortar"];
+/**
+ * The orders a rule can give next to its Helm move. Round shot, Chain shot, Grapeshot, Mortar and Hot Shot fire the great guns;
+ * Charge, Volley, Repel and Fire Pots are Deck orders that only count while Grappled (boarding spec section 2), and Board
+ * grapples. Only a Bombardier can fire the Mortar and only a Firebrand Hot Shot; any other ship that is given one fires Round
+ * shot (spec edge cases). While Grappled the great guns are quiet, so a Guns order there means Fists.
+ */
+export type GunsOrder =
+  | "roundShot" | "chainShot" | "grapeshot" | "holdFire" | "board" | "repel" | "mortar" | "hotShot" | "charge" | "volley" | "firePots";
+export const GUNS_ORDERS: readonly GunsOrder[] = [
+  "roundShot", "chainShot", "grapeshot", "holdFire", "board", "repel", "mortar", "hotShot", "charge", "volley", "firePots",
+];
+
+/**
+ * What a crew really fights with in a Grappled round. The four Deck orders a rule can give, and Fists, the fallback for a
+ * Guns order, a Volley with no Powder and Fire Pots with no pot or no Drill 5. Fists is never a choice in a doctrine.
+ */
+export type DeckOrder = "charge" | "volley" | "repel" | "firePots" | "fists";
+export const DECK_ORDERS: readonly DeckOrder[] = ["charge", "volley", "repel", "firePots", "fists"];
+
+/** How a Deck order met the enemy flagship's: it won the pairing of the cycle, lost it, or neither (8.6). */
+export type Pairing = "won" | "lost" | "even";
 
 /** The three things a ship can lose in battle (6.3). */
 export type DamageTrack = "hull" | "rigging" | "hands";
@@ -67,11 +85,13 @@ export interface BattleShip {
   charted: boolean; // the battle's water was Charted for this captain when the Tide began (D12)
   withCurrent: boolean; // moving with a Strong Current (2.2), decided when the battle is set up (P2.4)
   lurker: boolean; // springs an ambush (8.1)
+  drill?: number; // the ship's Drill level (boarding spec section 4); absent means 0
   // Changing during the battle.
   hullPoints: number;
   riggingPoints: number;
   hands: number;
   powder: number;
+  firePots?: number; // Fire Pots left; absent for a ship that never carried any
   abilities: string[]; // unused crew abilities, sorted (empty until P8.4)
   guns: GunsMemory;
 }
@@ -81,14 +101,34 @@ export interface BattleShip {
 /** One Helm contest (8.4, 8.6): `side` won with probability `chance`, by rolling `roll` below it. */
 export interface ContestRecord {
   // The Close In against Open Range chase, a big ship reaching Close in Shallows, a Grappled ship trying to get away, a
-  // Rammer's Ram finding its mark, or a dashing Rammer spoiling the rake of a ship that crosses its bow.
-  kind: "chase" | "shallows" | "cutFree" | "ram" | "dash";
+  // Rammer's Ram finding its mark, a dashing Rammer spoiling the rake of a ship that crosses its bow, or the grapnels
+  // taking hold when a Board failed on Helm score.
+  kind: "chase" | "shallows" | "cutFree" | "ram" | "dash" | "grapnel";
   side: BattleSide; // the ship whose chance this is
   ship?: ShipId; // set for a fleet mate that is not its side's flagship: it contests the enemy flagship (P2.5)
   scores: Record<BattleSide, number>;
   chance: number;
   roll: number;
   winner: BattleSide;
+}
+
+/** A Fire Pot thrown in a Grappled round: its roll against `deck.fireChance`, and whether the pitch caught. */
+export interface PotRecord {
+  roll: number;
+  fire: boolean;
+}
+
+/** What one crew did in the deck fight of a Grappled round (boarding spec section 2). */
+export interface DeckRecord {
+  order: DeckOrder; // what the crew really fought with, after the fallbacks
+  pairing: Pairing; // against the enemy flagship's Deck order
+  thrown?: PotRecord; // only when a Fire Pot was thrown
+}
+
+/** A ship burning at the end of a round: the Hull the fire took, and the rounds it has left to burn (fighting styles spec section 3). */
+export interface BurnRecord {
+  hull: number; // Hull lost to the fire at the end of this round
+  left: number; // rounds still to burn after this one
 }
 
 export interface RoundShipRecord {
@@ -100,6 +140,8 @@ export interface RoundShipRecord {
   asked?: GunsOrder; // the order the doctrine gave, only when the ship could not give it and played `guns` instead
   mortar?: { roll: number; hit: boolean; zeroing: number }; // only when the Mortar was fired: its hit roll, and the Zeroing In factor
   exposed?: number; // a monster reared up this round: Round shot does this many times the damage to it. Absent for every other round (D102)
+  deck?: DeckRecord; // only in a round of the deck fight (the ships were Grappled when the guns had fired)
+  fire?: BurnRecord; // only for a ship that burned at the end of this round
   helmScore: number;
   shot: { track: DamageTrack | null; damage: number; powderUsed: number }; // what this ship's guns did
   scrape: number; // Hull lost to a Reef scrape this round
@@ -109,14 +151,17 @@ export interface RoundShipRecord {
   riggingPoints: number;
   hands: number;
   powder: number;
+  firePots?: number; // only for a ship that carries or carried Fire Pots
 }
 
-/** A Board order played at Close (8.5): did the ship grapple, and why. */
+/** A Board order played at Close, or at Short for a Boarder (8.5): did the ship grapple, and why. */
 export interface GrappleRecord {
   side: BattleSide;
   ship?: ShipId; // set for a fleet mate that is not its side's flagship (P2.5)
   ok: boolean;
-  why: "helm" | "theyBoard" | "theyHold" | "failed"; // the first reason that let it succeed, or "failed"
+  // The first reason that let it succeed, or "failed". "grapnels" is the Helm contest a failed Board gets (kind "grapnel" in the
+  // round's contests).
+  why: "helm" | "theyBoard" | "theyHold" | "grapnels" | "failed";
 }
 
 /**
@@ -137,11 +182,28 @@ export interface MeleeRecord {
   strength: Record<BattleSide, number>; // boarding strength going in
   lost: Record<BattleSide, number>; // Hands each side lost
   hands: Record<BattleSide, number>; // Hands each side has left
+  firstOver?: BattleSide; // only in the grapple round: the boarder's Board fought as a Charge with First over the rail
+}
+
+/** Where a fire came from (fighting styles spec section 3). */
+export type FireSource = "hotShot" | "mortar" | "firePots" | "ram" | "embers";
+
+/**
+ * A fire lit, or a Fire Pot's flash. `rounds` is how many rounds the new fire burns, this one included; the ship keeps whichever
+ * fire burns longer. A Fire Pot thrown by a ship that is not a Firebrand does not burn: `rounds` is 0 and it costs the
+ * `hull` named here at once, never taking a ship below 1 Hull.
+ */
+export interface FireRecord {
+  source: FireSource;
+  ship: ShipId; // the ship set alight, or hurt by the flash
+  by: ShipId; // the ship whose shot, pot, prow or embers did it
+  rounds: number;
+  hull?: number; // only for a flash
 }
 
 /** One round. */
 export interface RoundRecord {
-  round: number; // 1 to B.combat.rounds
+  round: number; // 1 to B.combat.rounds, and up to B.combat.overtime more for a deck fight that is still going
   rangeBefore: Range;
   rangeAfter: Range;
   escaped: boolean; // the range went past Far
@@ -149,6 +211,9 @@ export interface RoundRecord {
   contests: ContestRecord[]; // in the order they were rolled
   grapples: GrappleRecord[]; // Board orders played at Close, hunter first
   rams?: RamRecord[]; // only in a round a Rammer played Close In at Close, hunter side first
+  edge?: BattleSide; // only while a side holds the boarder's edge: the side whose Board made the grapple (First over the rail, Lashed fast)
+  fires?: FireRecord[]; // only in a round a fire was lit, in the order they were lit
+  overtime?: true; // only after the last round: a deck fight going on in overtime (D127)
   melee: MeleeRecord | null; // null unless the ships were Grappled when the guns had fired. In a fleet battle each number is the whole side's
   crippled: BattleSide[]; // sides whose Rigging reached 0 this round (6.3)
   struck: BattleSide[]; // sides whose doctrine said Surrender; nothing else happens in that round
@@ -185,6 +250,7 @@ export type DoctrineCondition =
   | { kind: "terrain"; terrain: Terrain }
   | { kind: "windGauge"; holder: "mine" | "theirs" }
   | { kind: "havePowder" }
+  | { kind: "haveFirePots" }
   | { kind: "abilityUnused"; ability: string };
 
 export type DoctrineAction =

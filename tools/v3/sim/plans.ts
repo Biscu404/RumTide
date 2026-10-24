@@ -8,7 +8,8 @@ import type {
 
 /**
  * The Guns orders the simulator plays, tries and writes into doctrines: the six every ship can give. It is kept explicit so the
- * Mortar, which only a Bombardier fires, is not tried for ships that have no style. The simulator learns the styles in P3.B3.
+ * Mortar and Hot Shot, which only a Bombardier and a Firebrand fire, and the Deck orders (Charge, Volley, Fire Pots), are not tried
+ * by check 2, the random plans or the random doctrines. The simulator learns the styles and the deck fight in P3.B3.
  */
 export const SIM_GUNS_ORDERS: readonly GunsOrder[] = ["roundShot", "chainShot", "grapeshot", "holdFire", "board", "repel"];
 
@@ -109,6 +110,7 @@ export function mutateDoctrine(rng: Rng, d: Doctrine, name: string, slots = 3): 
 const HELM_WORDS: Record<HelmMove, string> = { closeIn: "Close In", hold: "Hold", openRange: "Open Range", crossTheirBow: "Cross Their Bow" };
 const GUNS_WORDS: Record<GunsOrder, string> = {
   roundShot: "Round shot", chainShot: "Chain shot", grapeshot: "Grapeshot", holdFire: "Hold Fire", board: "Board", repel: "Repel", mortar: "Mortar",
+  hotShot: "Hot Shot", charge: "Charge", volley: "Volley", firePots: "Fire Pots",
 };
 const RANGE_WORDS: Record<Range, string> = { far: "Far", long: "Long", medium: "Medium", short: "Short", close: "Close", grappled: "Grappled" };
 
@@ -128,6 +130,7 @@ export function conditionText(c: DoctrineCondition): string {
     case "terrain": return `terrain is ${c.terrain}`;
     case "windGauge": return `the wind gauge is ${c.holder}`;
     case "havePowder": return "I have Powder";
+    case "haveFirePots": return "I have Fire Pots";
     case "abilityUnused": return `${c.ability} is unused`;
   }
 }

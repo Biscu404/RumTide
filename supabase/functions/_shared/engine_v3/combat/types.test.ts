@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { B } from "../balance.ts";
 import { FIGHTING_STYLES } from "../types.ts";
-import { BATTLE_SIDES, GUNS_ORDERS, HELM_MOVES, RANGES } from "./types.ts";
+import { BATTLE_SIDES, DECK_ORDERS, GUNS_ORDERS, HELM_MOVES, RANGES } from "./types.ts";
 import type { BattleOutcome, Doctrine, OutcomeKind } from "./types.ts";
 
 describe("combat types (P2.1)", () => {
@@ -9,24 +9,34 @@ describe("combat types (P2.1)", () => {
     expect(RANGES).toEqual(["far", "long", "medium", "short", "close", "grappled"]);
   });
 
-  it("lists the four Helm moves and the seven Guns orders, the Mortar last", () => {
+  it("lists the four Helm moves and the eleven orders a rule can give, the style orders and the Deck orders last", () => {
     expect(HELM_MOVES).toEqual(["closeIn", "hold", "openRange", "crossTheirBow"]);
-    expect(GUNS_ORDERS).toEqual(["roundShot", "chainShot", "grapeshot", "holdFire", "board", "repel", "mortar"]);
+    expect(GUNS_ORDERS).toEqual([
+      "roundShot", "chainShot", "grapeshot", "holdFire", "board", "repel", "mortar", "hotShot", "charge", "volley", "firePots",
+    ]);
     expect(BATTLE_SIDES).toEqual(["hunter", "target"]);
+  });
+
+  it("lists the five things a crew fights with on deck: four Deck orders, and Fists, which a rule cannot give", () => {
+    expect(DECK_ORDERS).toEqual(["charge", "volley", "repel", "firePots", "fists"]);
+    expect(GUNS_ORDERS).not.toContain("fists");
+    for (const order of DECK_ORDERS.filter((o) => o !== "fists")) expect(GUNS_ORDERS).toContain(order);
   });
 
   it("names all seven Fighting Styles", () => {
     expect(FIGHTING_STYLES).toEqual(["bombardier", "gunline", "skirmisher", "rammer", "boarder", "firebrand", "smuggler"]);
   });
 
-  it("agrees with the ammo table in balance.ts, which is the table of the Fighting Styles spec", () => {
-    for (const row of Object.values(B.combat.range)) expect(Object.keys(row)).toEqual([...RANGES]);
-    expect(Object.keys(B.combat.range)).toEqual(["round", "chain", "grape", "mortar"]);
-    const at = (row: keyof typeof B.combat.range) => RANGES.slice(0, 5).map((r) => B.combat.range[row][r]);
+  it("agrees with the ammo table in balance.ts, which is the table of the Fighting Styles spec, with no Grappled column", () => {
+    const fires = RANGES.slice(0, 5); // while Grappled the great guns are quiet
+    for (const row of Object.values(B.combat.range)) expect(Object.keys(row)).toEqual([...fires]);
+    expect(Object.keys(B.combat.range)).toEqual(["round", "chain", "grape", "mortar", "hot"]);
+    const at = (row: keyof typeof B.combat.range) => fires.map((r) => B.combat.range[row][r as Exclude<typeof r, "grappled">]);
     expect(at("round")).toEqual([0.2, 0.6, 1.0, 1.0, 1.0]);
     expect(at("chain")).toEqual([0.4, 1.0, 0.8, 0.6, 0.4]);
     expect(at("grape")).toEqual([0, 0, 0.5, 0.85, 1.2]);
     expect(at("mortar")).toEqual([1.1, 1.1, 0.85, 0, 0]);
+    expect(at("hot")).toEqual([0, 0.3, 0.3, 1.0, 1.0]);
   });
 
 

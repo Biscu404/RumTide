@@ -114,6 +114,12 @@ describe("conditions (GAMEPLAY 8.8)", () => {
     expect(holds({ kind: "theirLastGuns", order: "roundShot" }, v)).toBe(false);
     expect(holds({ kind: "theirLastHelm", move: "openRange" }, view())).toBe(false);
     expect(holds({ kind: "theirLastGuns", order: "chainShot" }, view())).toBe(false);
+    // The Deck orders are Guns orders for this condition: "their last Guns order was Repel" reads the Repel of a deck fight too.
+    for (const order of ["charge", "volley", "repel", "firePots", "hotShot"] as const) {
+      const played = view({ last: { hunter: null, target: { helm: "hold", guns: order } } });
+      expect(holds({ kind: "theirLastGuns", order }, played), order).toBe(true);
+      expect(holds({ kind: "theirLastGuns", order: "roundShot" }, played), order).toBe(false);
+    }
     // The target reads the hunter's play, not its own.
     expect(holds({ kind: "theirLastHelm", move: "openRange" }, v, "target")).toBe(false);
   });
@@ -144,6 +150,14 @@ describe("conditions (GAMEPLAY 8.8)", () => {
     expect(holds({ kind: "havePowder" })).toBe(true);
     expect(holds({ kind: "havePowder" }, view({}, { powder: 0 }))).toBe(false);
     expect(holds({ kind: "havePowder" }, view({}, { powder: 0 }, { powder: 9 }), "target")).toBe(true);
+  });
+
+  it("I have Fire Pots: a pot in my hold, whatever my Drill, and false for a ship that never carried any", () => {
+    expect(holds({ kind: "haveFirePots" })).toBe(false);
+    expect(holds({ kind: "haveFirePots" }, view({}, { firePots: 2 }))).toBe(true);
+    expect(holds({ kind: "haveFirePots" }, view({}, { firePots: 0 }))).toBe(false);
+    expect(holds({ kind: "haveFirePots" }, view({}, { firePots: 2 }, {}), "target")).toBe(false); // the target looks at its own hold
+    expect(holds({ kind: "haveFirePots" }, view({}, {}, { firePots: 1 }), "target")).toBe(true);
     expect(holds({ kind: "abilityUnused", ability: "fake.flare" }, view({}, { abilities: ["fake.flare"] }))).toBe(true);
     expect(holds({ kind: "abilityUnused", ability: "fake.flare" }, view())).toBe(false);
     expect(holds({ kind: "abilityUnused", ability: "fake.flare" }, view({}, {}, { abilities: ["fake.flare"] }))).toBe(false);
@@ -406,6 +420,8 @@ describe("validation", () => {
     expect(bad({ kind: "track", who: "mine", track: "hull", op: "equal", pct: 5 })).toHaveLength(1);
     expect(bad({ kind: "theirLastHelm", move: "ram" })).toEqual(["rule 1: unknown Helm move ram"]);
     expect(bad({ kind: "theirLastGuns", order: "ram" })).toEqual(["rule 1: unknown Guns order ram"]);
+    expect(bad({ kind: "theirLastGuns", order: "fists" })).toEqual(["rule 1: unknown Guns order fists"]); // Fists is never a choice
+    expect(bad({ kind: "haveFirePots" })).toEqual([]);
     expect(bad({ kind: "enemyType", type: "kraken" })).toEqual(["rule 1: unknown enemy type kraken"]);
     expect(bad({ kind: "enemyCaptain", captainId: "" })).toHaveLength(1);
     expect(bad({ kind: "terrain", terrain: "lava" })).toEqual(["rule 1: unknown terrain lava"]);
@@ -420,7 +436,7 @@ describe("validation", () => {
       { kind: "track", who: "theirs", track: "hands", op: "above", pct: 0 }, { kind: "track", who: "mine", track: "rigging", op: "below", pct: 100 },
       { kind: "theirLastHelm", move: "crossTheirBow" }, { kind: "theirLastGuns", order: "repel" }, { kind: "enemyType", type: "brethren" },
       { kind: "enemyCaptain", captainId: "cap_x" }, { kind: "terrain", terrain: "strongCurrent" }, { kind: "windGauge", holder: "theirs" },
-      { kind: "havePowder" }, { kind: "abilityUnused", ability: "fake.flare" },
+      { kind: "havePowder" }, { kind: "haveFirePots" }, { kind: "abilityUnused", ability: "fake.flare" },
       { kind: "range", op: "is", range: "far" }, { kind: "range", op: "atMost", range: "short" }, { kind: "theirLastGuns", order: "mortar" },
       ...FIGHTING_STYLES.map((style): DoctrineCondition => ({ kind: "theirStyle", style })),
     ];
@@ -448,8 +464,9 @@ describe("validation", () => {
 });
 
 describe("the templates (GAMEPLAY 8.8, Fighting Styles spec section 6)", () => {
-  it("are the Bombardier, Gunline, Skirmisher, Rammer, Brawler and Smuggler, and each is valid for a captain with the base slots", () => {
-    expect([...TEMPLATE_NAMES]).toEqual(["Bombardier", "Gunline", "Skirmisher", "Rammer", "Brawler", "Smuggler"]);
+  it("are the Bombardier, Gunline, Skirmisher, Rammer, Boarder, Firebrand and Smuggler, and each is valid for a captain with the base slots", () => {
+    expect([...TEMPLATE_NAMES]).toEqual(["Bombardier", "Gunline", "Skirmisher", "Rammer", "Boarder", "Firebrand", "Smuggler"]);
+    expect([...TEMPLATE_NAMES]).not.toContain("Brawler"); // the Brawler split into the Rammer and the Boarder (D123)
     expect(templateDoctrines().map((d) => d.name)).toEqual([...TEMPLATE_NAMES]);
     for (const name of TEMPLATE_NAMES) {
       const d = templateDoctrine(name);
@@ -462,12 +479,12 @@ describe("the templates (GAMEPLAY 8.8, Fighting Styles spec section 6)", () => {
   });
 
   it("hand out fresh copies, so editing one captain's doctrine changes nobody else's", () => {
-    const a = templateDoctrine("Brawler");
-    const b = templateDoctrine("Brawler");
+    const a = templateDoctrine("Boarder");
+    const b = templateDoctrine("Boarder");
     a.name = "Mine";
     a.rules.pop();
-    expect(b).toEqual(templateDoctrine("Brawler"));
-    expect(templateDoctrines()[TEMPLATE_NAMES.indexOf("Brawler")]).toEqual(templateDoctrine("Brawler"));
+    expect(b).toEqual(templateDoctrine("Boarder"));
+    expect(templateDoctrines()[TEMPLATE_NAMES.indexOf("Boarder")]).toEqual(templateDoctrine("Boarder"));
     // Even a deep edit of one copy, inside a rule that several templates have, leaves every other template whole.
     const pristine = structuredClone(templateDoctrines());
     for (const mine of templateDoctrines()) {
@@ -480,16 +497,14 @@ describe("the templates (GAMEPLAY 8.8, Fighting Styles spec section 6)", () => {
   });
 
   it("use only the thresholds in balance.ts", () => {
-    const T = D.templates;
-    const hands = templateDoctrine("Brawler").rules[2]!.if[0];
-    expect(hands).toMatchObject({ kind: "track", track: "hands", pct: T.brawlerBoardHandsPct });
+    expect(D).not.toHaveProperty("templates"); // the Brawler's Hands threshold went with the Brawler
     expect(templateDoctrine("Smuggler").rules[0]!.if[0]).toMatchObject({ who: "mine", track: "hull", pct: B.styles.smuggler.strikeHullPct });
     expect(B.styles.smuggler.strikeHullPct).toBe(40);
   });
 
-  it("are the template each Fighting Style gives; the Boarder and the Firebrand start with the Brawler for now", () => {
-    expect(FIGHTING_STYLES.map(styleTemplate)).toEqual(["Bombardier", "Gunline", "Skirmisher", "Rammer", "Brawler", "Brawler", "Smuggler"]);
-    expect(styleTemplate(undefined)).toBe("Brawler");
+  it("are the template each Fighting Style gives, and a captain with no style starts with the Boarder, the Brawler's successor", () => {
+    expect(FIGHTING_STYLES.map(styleTemplate)).toEqual(["Bombardier", "Gunline", "Skirmisher", "Rammer", "Boarder", "Firebrand", "Smuggler"]);
+    expect(styleTemplate(undefined)).toBe("Boarder");
   });
 
   const play = (name: Parameters<typeof templateDoctrine>[0], v: RoundView) => evaluateDoctrine(templateDoctrine(name), v, ctx);
@@ -540,12 +555,36 @@ describe("the templates (GAMEPLAY 8.8, Fighting Styles spec section 6)", () => {
     expect(play("Smuggler", view({ range: "grappled" }, { hullPoints: 39 }))).toEqual({ kind: "surrender", rule: 0, abilities: [] });
   });
 
-  it("Brawler closes in, boards at Close and grapes the crew once Grappled", () => {
-    expect(play("Brawler", view({ range: "long" }))).toMatchObject({ rule: 3, helm: "closeIn", guns: "roundShot" });
-    expect(play("Brawler", view({ range: "medium" }))).toMatchObject({ rule: 3, helm: "closeIn", guns: "roundShot" });
-    expect(play("Brawler", view({ range: "close" }))).toMatchObject({ rule: 1, helm: "closeIn", guns: "board" });
-    expect(play("Brawler", view({ range: "grappled" }))).toMatchObject({ rule: 0, helm: "closeIn", guns: "grapeshot" });
-    expect(play("Brawler", view({ range: "long" }, {}, { hands: 14 }))).toMatchObject({ rule: 2, helm: "closeIn", guns: "board" }); // a thin crew: go and take them
+  it("Boarder closes in with Round shot, boards from Short, charges once Grappled and answers a Repel with muskets (spec section 6)", () => {
+    for (const range of ["far", "long", "medium"] as const) expect(at("Boarder", range)).toEqual([3, "closeIn", "roundShot"]);
+    expect(at("Boarder", "short")).toEqual([2, "closeIn", "board"]);
+    expect(at("Boarder", "close")).toEqual([2, "closeIn", "board"]);
+    expect(at("Boarder", "grappled")).toEqual([1, "hold", "charge"]);
+    const repelled = view({ range: "grappled", last: { hunter: null, target: { helm: "hold", guns: "repel" } } });
+    expect(play("Boarder", repelled)).toMatchObject({ rule: 0, helm: "hold", guns: "volley" });
+    const charged = view({ range: "grappled", last: { hunter: null, target: { helm: "hold", guns: "charge" } } });
+    expect(play("Boarder", charged)).toMatchObject({ rule: 1, helm: "hold", guns: "charge" });
+  });
+
+  it("Firebrand throws Fire Pots once Grappled, Hot Shot at Short and Close, Round shot while they are far, and Hot Shot on a crossed bow", () => {
+    expect(at("Firebrand", "grappled")).toEqual([0, "hold", "firePots"]);
+    for (const range of ["far", "long", "medium"] as const) expect(at("Firebrand", range)).toEqual([2, "closeIn", "roundShot"]);
+    for (const range of ["short", "close"] as const) expect(at("Firebrand", range)).toEqual([3, "closeIn", "hotShot"]);
+    const crossed = view({ range: "medium", last: { hunter: null, target: { helm: "crossTheirBow", guns: "roundShot" } } });
+    expect(play("Firebrand", crossed)).toMatchObject({ rule: 1, helm: "openRange", guns: "hotShot" });
+  });
+
+  it("fit the three rules with conditions of a captain with the base slots, as written in the spec", () => {
+    for (const name of ["Boarder", "Firebrand"] as const) expect(templateDoctrine(name).rules.length).toBe(D.baseSlots + 1);
+    expect(templateDoctrine("Boarder").rules[0]!.if).toEqual([{ kind: "range", op: "is", range: "grappled" }, { kind: "theirLastGuns", order: "repel" }]);
+  });
+
+  it("always play: Hot Shot without the style, Fire Pots without pots or Drill 5 and Volley without Powder are replaced, not refused", () => {
+    // Validation takes the orders at face value; the replacement happens when the round is played (styles.ts, deck.ts).
+    const copied: Doctrine = { name: "Copied", rules: [rule([{ kind: "range", op: "is", range: "grappled" }], fight("hold", "firePots")), otherwise(fight("closeIn", "hotShot"))] };
+    expect(validateDoctrine(copied, { slots: D.baseSlots })).toEqual([]);
+    const volley: Doctrine = { name: "Volley", rules: [rule([{ kind: "haveFirePots" }, { kind: "havePowder" }], fight("hold", "volley")), otherwise(fight("hold", "charge"))] };
+    expect(validateDoctrine(volley, { slots: D.baseSlots })).toEqual([]);
   });
 
   const duel = (
@@ -558,20 +597,24 @@ describe("the templates (GAMEPLAY 8.8, Fighting Styles spec section 6)", () => {
       { seed, doctrines: { hunter, target }, ...input },
     ));
 
-  it("play out in a battle: the Brawler closes on a Gunline that holds near, and boards it at Close", () => {
-    const r = duel("Brawler", "Gunline");
-    expect(r.doctrines).toEqual({ hunter: "Brawler", target: "Gunline" });
+  it("play out in a battle: the Boarder closes on a Gunline that holds near, boards it from Short and charges over the rail", () => {
+    const r = duel("Boarder", "Gunline");
+    expect(r.doctrines).toEqual({ hunter: "Boarder", target: "Gunline" });
     expect(r.rounds[0]!.ships.map((s) => [s.helm, s.guns])).toEqual([["closeIn", "roundShot"], ["closeIn", "roundShot"]]);
     expect(r.rounds[0]!.rangeAfter).toBe("short"); // both Close In from Long: two bands
-    expect(r.rounds[1]!.ships[1]).toMatchObject({ rule: 3, helm: "hold", guns: "roundShot" });
-    expect(r.rounds[1]!.rangeAfter).toBe("close");
-    expect(r.rounds[2]!.ships.map((s) => [s.rule, s.helm, s.guns])).toEqual([[1, "closeIn", "board"], [1, "hold", "grapeshot"]]);
-    expect(r.rounds[2]!.grapples).toEqual([{ side: "hunter", ok: true, why: "helm" }]);
-    expect(r.rounds[2]!.rangeAfter).toBe("grappled");
+    // At Short the Boarder boards at once. Its chase (1.3) puts its Helm score above the Gunline, so the Board works on Helm score.
+    expect(r.rounds[1]!.ships.map((s) => [s.rule, s.helm, s.guns])).toEqual([[2, "closeIn", "board"], [3, "hold", "roundShot"]]);
+    expect(r.rounds[1]!.grapples).toEqual([{ side: "hunter", ok: true, why: "helm" }]);
+    expect(r.rounds[1]!.rangeAfter).toBe("grappled");
+    expect(r.rounds[1]!.edge).toBe("hunter");
+    expect(r.rounds[1]!.melee!.firstOver).toBe("hunter");
+    expect(r.rounds[1]!.ships.map((s) => s.deck!.order)).toEqual(["charge", "fists"]); // First over the rail: the Gunline fights with Fists
+    expect(r.rounds[2]!.ships.map((s) => [s.rule, s.helm, s.guns])).toEqual([[1, "hold", "charge"], [0, "openRange", "repel"]]);
+    expect(r.rounds[2]!.ships.map((s) => s.deck!.order)).toEqual(["charge", "repel"]); // and now the Gunline repels
   });
 
-  it("play out in a battle: the Skirmisher crosses the bow of a Brawler that charges, and rakes it", () => {
-    const r = duel("Skirmisher", "Brawler");
+  it("play out in a battle: the Skirmisher crosses the bow of a Boarder that charges, and rakes it", () => {
+    const r = duel("Skirmisher", "Boarder");
     expect(r.rounds[0]!.ships[0]).toMatchObject({ rule: 2, helm: "closeIn", guns: "roundShot" }); // far apart: close in
     expect(r.rounds[0]!.rangeAfter).toBe("short");
     expect(r.rounds[1]!.row).toBe("crossClose");
@@ -602,7 +645,7 @@ describe("the templates (GAMEPLAY 8.8, Fighting Styles spec section 6)", () => {
           expect(r, `${a} v ${b} seed ${seed}`).toEqual(duel(a, b, seed));
           kinds.add(r.outcome.kind);
           expect(r.rounds.length).toBeGreaterThan(0);
-          expect(r.rounds.length).toBeLessThanOrEqual(B.combat.rounds);
+          expect(r.rounds.length).toBeLessThanOrEqual(B.combat.rounds + B.combat.overtime);
           for (const s of r.final) {
             expect(s.hullPoints).toBeGreaterThanOrEqual(0);
             expect(s.riggingPoints).toBeGreaterThanOrEqual(0);

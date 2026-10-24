@@ -58,7 +58,9 @@ describe("the seven outcomes of GAMEPLAY 8.7 (P2.2)", () => {
     const r = fight(always("closeIn", "board"), always("closeIn", "roundShot"), {}, { hands: 8 }, NEAR);
     expect(r.outcome).toEqual({ kind: "captured", winner: "hunter", loser: "target", round: 1 });
     expect(r.rounds[0]!.grapples).toEqual([{ side: "hunter", ok: true, why: "helm" }]);
-    expect(r.rounds[0]!.melee).toMatchObject({ lost: { hunter: 2, target: 6 }, hands: { hunter: 28, target: 2 } });
+    // The Board made the grapple, so the hunter charges over the rail (30 x 0.2 x 1.5 x 1.25, and First over the rail x1.25 of that)
+    // against a crew that fights with Fists: the target's 8 Hands are gone, and its fists took 2 of the hunter's 30.
+    expect(r.rounds[0]!.melee).toMatchObject({ lost: { hunter: 2, target: 8 }, hands: { hunter: 28, target: 0 }, firstOver: "hunter" });
   });
 
   it("Victory on points: a 5 point lead in damage share after five rounds (D132)", () => {

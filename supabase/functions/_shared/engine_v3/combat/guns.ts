@@ -15,12 +15,16 @@ const NEUTRAL = 1; // a factor that changes nothing
 
 type Ammo = { key: keyof typeof C.range; track: DamageTrack };
 
-/** The orders that fire the guns, and the track each one hits. Hold Fire, Board and Repel fire nothing. Only a Bombardier fires the Mortar. */
+/**
+ * The orders that fire the great guns, and the track each one hits. Hold Fire, Board and the Deck orders fire nothing here:
+ * they count in the deck fight (deck.ts). Only a Bombardier fires the Mortar and only a Firebrand fires Hot Shot.
+ */
 const AMMO: Partial<Record<GunsOrder, Ammo>> = {
   roundShot: { key: "round", track: "hull" },
   chainShot: { key: "chain", track: "rigging" },
   grapeshot: { key: "grape", track: "hands" },
   mortar: { key: "mortar", track: "hull" },
+  hotShot: { key: "hot", track: "hull" },
 };
 
 const TRACK_FIELD = { hull: "hullPoints", rigging: "riggingPoints", hands: "hands" } as const;
@@ -28,10 +32,10 @@ const TRACK_FIELD = { hull: "hullPoints", rigging: "riggingPoints", hands: "hand
 /** The track an order damages, or null for an order that fires nothing. */
 export const gunsTrack = (order: GunsOrder): DamageTrack | null => AMMO[order]?.track ?? null;
 
-/** The "range factor" of the ammo table: 0 for an order that fires nothing. */
+/** The "range factor" of the ammo table: 0 for an order that fires nothing, and for every order while Grappled (the guns are quiet). */
 export const ammoFactor = (order: GunsOrder, range: Range): number => {
   const ammo = AMMO[order];
-  return ammo ? C.range[ammo.key][range] : 0;
+  return ammo && range !== "grappled" ? C.range[ammo.key][range] : 0;
 };
 
 /** A shot's raw damage as points on the track it hits: Grapeshot removes one Hand for every grapeDamagePerHand damage (D30). */
@@ -113,7 +117,9 @@ export interface GunsResult {
  *
  * The Mortar hits Hull, never goes stale, takes the Zeroing In factor, and draws its hit roll from "mortar/<attacker id>":
  * a shell that misses does no damage but still burns its Powder. Only a Bombardier fires it; runBattle sees to that
- * (styles.ts playableOrder). Long Nines changes the range factor of a Gunline's Round shot at Long.
+ * (styles.ts playableOrder). Long Nines changes the range factor of a Gunline's Round shot at Long. Hot Shot hits Hull and
+ * burns `hotShotPowder` times the Powder (with less left it fires and uses up the rest). While Grappled the great guns are
+ * quiet: nothing fires, no luck is rolled and no Powder is burned.
  */
 export function fireGuns(
   attacker: BattleShip,
@@ -124,7 +130,7 @@ export function fireGuns(
   ctx: GunsContext = OPEN_WATER,
 ): GunsResult {
   const ammo = AMMO[order];
-  if (!ammo) return { order, track: null, raw: 0, damage: 0, powderUsed: 0, factors: null };
+  if (!ammo || range === "grappled") return { order, track: null, raw: 0, damage: 0, powderUsed: 0, factors: null };
 
   const dry = attacker.powder <= 0;
   const mortar = ammo.key === "mortar";
@@ -154,7 +160,7 @@ export function fireGuns(
     track: ammo.track,
     raw,
     damage: Math.max(0, Math.min(Math.round(points), available)),
-    powderUsed: dry ? 0 : Math.min(attacker.powder, B.hulls[attacker.hull].powderPerRound),
+    powderUsed: dry ? 0 : Math.min(attacker.powder, B.hulls[attacker.hull].powderPerRound * (order === "hotShot" ? B.styles.firebrand.hotShotPowder : 1)),
     factors,
     ...(shell ? { shell } : {}),
   };

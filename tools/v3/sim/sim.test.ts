@@ -36,19 +36,19 @@ describe("the arena", () => {
   });
 
   it("runs the same duel to the same record, and a different seed to a different one", () => {
-    const a = duel(fighter("Brawler"), fighter("Brawler"), OPEN_BREEZE, 77);
-    expect(duel(fighter("Brawler"), fighter("Brawler"), OPEN_BREEZE, 77)).toEqual(a);
-    const others = [1, 2, 3, 4, 5].map((s) => JSON.stringify(duel(fighter("Brawler"), fighter("Brawler"), OPEN_BREEZE, s * 991).rounds));
+    const a = duel(fighter("Boarder"), fighter("Boarder"), OPEN_BREEZE, 77);
+    expect(duel(fighter("Boarder"), fighter("Boarder"), OPEN_BREEZE, 77)).toEqual(a);
+    const others = [1, 2, 3, 4, 5].map((s) => JSON.stringify(duel(fighter("Boarder"), fighter("Boarder"), OPEN_BREEZE, s * 991).rounds));
     expect(new Set(others).size).toBeGreaterThan(1);
   });
 
   it("plays every scene the simulator names, and refuses one it does not", () => {
-    for (const scene of SCENES) expect(duel(fighter("Brawler"), fighter("Skirmisher"), scene, 5).rounds.length).toBeGreaterThan(0);
+    for (const scene of SCENES) expect(duel(fighter("Boarder"), fighter("Skirmisher"), scene, 5).rounds.length).toBeGreaterThan(0);
     expect(() => sceneByName("the moon")).toThrow("No scene called the moon");
   });
 
-  it("reads a battle from either side: a much stronger Brawler beats a fresh one, and two Smugglers part at once", () => {
-    const record = duel({ ...fighter("Brawler"), ship: { levels: evenLevels(10) } }, fighter("Brawler"), OPEN_BREEZE, 31);
+  it("reads a battle from either side: a much stronger Boarder beats a fresh one, and two Smugglers part at once", () => {
+    const record = duel({ ...fighter("Boarder"), ship: { levels: evenLevels(10) } }, fighter("Boarder"), OPEN_BREEZE, 31);
     expect(verdictFor(record, "hunter")).toBe("win");
     expect(verdictFor(record, "target")).toBe("loss");
     expect(verdictFor(duel(fighter("Smuggler"), fighter("Smuggler"), OPEN_BREEZE, 31), "hunter")).toBe("escape");
@@ -95,7 +95,8 @@ describe("random plans and doctrines", () => {
       "3. Otherwise: Open Range, Chain shot",
     ]);
     expect(doctrineLines(templateDoctrine("Bombardier"))[1]).toBe("2. IF range is at most Short THEN Open Range, Round shot");
-    expect(doctrineLines(templateDoctrine("Brawler"))[0]).toBe("1. IF range is Grappled THEN Close In, Grapeshot");
+    expect(doctrineLines(templateDoctrine("Boarder"))[0]).toBe("1. IF range is Grappled AND their last Guns order was Repel THEN Hold, Volley");
+    expect(doctrineLines(templateDoctrine("Firebrand"))[0]).toBe("1. IF range is Grappled THEN Hold, Fire Pots");
   });
 });
 
@@ -145,7 +146,7 @@ describe("reading a situation (check 2)", () => {
     plays,
     values: plays.map((_, i) => Array.from({ length: 12 }, (_, s) => means(i) + (s % 2 === 0 ? 0.01 : -0.01))),
   });
-  const situation = { scene: "open/breeze", me: "Brawler", foe: "Brawler", k: 1 } as const;
+  const situation = { scene: "open/breeze", me: "Boarder", foe: "Boarder", k: 1 } as const;
 
   it("finds the best play and calls its Helm move and Guns order clear when it wins by a wide margin", () => {
     const row = readSituation(situation, result((i) => (i === 7 ? 1 : 0.2)));
@@ -190,7 +191,7 @@ describe("the gate pace (D108)", () => {
 });
 
 describe("the jobs and the pool", () => {
-  const job = { a: fighter("Brawler"), b: fighter("Skirmisher"), scene: "fog", label: "test/pool", from: 0, count: 40 };
+  const job = { a: fighter("Boarder"), b: fighter("Skirmisher"), scene: "fog", label: "test/pool", from: 0, count: 40 };
 
   it("count the same battles in two halves as in one", () => {
     const whole = runDuels(job);
@@ -229,7 +230,7 @@ describe("a run of the five checks", () => {
       expect(s.battles).toBe(SCENES.length * 2 * (TEMPLATE_NAMES.length - 1) * effort.fieldPerCell); // every other template, both seats
     }
     expect(judgeSeats(data).rows.length).toBe(SCENES.length * (1 + TEMPLATE_NAMES.length)); // the pooled field and each mirror
-  });
+  }, 30000); // seven templates now: the field is 49 pairs, and a busy machine ran it past the default 5 seconds
 
   it("runs all five checks, reports them, and gives the same numbers twice", async () => {
     const first = await runChecks(inlinePool(), effort);

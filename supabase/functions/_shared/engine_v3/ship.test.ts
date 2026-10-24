@@ -77,7 +77,7 @@ describe("Power Rating (D26, D136, P2.4)", () => {
 
   it("grows faster than the stats with upgrades and a bigger hull (D136)", () => {
     const { ship: sh } = setup();
-    sh.levels = { hull: 5, cannons: 5, sails: 5, berths: 5, hold: 0 };
+    sh.levels = { hull: 5, cannons: 5, sails: 5, berths: 5, hold: 0, drill: 0 };
     sh.hands = maxHands(sh);
     expect(powerRating(sh)).toBeCloseTo(rated(16), 10); // a sum of 16 rates about 21.2
     expect(powerRating(sh)).toBeGreaterThan(21);

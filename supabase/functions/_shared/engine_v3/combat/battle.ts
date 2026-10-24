@@ -12,25 +12,41 @@
 // enemy ships by max Hull. A battle with one ship a side runs exactly as it did before fleets existed.
 //
 // Fighting Styles (docs/specs/fighting-styles.md): each ship's style trait counts in the rounds its own move or order is
-// played (styles.ts). Spotters set the starting range, the Helm step holds Slippery, Dash, Kite, Braced and Steady Deck, the
-// Ram lands after the Helm step and before the guns, and the guns hold the Mortar, Zeroing In and Long Nines. A ship given an
-// order its style cannot give (the Mortar, for anyone but a Bombardier) plays Round shot, and the record says so.
+// played (styles.ts). Spotters set the starting range, the Helm step holds Slippery, the chase, Dash, Kite, Braced and Steady
+// Deck, the Ram lands after the Helm step and before the guns, and the guns hold the Mortar, Zeroing In, Long Nines and Hot
+// Shot. A ship given an order its style cannot give (the Mortar, for anyone but a Bombardier, Hot Shot, for anyone but a
+// Firebrand) plays Round shot, and the record says so.
+//
+// The deck fight (docs/specs/boarding.md): while Grappled the great guns are quiet and the order a rule gives is a Deck order
+// (deck.ts). The guns of the round the ships grapple fire at Close, and then the grapple happens. The ship whose Board made the
+// grapple holds the boarder's edge until the grapple ends: First over the rail in the grapple round, and Lashed fast in every
+// Cut Free contest. A deck fight still going after the last round goes on for up to B.combat.overtime more rounds.
+//
+// Fire (fire.ts): Hot Shot, the Mortar, a Firebrand's Fire Pots, a Fireship's embers and a ram on a Firebrand set a ship alight.
+// A burning ship loses Hull at the end of the round, after the deck fight and before the end checks. The fires belong to the
+// battle and burn out with it.
 
 import { B } from "../balance.ts";
 import type { ShipId, Terrain, WaterId, WindKind } from "../types.ts";
-import { captureCheckBySide, cutFree } from "./boarding.ts";
+import { captureCheckBySide, cutFree, lashedScores } from "./boarding.ts";
+import { crewOrder } from "./deck.ts";
+import { blazeRounds, fireLoss, flashLoss, ignite } from "./fire.ts";
+import type { Blazes } from "./fire.ts";
 import {
-  apportion, fleetGrapples, fleetMelee, mateCutFree, mateHelm, noLosses, shareDamage, sideBonus, strikeTotals, withLosses,
+  apportion, fleetGrapples, fleetMelee, grapnelRescue, mateCutFree, mateHelm, noLosses, shareDamage, sideBonus, strikeTotals, withLosses,
 } from "./fleet.ts";
 import type { Shot } from "./fleet.ts";
 import { fireGuns, recordFiring, shotPoints } from "./guns.ts";
 import type { GunsResult } from "./guns.ts";
 import { battleRng, contestRecord, isCrippled, helmScore, resolveHelm, startingRange, windGauge } from "./helm.ts";
-import { firesLongNines, isRam, playableOrder, ramHull, ramSelf, spotters, zeroingFactor } from "./styles.ts";
+import {
+  emberChance, firesLongNines, hasGrapnels, hasStyle, isRam, playableOrder, ramHull, ramSelf, shotFireChance, spotters, zeroingFactor,
+} from "./styles.ts";
 import { BATTLE_SIDES, DAMAGE_TRACKS } from "./types.ts";
 import type {
-  AmbushRange, BattleOutcome, BattleRecord, BattleShip, BattleSide, ContestRecord, DamageTrack, FleetRecord, FleetRoundRecord,
-  GrappleRecord, GunsOrder, HelmMove, MeleeRecord, RamRecord, Range, RoundRecord, RoundShipRecord,
+  AmbushRange, BattleOutcome, BattleRecord, BattleShip, BattleSide, BurnRecord, ContestRecord, DamageTrack, DeckOrder, DeckRecord,
+  FireRecord, FireSource, FleetRecord, FleetRoundRecord, GrappleRecord, GunsOrder, HelmMove, MeleeRecord, PotRecord, RamRecord, Range,
+  RoundRecord, RoundShipRecord,
 } from "./types.ts";
 
 const C = B.combat;
@@ -71,7 +87,7 @@ export interface LastPlay {
  * of the enemy (7.5); in a one ship battle that is simply the two ships.
  */
 export interface RoundView {
-  round: number; // 1 to B.combat.rounds
+  round: number; // 1 to B.combat.rounds, and up to B.combat.overtime more while a deck fight is still going
   side: BattleSide; // the side of the ship choosing
   range: Range;
   terrain: Terrain;
@@ -153,7 +169,8 @@ function shipRecord(
   score: number,
   shot: Pick<GunsResult, "track" | "damage" | "powderUsed">,
   scrape: number,
-  extra: { asked?: GunsOrder; mortar?: RoundShipRecord["mortar"] | undefined } = {}, // the order the doctrine gave; the Mortar's shell
+  // the order the doctrine gave; the Mortar's shell; the deck fight; the fire that burned the ship
+  extra: { asked?: GunsOrder; mortar?: RoundShipRecord["mortar"] | undefined; deck?: DeckRecord | undefined; fire?: BurnRecord | undefined } = {},
 ): RoundShipRecord {
   return {
     ship: ship.shipId,
@@ -164,6 +181,8 @@ function shipRecord(
     ...(extra.asked !== undefined && extra.asked !== guns ? { asked: extra.asked } : {}),
     ...(extra.mortar ? { mortar: { ...extra.mortar } } : {}),
     ...(choice.kind === "fight" && choice.exposed !== undefined && choice.exposed !== 1 ? { exposed: choice.exposed } : {}),
+    ...(extra.deck ? { deck: { ...extra.deck, ...(extra.deck.thrown ? { thrown: { ...extra.deck.thrown } } : {}) } } : {}),
+    ...(extra.fire ? { fire: { ...extra.fire } } : {}),
     helmScore: score,
     shot: { track: shot.track, damage: shot.damage, powderUsed: shot.powderUsed },
     scrape,
@@ -172,6 +191,7 @@ function shipRecord(
     riggingPoints: ship.riggingPoints,
     hands: ship.hands,
     powder: ship.powder,
+    ...(ship.firePots !== undefined ? { firePots: ship.firePots } : {}),
   };
 }
 
@@ -256,8 +276,14 @@ export function runBattle(input: BattleInput): BattleRecord {
   let outcome: BattleOutcome | null = null;
   // Zeroing In: the rounds in a row each Bombardier has fired the Mortar with the range unchanged.
   let zeroing: Record<ShipId, number> = Object.fromEntries(all.map((id) => [id, 0]));
+  // The side that holds the boarder's edge while the grapple lasts: the one whose Board made it. Nobody if both Boarded, or the
+  // grapple came from Close In against Close In (boarding spec section 3).
+  let edge: BattleSide | null = null;
+  // The fires burning on each ship.
+  let blazes: Blazes = {};
 
-  for (let round = 1; round <= C.rounds && outcome === null; round++) {
+  // A deck fight still going after the last round goes on for up to C.overtime more (D127).
+  for (let round = 1; (round <= C.rounds || (range === "grappled" && round <= C.rounds + C.overtime)) && outcome === null; round++) {
     const rng = battleRng(seed, flag.hunter, flag.target, round);
 
     // A ship sees itself and the enemy flagship (7.5).
@@ -343,20 +369,40 @@ export function runBattle(input: BattleInput): BattleRecord {
         if (m.contest.winner !== side) outrun.add(id);
       }
     }
+    // The edge in force this round, for the record: the one held coming in, or the one the grapple of this round makes.
+    let roundEdge: BattleSide | null = range === "grappled" ? edge : null;
+    let freedNow = false; // some ship cut free this round: the ships do not grapple again in it (D61)
     if (range === "grappled") {
-      const free = cutFree(rng, helm.moves, helm.scores);
+      // Lashed fast: the Helm score of the boarder counts lashedFast times in every Cut Free contest while the grapple lasts, and
+      // a ship with Grapnels is lashed fast in every grapple it is in (boarding spec sections 3 and 4).
+      const lashed: Record<BattleSide, boolean> = {
+        hunter: edge === "hunter" || hasGrapnels(ships[flag.hunter]!),
+        target: edge === "target" || hasGrapnels(ships[flag.target]!),
+      };
+      const free = cutFree(rng, helm.moves, helm.scores, lashed);
       contests.push(...free.contests);
       let freed = free.freed;
       for (const id of all) {
         if (id === flag.hunter || id === flag.target) continue;
         const side = sideOf(id);
-        const c = mateCutFree(ships[id]!, moves[id]!, scores[id]!, helm.scores[other(side)], rng);
+        const c = mateCutFree(ships[id]!, moves[id]!, scores[id]!, lashedScores(helm.scores, side, lashed)[other(side)], rng);
         if (!c) continue;
         contests.push(c);
         if (c.winner === c.side) freed = true;
       }
-      if (freed) after = "close";
+      if (freed) {
+        after = "close";
+        freedNow = true;
+        edge = null; // the edge ends with the grapple (D61)
+      }
     }
+
+    // Fires lit this round, in the order they were lit.
+    const fires: FireRecord[] = [];
+    const light = (ship: ShipId, by: ShipId, source: FireSource, rounds: number): void => {
+      blazes = ignite(blazes, ship, by, rounds);
+      fires.push({ source, ship, by, rounds });
+    };
 
     // The Ram (spec section 3): at Close, a Rammer's Close In strikes the enemy flagship (D91), after the Helm step and
     // before the guns. It misses when the flagship crossed its bow or got away (it won the chase, or the range opened), and
@@ -387,7 +433,7 @@ export function runBattle(input: BattleInput): BattleRecord {
           rams.push({ side, ...mate, hit: false, why: "contest", hull: 0, self: 0 });
           continue;
         }
-        const hull = Math.min(ramHull(ships[foe]!, theirMove), hullLeft(foe));
+        const hull = Math.min(ramHull(ships[foe]!, theirMove, orders[foe]), hullLeft(foe));
         const self = Math.min(ramSelf(), hullLeft(id));
         ramLoss[foe]! += hull;
         ramLoss[id]! += self;
@@ -399,6 +445,8 @@ export function runBattle(input: BattleInput): BattleRecord {
         dealt[foeSide] += recoil;
         dealtBy[foe]! += recoil;
         rams.push({ side, ...mate, hit: true, why: "contest", hull, self });
+        // Fireship: a ship that Rams a Firebrand catches a blaze.
+        if (hasStyle(ships[foe]!, "firebrand")) light(id, foe, "ram", blazeRounds("ram", ships[foe]!));
       }
       if (after === "grappled" && rams.some((r) => r.hit && r.ship === undefined)) after = "close";
     }
@@ -411,14 +459,31 @@ export function runBattle(input: BattleInput): BattleRecord {
     const fired: Record<ShipId, GunsResult> = {};
     const zeroingNext: Record<ShipId, number> = {};
     let melee: MeleeRecord | null = null;
+    const deckOf: Record<ShipId, DeckRecord> = {}; // what every crew did in the deck fight of this round
     const shots: Record<ShipId, Pick<GunsResult, "track" | "damage" | "powderUsed">> = Object.fromEntries(all.map((id) => [id, NO_SHOT]));
     const taken: Record<ShipId, Record<DamageTrack, number>> = Object.fromEntries(all.map((id) => [id, noLosses()]));
     const sideDamage: Record<BattleSide, Record<DamageTrack, number>> = { hunter: noLosses(), target: noLosses() };
 
     if (!helm.escaped) {
-      // A Board order at Close tries to grapple, once the range is known (8.5).
-      grapples = fleetGrapples({ range: after, ids, flagships: flag, orders, moves, scores });
+      // A Board order at Close (at Short too for a Boarder) tries to grapple, once the range is known (8.5). A Board that failed on
+      // Helm score gets a Helm contest instead when the ship has Grapnels.
+      const grappleIn = { range: after, ids, flagships: flag, orders, moves, scores, ships };
+      grapples = freedNow ? [] : fleetGrapples(grappleIn);
+      if (grapples.some((g) => !g.ok && hasGrapnels(ships[g.ship ?? flag[g.side]]!))) {
+        const rescued = grapnelRescue(grappleIn, grapples, rng);
+        grapples = rescued.grapples;
+        contests.push(...rescued.contests);
+      }
       if (grapples.some((g) => g.ok)) after = "grappled";
+      // The boarder is the side whose Board made the grapple. If both Boarded, or the grapple came from Close In against Close
+      // In at Close, nobody has the edge.
+      const grappleRound = range !== "grappled" && after === "grappled";
+      if (grappleRound) {
+        const boarders = BATTLE_SIDES.filter((s) => grapples.some((g) => g.ok && g.side === s));
+        edge = boarders.length === 1 ? boarders[0]! : null;
+        roundEdge = edge;
+      }
+      const boarded = (id: ShipId): boolean => grapples.some((g) => g.ok && (g.ship ?? flag[g.side]) === id);
 
       // 4. Guns fire at the same time, at the new range (8.5). Every ship fires from the state the round began with.
       // A monster that reared up this round takes more from Round shot (D102); only the enemy flagship is ever the aim.
@@ -427,12 +492,15 @@ export function runBattle(input: BattleInput): BattleRecord {
         target: fights[flag.target]!.exposed ?? 1,
       };
       // The Mortar takes the rake, flank and weakened factors (D137), and Zeroing In grows while the range holds. A Gunline
-      // that Holds fires Long Nines.
+      // that Holds fires Long Nines. While Grappled the great guns are quiet, and also in the round a ship cuts free (D135). The
+      // guns of the round the ships grapple fire at Close, as they come together, and then the grapple happens.
+      const quiet = range === "grappled" && (after === "grappled" || C.quietCutFree);
+      const gunRange: Range = quiet ? "grappled" : after === "grappled" ? "close" : after;
       for (const id of all) {
         const foe = other(sideOf(id));
-        const mortar = orders[id] === "mortar";
+        const mortar = orders[id] === "mortar" && !quiet;
         zeroingNext[id] = mortar && range === after ? zeroing[id]! + 1 : 0;
-        fired[id] = fireGuns(working[id]!, working[flag[foe]!]!, after, orders[id]!, rng, {
+        fired[id] = fireGuns(working[id]!, working[flag[foe]!]!, gunRange, orders[id]!, rng, {
           terrain,
           helmMod: mortar && !B.styles.bombardier.mortarTakesRakes ? NEUTRAL : gunsMod[id]!,
           exposed: exposure[foe],
@@ -468,18 +536,94 @@ export function runBattle(input: BattleInput): BattleRecord {
       }
       next = Object.fromEntries(all.map((id) => [id, recordFiring(withLosses(working[id]!, taken[id]!), orders[id]!, fired[id]!)]));
 
-      // 5. Boarding melee if Grappled (8.6): side against side.
+      // A hit of Hot Shot or of the Mortar may set the enemy flagship alight. Each ship rolls from its own stream.
+      for (const id of all) {
+        const chance = shotFireChance(orders[id]!);
+        if (chance <= 0 || fired[id]!.damage <= 0) continue;
+        const source: FireSource = orders[id] === "mortar" ? "mortar" : "hotShot";
+        if (rng.stream("fire", source, id).next() < chance) light(flag[other(sideOf(id))], id, source, blazeRounds(source, ships[id]!));
+      }
+
+      // 5. The deck fight if Grappled (8.6, boarding spec): side against side, each crew with its Deck order, judged against the
+      // enemy flagship's. In the round the ships grapple only the crews whose Board made the grapple charge; the others fight with
+      // Fists. First over the rail goes to the boarder's Boards.
       if (after === "grappled") {
-        const m = fleetMelee(ids, next, orders, terrain, bonus);
-        melee = m.record;
+        const decks: Record<ShipId, DeckOrder> = Object.fromEntries(
+          all.map((id) => [id, crewOrder(ships[id]!, orders[id]!, { grappleRound, boarded: boarded(id) })]),
+        );
+        const firstOver = grappleRound && edge !== null ? all.filter((id) => sideOf(id) === edge && boarded(id)) : [];
+        const m = fleetMelee({ ids, flagships: flag, ships: next, decks, terrain, bonus, firstOver });
+        melee = { ...m.record, ...(firstOver.length > 0 ? { firstOver: edge! } : {}) };
         for (const id of all) next[id] = withHands(next[id]!, next[id]!.hands - m.lost[id]!);
         for (const side of BATTLE_SIDES) {
           const credit = sideShare(shipsOf(side, next), "hands", m.record.lost[side]);
           dealt[other(side)] += credit;
           for (const id of ids[other(side)]) dealtBy[id]! += credit * m.credit[id]!;
         }
+
+        // A Volley burns Powder like a round of guns.
+        for (const id of all) {
+          if (decks[id] !== "volley") continue;
+          const used = Math.min(next[id]!.powder, B.hulls[next[id]!.hull].powderPerRound);
+          next[id] = { ...next[id]!, abilities: [...next[id]!.abilities], guns: { ...next[id]!.guns }, powder: next[id]!.powder - used };
+          shots[id] = { ...shots[id]!, powderUsed: used };
+        }
+
+        // A Fire Pot is used up when it is thrown, and each throw rolls for a fire. A Firebrand's fire burns the enemy flagship. Any
+        // other ship's fire is a flash that costs the throwing ship and the enemy flagship Hull at once, and never takes one below 1.
+        const pots: Record<ShipId, PotRecord> = {};
+        for (const id of all) {
+          if (decks[id] !== "firePots") continue;
+          const roll = rng.stream("fire", "pots", id).next();
+          const fire = roll < C.deck.fireChance;
+          pots[id] = { roll, fire };
+          next[id] = { ...next[id]!, abilities: [...next[id]!.abilities], guns: { ...next[id]!.guns }, firePots: Math.max(0, (next[id]!.firePots ?? 0) - 1) };
+          if (!fire) continue;
+          const side = sideOf(id);
+          const foe = flag[other(side)];
+          if (hasStyle(next[id]!, "firebrand")) {
+            light(foe, id, "firePots", blazeRounds("firePots", next[id]!));
+            continue;
+          }
+          const blow = flashLoss(next[foe]!.hullPoints);
+          const recoil = flashLoss(next[id]!.hullPoints);
+          next[foe] = withLosses(next[foe]!, { ...noLosses(), hull: blow });
+          next[id] = withLosses(next[id]!, { ...noLosses(), hull: recoil });
+          const struck = sideShare(shipsOf(other(side), ships), "hull", blow);
+          const hurt = sideShare(shipsOf(side, ships), "hull", recoil);
+          dealt[side] += struck;
+          dealtBy[id]! += struck;
+          dealt[other(side)] += hurt;
+          dealtBy[foe]! += hurt;
+          fires.push({ source: "firePots", ship: foe, by: id, rounds: 0, hull: blow }, { source: "firePots", ship: id, by: foe, rounds: 0, hull: recoil });
+        }
+
+        // Fireship: while Grappled with a Firebrand, the embers may catch on the enemy deck.
+        for (const id of all) {
+          const chance = emberChance(ships[id]!);
+          if (chance > 0 && rng.stream("fire", "embers", id).next() < chance) light(flag[other(sideOf(id))], id, "embers", blazeRounds("embers", ships[id]!));
+        }
+
+        for (const id of all) {
+          deckOf[id] = { order: decks[id]!, pairing: m.pairings[id]!, ...(pots[id] ? { thrown: pots[id]! } : {}) };
+        }
       }
     }
+
+    // Fire: every burning ship loses Hull at the end of the round, after the deck fight. A fire can sink a ship. The damage
+    // counts for the side that did not burn, and for the ship that lit the fire.
+    const burns: Record<ShipId, BurnRecord> = {};
+    for (const id of all) {
+      const blaze = blazes[id];
+      if (!blaze) continue;
+      const loss = Math.min(next[id]!.hullPoints, fireLoss(next[id]!));
+      next[id] = withLosses(next[id]!, { ...noLosses(), hull: loss });
+      const credit = sideShare(shipsOf(sideOf(id), ships), "hull", loss);
+      dealt[other(sideOf(id))] += credit;
+      dealtBy[blaze.by]! += credit;
+      burns[id] = { hull: loss, left: blaze.rounds - 1 };
+    }
+    blazes = Object.fromEntries(Object.entries(blazes).filter(([, b]) => b.rounds > 1).map(([id, b]) => [id, { ...b, rounds: b.rounds - 1 }]));
 
     const crippled = BATTLE_SIDES.filter((s) => ids[s].some((id) => isCrippled(next[id]!) && !isCrippled(ships[id]!)));
     for (const id of all) if (fights[id]!.jettison) jettisoned.add(id);
@@ -497,9 +641,10 @@ export function runBattle(input: BattleInput): BattleRecord {
     };
     rounds.push({
       round, rangeBefore: range, rangeAfter: after, escaped: helm.escaped, row: helm.row,
-      contests, grapples, ...(rams.length > 0 ? { rams } : {}), melee, crippled, struck: [],
+      contests, grapples, ...(rams.length > 0 ? { rams } : {}), ...(roundEdge !== null ? { edge: roundEdge } : {}),
+      ...(fires.length > 0 ? { fires } : {}), ...(round > C.rounds ? { overtime: true as const } : {}), melee, crippled, struck: [],
       ships: all.map((id) => shipRecord(next[id]!, fights[id]!, moves[id]!, orders[id]!, scores[id]!, shots[id]!, scrape[id]!, {
-        asked: fights[id]!.guns, mortar: shellOf(id),
+        asked: fights[id]!.guns, mortar: shellOf(id), deck: deckOf[id], fire: burns[id],
       })),
       ...(fleetRound ? { fleet: fleetRound } : {}),
     });
