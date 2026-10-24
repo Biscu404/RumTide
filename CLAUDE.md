@@ -6,7 +6,7 @@ The full design is in `docs/GAME_DESIGN.md`. It is long, so do not read it all a
 
 ## Current focus
 
-* Next task: P3.B2, the engineer builds `docs/specs/boarding.md` and `docs/specs/fighting-styles.md` together in `engine_v3` (D116 to D134). Then P3.B3 teaches the simulator the Deck orders and the six Fighting Styles. P3.2, tuning `balance.ts` until the checks of GAMEPLAY 8.9 and the new wheel check pass, is paused until then. Task ids come from the Rumtide Roadmap tracker on claude.ai.
+* Next task: P3.B2, the engineer builds `docs/specs/boarding.md` and `docs/specs/fighting-styles.md` together in `engine_v3` (D116 to D141). The scratch prototype behind the numbers is on the branch `proto-fighting-styles`, a reference only (see `tools/proto/README.md` there). Then P3.B3 teaches the simulator the Deck orders and the six Fighting Styles. P3.2, tuning `balance.ts` until the checks of GAMEPLAY 8.9 and the new wheel check pass, is paused until then. Task ids come from the Rumtide Roadmap tracker on claude.ai.
 * Done work is in `git log` and `docs/DECISIONS.md`.
 * Decisions waiting on Biscu are in `docs/STATUS.md`.
 

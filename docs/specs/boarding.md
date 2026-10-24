@@ -2,14 +2,16 @@
 
 **Status: approved, 22 October 2026,** together with `docs/specs/fighting-styles.md` (D129). Biscu made the four big calls (D116 to D120 in `docs/DECISIONS.md`) and handed the rest over on 21 October 2026. P3.B2 builds both specs. Once they are built, GAMEPLAY 6.2, 6.4, 6.5, 8.3, 8.5, 8.6, 8.8 and 8.9 are rewritten to match and this file points at them.
 
-**What the Fighting Styles spec changes here (D121 to D134):**
+**What the Fighting Styles spec changes here (D121 to D141):**
 
 * The Brawler template of section 5 goes. The Boarder (the same rules, boarding from Short) and the Rammer replace it, and the Runner and the Coward become the Smuggler.
 * Grapnels: the Boarder has them from Drill 0 as Grapnel lines. Every other style still unlocks them at Drill 10.
-* Fire Pots: a Firebrand has them from Drill 0, with 6 pots to start, and its fires can sink a ship. A Fire Pot from any other style keeps the rule of section 2.
+* Fire Pots: a Firebrand has them from Drill 0, with 2 pots to start, and its fires burn for 3 rounds and can sink a ship (D138). A Fire Pot from any other style keeps the rule of section 2.
 * Starting numbers: `pairWin` 1.8, `pairLose` 0.75, Fire Pots `hit` 1.4, First over the rail 1.25 (D130), Lashed fast 2.
-* Old Shellback's habits in section 5 are replaced by the rework of D133: his shell, his moods, the claw snatch, claws 50, and being driven off.
+* Old Shellback's habits in section 5 are replaced by the rework of D133: his shell, his moods, the claw snatch, claws 52, Cannons 22, and being driven off (D140).
 * Acceptance item 2 (the Brawler at 40% of the field) becomes the wheel check of the Fighting Styles spec.
+* Cutting free quiets the guns of both ships for that round (D135, see Edge cases).
+* A Drill level is priced like a level of any other upgrade (D141, section 4).
 * A deck fight still going after round 5 goes on for up to 2 more rounds (D127).
 
 ## The problem
@@ -64,7 +66,7 @@ The **boarder** is the ship whose Board order made the grapple. If both ships Bo
 ### 4. Drill, the Hands track
 
 * A sixth ship upgrade beside Hull, Cannons, Sails, Berths and Hold: **Drill 0 to 15, in three stages of five levels.** Stage 1 is **Deckhands** (1 to 5), stage 2 **Cutthroats** (6 to 10), stage 3 **Sea Wolves** (11 to 15).
-* Each level adds boarding strength. A level in a later stage adds more than one in an earlier stage, and costs more. The season preset's cost multiplier applies, as for every upgrade.
+* Each level adds boarding strength. A level in a later stage adds more than one in an earlier stage, and costs more: the Nth level of Drill costs what the Nth level of any other upgrade costs (D141). The season preset's cost multiplier applies, as for every upgrade.
 * Bought like the other upgrades, in a Town or City. Drill belongs to the ship: new hires are trained by the old hands, and Drill is never lost to a tow, a Capture or a hiring.
 * **Finishing a stage unlocks something:**
 
@@ -91,7 +93,7 @@ The **boarder** is the ship whose Board order made the grapple. If both ships Bo
 
 * Both ships Board in the same round: they grapple, nobody has the edge, and both fight as a Charge without the bonus.
 * Grappled by Close In against Close In: nobody has the edge, and both crews fight with Fists that round.
-* A Cut Free that wins returns the range to Close with no melee that round (D61). The edge ends with the grapple, and a new grapple makes a new boarder.
+* A Cut Free that wins returns the range to Close with no melee that round (D61), and the great guns of both ships stay quiet that round, because every hand is at the axes (D135). The edge ends with the grapple, and a new grapple makes a new boarder.
 * A Crippled ship cannot Cut Free (unchanged).
 * Out of Powder: Volley falls back to Fists, it does not fire at half strength.
 * A doctrine may name Fire Pots without Drill 5 or without pots. It falls back to Fists, so a copied doctrine always plays.
@@ -108,7 +110,7 @@ The build picks first values so that Fists matches today's melee, and P3.2 tunes
 * `combat.range`: the `grappled` entries go.
 * `combat.deck`: `hit` and `guard` for each of `charge`, `volley`, `repel`, `firePots` and `fists`; `pairWin` and `pairLose` for the cycle; `fireChance` and `fireHull`.
 * `combat.edge`: `firstOverTheRail` (the strength bonus) and `lashedFast` (the Cut Free factor).
-* `drill`: `stageSize`, `perLevel` (one per stage), `baseCost`, `growth`, `stageCost` (one per stage), `unlocks` (`firePots`, `grapnels`, `secondWave`) and `secondWaveShare`.
+* `drill`: `stageSize`, `perLevel` (one per stage), `baseCost` and `growth` (the same as the other upgrades, D141), `unlocks` (`firePots`, `grapnels`, `secondWave`) and `secondWaveShare`.
 * `supplies.firePotPrice`, `holdSpace.firePots`, `start.firePots`.
 * `SEASON_PRESETS.<season>.drillMaxLevel`.
 * `power`: Hands count times the Drill factor.
