@@ -185,7 +185,7 @@ At most 3 rules with conditions, then Otherwise, so every template fits the base
 
 ## Measured (scratch prototype, 22 and 23 October 2026)
 
-* **How:** a scratch copy of `engine_v3` with these rules added, all six templates against each other, equal fresh sloops, the nine waters of the simulator, both seats, 100 battles each, Drill 0. The numbers came from a coordinate search scored on the wheel, with luck kept at 0.9 to 1.1. Nothing from the prototype is merged: P3.B2 builds it properly.
+* **How:** a scratch copy of `engine_v3` with these rules added, all six templates against each other, equal fresh sloops, the nine waters of the simulator, both seats, 100 battles each, Drill 0. The numbers came from a coordinate search scored on the wheel, with luck kept at 0.9 to 1.1. Nothing from the prototype is merged: P3.B2 builds it properly. The prototype is kept on the branch `proto-fighting-styles` for reference, with a README for its tools.
 * **Field share** (wins against the other five): Bombardier 41%, Gunline 43%, Skirmisher 37%, Rammer 46%, Boarder 43%, Firebrand 51%. No style is above 60% or below 25%. Before this, with four templates, the Skirmisher had 67%.
 * **The wheel:** all 12 designed wins land between 57% and 78% of decided battles, and the three even pairs between 37% and 63%. The first pass (22 October) had two hard counters (85% and 80%) and a 71% lean between the Rammer and the Boarder; Long Nines, Fighters, Grapnels catch the prow and the new numbers fixed them.
 * **Mechanics the search found no use for,** so they are not in this spec: a Ram that staggers the next Helm move, a Ram that is easier against a ship that Holds, a Ram that hands a Boarder the grapple, a bomb vessel's hull that takes Rams better, fire that weakens guns, a crew fighting a fire on its own deck fighting worse, Zeroing In raising the hit chance, a Helm bonus for a Bombardier turning away, and a shell that takes Rams better for Old Shellback.
@@ -231,7 +231,7 @@ Never cut the six distances, the six styles or their signature moves. They are w
 
 | Task | Owner | What |
 |-|-|-|
-| P3.B2 | engineer (Claude Code) | `engine_v3`: this spec and the boarding spec together. Six distances, the styles and their traits, Ram, Mortar, Hot Shot, fire, overtime, templates, doctrine conditions, replay text, tests and the golden Tide. GAMEPLAY rewritten to match |
+| P3.B2 | engineer (Claude Code) | `engine_v3`: this spec and the boarding spec together (the reference prototype is on the branch `proto-fighting-styles`). Six distances, the styles and their traits, Ram, Mortar, Hot Shot, fire, overtime, templates, doctrine conditions, replay text, tests and the golden Tide. GAMEPLAY rewritten to match |
 | P3.B3 | engineer and qa-tester | The simulator learns Deck orders and styles: six templates in check 1, the wheel check, equal spending, the new plays in check 2 |
 | P3.2 | game designer and qa-tester | Tuning resumes on the real engine: confirm the wheel and Old Shellback with the full checks, and price Drill against the other upgrades |
 | P5 and P6 | | Changing style in a City, Fire Pots and Drill prices |
