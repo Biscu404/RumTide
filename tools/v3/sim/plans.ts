@@ -3,13 +3,13 @@
 
 import { HELM_MOVES, RANGES, rngFor, validateDoctrine } from "../../../supabase/functions/_shared/engine_v3/index.ts";
 import type {
-  Chooser, Doctrine, DoctrineAction, DoctrineCondition, DoctrineRule, GunsOrder, HelmMove, Range, Rng,
+  Chooser, Doctrine, DoctrineAction, DoctrineCondition, DoctrineRule, FightingStyle, GunsOrder, HelmMove, Range, Rng,
 } from "../../../supabase/functions/_shared/engine_v3/index.ts";
 
 /**
- * The Guns orders the simulator plays, tries and writes into doctrines: the six every ship can give. It is kept explicit so the
- * Mortar and Hot Shot, which only a Bombardier and a Firebrand fire, and the Deck orders (Charge, Volley, Fire Pots), are not tried
- * by check 2, the random plans or the random doctrines. The simulator learns the styles and the deck fight in P3.B3.
+ * The Guns orders every ship can give, whatever its style or Drill: the six explicit ones. The random plans of check 4 play only
+ * these, so a ship with no style is measured as before. What a ship of a given style can try beyond them (the Mortar, Hot Shot, the
+ * Deck orders) is decided in one place, plays.ts.
  */
 export const SIM_GUNS_ORDERS: readonly GunsOrder[] = ["roundShot", "chainShot", "grapeshot", "holdFire", "board", "repel"];
 
@@ -45,52 +45,71 @@ const PCTS = [25, 50, 75] as const;
 
 const pick = <T>(rng: Rng, xs: readonly T[]): T => xs[Math.floor(rng.next() * xs.length)]!;
 
-export function randomCondition(rng: Rng): DoctrineCondition {
-  switch (Math.floor(rng.next() * 7)) {
+/**
+ * What a doctrine of the search may write: the Guns orders its ship can give, and the Fighting Styles a "their style is X"
+ * condition may name. With no styles the condition is never written. The default is a ship with no style: the six orders of
+ * SIM_GUNS_ORDERS and no style test, which is what the random doctrines of P3.1 were.
+ */
+export interface DoctrineSpace {
+  orders: readonly GunsOrder[];
+  styles: readonly FightingStyle[];
+}
+
+export const PLAIN_SPACE: DoctrineSpace = { orders: SIM_GUNS_ORDERS, styles: [] };
+
+export function randomCondition(rng: Rng, space: DoctrineSpace = PLAIN_SPACE): DoctrineCondition {
+  // The style test is one more kind of condition, drawn only when the space has styles, so a plain space draws exactly as before.
+  switch (Math.floor(rng.next() * (space.styles.length > 0 ? 8 : 7))) {
     case 0: return { kind: "round", op: "is", n: 1 + Math.floor(rng.next() * 5) };
     case 1: return { kind: "round", op: "atLeast", n: 2 + Math.floor(rng.next() * 4) };
     case 2: return { kind: "range", op: pick(rng, ["is", "atLeast", "atMost"] as const), range: pick(rng, RANGES_USED) };
     case 3: return { kind: "track", who: "mine", track: pick(rng, ["hull", "rigging", "hands"] as const), op: pick(rng, ["above", "below"] as const), pct: pick(rng, PCTS) };
     case 4: return { kind: "track", who: "theirs", track: pick(rng, ["hull", "rigging", "hands"] as const), op: pick(rng, ["above", "below"] as const), pct: pick(rng, PCTS) };
     case 5: return { kind: "theirLastHelm", move: pick(rng, HELM_MOVES) };
-    default: return { kind: "theirLastGuns", order: pick(rng, SIM_GUNS_ORDERS) };
+    case 6: return { kind: "theirLastGuns", order: pick(rng, space.orders) };
+    default: return { kind: "theirStyle", style: pick(rng, space.styles) };
   }
 }
 
-export const randomAction = (rng: Rng): DoctrineAction => ({ kind: "fight", helm: pick(rng, HELM_MOVES), guns: pick(rng, SIM_GUNS_ORDERS) });
+export const randomAction = (rng: Rng, space: DoctrineSpace = PLAIN_SPACE): DoctrineAction => ({
+  kind: "fight", helm: pick(rng, HELM_MOVES), guns: pick(rng, space.orders),
+});
 
-export function randomRule(rng: Rng): DoctrineRule {
+export function randomRule(rng: Rng, space: DoctrineSpace = PLAIN_SPACE): DoctrineRule {
   const conditions = rng.next() < 0.35 ? 2 : 1;
-  return { if: Array.from({ length: conditions }, () => randomCondition(rng)), then: randomAction(rng) };
+  return { if: Array.from({ length: conditions }, () => randomCondition(rng, space)), then: randomAction(rng, space) };
 }
 
 /** A valid doctrine with up to `slots` rules with conditions and an Otherwise, named for the search. */
-export function randomDoctrine(rng: Rng, name: string, slots = 3): Doctrine {
+export function randomDoctrine(rng: Rng, name: string, slots = 3, space: DoctrineSpace = PLAIN_SPACE): Doctrine {
   const count = 1 + Math.floor(rng.next() * slots);
   const doctrine: Doctrine = {
     name,
-    rules: [...Array.from({ length: count }, () => randomRule(rng)), { if: [], then: randomAction(rng) }],
+    rules: [...Array.from({ length: count }, () => randomRule(rng, space)), { if: [], then: randomAction(rng, space) }],
   };
   return doctrine;
 }
 
-/** A copy with one thing changed: a condition, an action, a rule added or dropped. The result is always valid for `slots`. */
-export function mutateDoctrine(rng: Rng, d: Doctrine, name: string, slots = 3): Doctrine {
+/**
+ * A copy with one thing changed: a condition, an action, a rule added or dropped. The result is always valid for `slots`. Whatever
+ * is written new comes from `space`; what the doctrine already had stays, even an order the space does not list.
+ */
+export function mutateDoctrine(rng: Rng, d: Doctrine, name: string, slots = 3, space: DoctrineSpace = PLAIN_SPACE): Doctrine {
   const rules: DoctrineRule[] = d.rules.map((r) => ({ if: r.if.map((c) => ({ ...c })), then: { ...r.then } }));
   const last = rules.length - 1;
   switch (Math.floor(rng.next() * 5)) {
     case 0: // new action on a rule (Otherwise included)
-      rules[Math.floor(rng.next() * rules.length)]!.then = randomAction(rng);
+      rules[Math.floor(rng.next() * rules.length)]!.then = randomAction(rng, space);
       break;
     case 1: { // new condition in a rule with conditions
       if (last === 0) break;
       const r = rules[Math.floor(rng.next() * last)]!;
       const at = Math.floor(rng.next() * r.if.length);
-      r.if[at] = randomCondition(rng);
+      r.if[at] = randomCondition(rng, space);
       break;
     }
     case 2: // add a rule
-      if (last < slots) rules.splice(Math.floor(rng.next() * (last + 1)), 0, randomRule(rng));
+      if (last < slots) rules.splice(Math.floor(rng.next() * (last + 1)), 0, randomRule(rng, space));
       break;
     case 3: // drop a rule
       if (last > 1) rules.splice(Math.floor(rng.next() * last), 1);
@@ -98,7 +117,7 @@ export function mutateDoctrine(rng: Rng, d: Doctrine, name: string, slots = 3): 
     default: { // add or drop a second condition
       if (last === 0) break;
       const r = rules[Math.floor(rng.next() * last)]!;
-      if (r.if.length === 1) r.if.push(randomCondition(rng)); else r.if.pop();
+      if (r.if.length === 1) r.if.push(randomCondition(rng, space)); else r.if.pop();
     }
   }
   const out: Doctrine = { name, rules };

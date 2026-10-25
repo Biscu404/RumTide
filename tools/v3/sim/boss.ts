@@ -1,27 +1,42 @@
-// Check 5 of GAMEPLAY 8.9 (P3.1): Old Shellback is beatable by a fresh sloop with a good doctrine, about half the time.
+// Check 5 of GAMEPLAY 8.9 (P3.1, P3.B3): Old Shellback is beatable by a fresh sloop with a good doctrine, for every Fighting Style.
 //
-// A fresh level 0 sloop lies in wait in the Narrows on Tide 6 and the real Tide loop does the rest, so the escape roll, the
-// Truce, the fixed Helm score and "beaten" (being on the winning side of a battle that has a winner, D105) are all the
-// game's own. "A good doctrine" is found, not guessed: a search over doctrines a new captain can really save (three rules
-// with conditions and an Otherwise, validated like save_doctrine) keeps the best by fights won, the finalists are judged
-// again on fresh fights, and the winner is confirmed on fights nobody has seen. The reported number is that last one, so the
-// search cannot flatter itself. The check passes when it is from 40% to 60%.
+// A fresh level 0 sloop that really has the style lies in wait in the Narrows on Tide 6 and the real Tide loop does the rest, so
+// the escape roll, the Truce, the fixed Helm score and "beaten" (being on the winning side of a battle that has a winner, D105)
+// are all the game's own. "A good doctrine" is found, not guessed, and found once for each style: a search over doctrines that
+// captain can really save (three rules with conditions and an Otherwise, validated like save_doctrine) writing only the Guns orders
+// that style can give, Deck orders included (plays.ts: the Mortar for the Bombardier, Hot Shot and Fire Pots for the Firebrand). It
+// starts from the seven templates, the Crabber of the P2.6 notes and random doctrines, keeps the best by fights won, judges the
+// finalists again on fresh fights, and confirms the winner on fights nobody has seen. The reported number is that last one, so the
+// search cannot flatter itself. The check passes when every style of the wheel is from 35% to 80% (D140, replacing the single
+// band of 40% to 60%). The Smuggler is searched too and reported, but it is not judged.
 //
-// Alongside it: the templates, the Crabber of the P2.6 notes, and the gate pace of GAMEPLAY 2.5 (the median captain
-// passes by Tide 7 to 9, nobody later than Tide 12) worked out from the win chance on each Tide, with one fight a Tide (D108).
+// Old Shellback has no style, so a "their style is X" condition never holds against him, and the search does not write one.
+//
+// Alongside it: the templates and the Crabber for each style on the confirming fights, and the gate pace of GAMEPLAY 2.5 (the
+// median captain passes by Tide 7 to 9, nobody later than Tide 12) worked out from the win chance on each Tide, with one fight a
+// Tide (D108). The gate pace is a measurement, not a verdict: it uses the best doctrine found for the style that beat him most, and
+// that style's own template as the starting doctrine.
 
-import { Rng, TEMPLATE_NAMES, styleTemplate, templateDoctrine, validateDoctrine } from "../../../supabase/functions/_shared/engine_v3/index.ts";
-import type { Doctrine } from "../../../supabase/functions/_shared/engine_v3/index.ts";
+import {
+  Rng, TEMPLATE_NAMES, styleTemplate, templateDoctrine, validateDoctrine,
+} from "../../../supabase/functions/_shared/engine_v3/index.ts";
+import type { Doctrine, FightingStyle } from "../../../supabase/functions/_shared/engine_v3/index.ts";
+import { FIGHTING_STYLES } from "./arena.ts";
+import { chunked } from "./chunks.ts";
 import type { Effort } from "./effort.ts";
+import { emptyBoss, mergeBoss } from "./jobs.ts";
 import type { BossJob, BossResult } from "./jobs.ts";
 import type { Pool } from "./pool.ts";
 import { mutateDoctrine, randomDoctrine } from "./plans.ts";
+import type { DoctrineSpace } from "./plans.ts";
+import { ordersFor } from "./plays.ts";
 import { share, wilson } from "./stats.ts";
 
-export const BOSS_LOW = 0.4; // "about half the time", ten points either side
-export const BOSS_HIGH = 0.6;
+export const BOSS_LOW = 0.35; // D140: every style's best doctrine beats him 35% to 80% of the time
+export const BOSS_HIGH = 0.8;
 export const BOSS_TIDE = 6; // the Tide of the challenge; his Hull is still 300
 export const SLOTS = 3; // rules with conditions a new captain can save (D64)
+const PART = 100; // fights in one job, so a long run of fights spreads over every worker
 
 /** The Crabber of the P2.6 notes: Close In, a Round shot when he rears up, Grapeshot once the claws are on, else Cross Their Bow. */
 export const crabber = (): Doctrine => ({
@@ -33,6 +48,9 @@ export const crabber = (): Doctrine => ({
   ],
 });
 
+/** What the search for a style may write: the orders its fresh sloop can give, and no style test (he has no style). */
+export const spaceFor = (style: FightingStyle): DoctrineSpace => ({ orders: ordersFor({ style }, "grappled"), styles: [] });
+
 export interface Scored {
   doctrine: Doctrine;
   result: BossResult;
@@ -41,18 +59,38 @@ export interface Scored {
   rate: number;
 }
 
-const job = (doctrine: Doctrine, tide: number, label: string, count: number): BossJob => ({ doctrine, tide, label, from: 0, count });
-
-function scored(doctrine: Doctrine, result: BossResult, seeds: number): Scored {
+function scored(doctrine: Doctrine, result: Scored["result"], seeds: number): Scored {
   return { doctrine, result, seeds, rate: share(result.beaten, seeds) };
 }
 
-/** Scores doctrines on the same fights; the lead breaks ties between doctrines that win equally often. */
-async function score(pool: Pool, doctrines: Doctrine[], tide: number, label: string, seeds: number): Promise<Scored[]> {
-  const results = await pool.run("boss", doctrines.map((d) => job(d, tide, label, seeds)));
-  return doctrines.map((d, i) => scored(d, results[i]!, seeds));
+/** One doctrine to score: its fights on a Tide, drawn from the seeds of `label`. */
+interface Entry {
+  doctrine: Doctrine;
+  tide: number;
+  label: string;
+  seeds: number;
 }
 
+/**
+ * Scores every entry for a style in one go. Each entry's fights are cut into parts so a long run spreads over every worker, and the
+ * whole lot is one call to the pool, which runs one call at a time.
+ */
+async function scoreAll(pool: Pool, style: FightingStyle, entries: Entry[]): Promise<Scored[]> {
+  const jobs = entries.flatMap((e) => chunked(e.seeds, PART).map((p): BossJob => ({ doctrine: e.doctrine, ship: { style }, tide: e.tide, label: e.label, from: p.from, count: p.count })));
+  const results = await pool.run("boss", jobs);
+  let at = 0;
+  return entries.map((e) => {
+    const total = emptyBoss();
+    for (let p = 0; p < chunked(e.seeds, PART).length; p++) mergeBoss(total, results[at++]!);
+    return scored(e.doctrine, total, e.seeds);
+  });
+}
+
+/** Scores doctrines for a style on the same fights. */
+const score = (pool: Pool, style: FightingStyle, doctrines: Doctrine[], tide: number, label: string, seeds: number): Promise<Scored[]> =>
+  scoreAll(pool, style, doctrines.map((doctrine) => ({ doctrine, tide, label, seeds })));
+
+/** Fights won, with the damage lead to break ties between doctrines that win equally often. */
 const objective = (s: Scored): number => s.rate + 0.1 * (s.result.lead / s.seeds);
 
 export interface SearchTrace {
@@ -61,52 +99,72 @@ export interface SearchTrace {
   bestRate: number;
 }
 
-export interface BossData {
+/** The search for one style. */
+export interface StyleBoss {
+  style: FightingStyle;
+  /** The Smuggler's row is reported and not judged. */
+  judged: boolean;
   best: Scored; // confirmed on fights the search never saw
   finalists: Scored[]; // judged on the held out fights
   references: Scored[]; // the templates and the Crabber, on the same fights as `best`
   trace: SearchTrace[];
-  /** Win chance of the best doctrine and of the doctrine a new captain starts with (the Boarder) on each Tide, from the first Tide he can be fought. */
+}
+
+async function searchStyle(pool: Pool, effort: Effort, style: FightingStyle, judged: boolean): Promise<StyleBoss> {
+  const B = effort.boss;
+  const space = spaceFor(style);
+  const rng = new Rng(`p3/boss/search/${style}`);
+  const trace: SearchTrace[] = [];
+
+  let population: Doctrine[] = [
+    ...TEMPLATE_NAMES.map((n) => templateDoctrine(n)),
+    crabber(),
+    ...Array.from({ length: B.random }, (_, i) => randomDoctrine(rng, `r${i}`, SLOTS, space)),
+  ];
+  let ranked: Scored[] = [];
+  for (let g = 0; g <= B.generations; g++) {
+    ranked = (await score(pool, style, population, BOSS_TIDE, `boss/${style}/search/${g}`, B.searchSeeds)).sort((a, b) => objective(b) - objective(a));
+    trace.push({ generation: g, best: objective(ranked[0]!), bestRate: ranked[0]!.rate });
+    if (g === B.generations) break;
+    const parents = ranked.slice(0, B.keep).map((s) => s.doctrine);
+    population = [...parents];
+    parents.forEach((p, pi) => {
+      for (let m = 0; m < B.perParent; m++) population.push(mutateDoctrine(rng, p, `g${g + 1}p${pi}m${m}`, SLOTS, space));
+    });
+  }
+  const finalists = (await score(pool, style, ranked.slice(0, B.finalists).map((s) => s.doctrine), BOSS_TIDE, `boss/${style}/heldout`, B.heldOut)).sort((a, b) => objective(b) - objective(a));
+  const winner = finalists[0]!.doctrine;
+  const [best] = await score(pool, style, [winner], BOSS_TIDE, `boss/${style}/confirm`, B.confirm);
+  if (validateDoctrine(winner, { slots: SLOTS }).length > 0) throw new Error("The search made a doctrine a captain could not save");
+  const references = await score(pool, style, [...TEMPLATE_NAMES.map((n) => templateDoctrine(n)), crabber()], BOSS_TIDE, `boss/${style}/confirm`, B.reference);
+  return { style, judged, best: best!, finalists, references, trace };
+}
+
+export interface BossData {
+  /** The six styles of the wheel in order, then the Smuggler. */
+  styles: StyleBoss[];
+  /** The style whose best doctrine beat him most, which the gate pace is measured for. */
+  paceStyle: FightingStyle;
+  /** Win chance of that style's best doctrine and of its own template on each Tide, from the first Tide he can be fought. */
   pace: { tide: number; best: number; starter: number }[];
   gate: GatePace;
 }
 
 export async function runBoss(pool: Pool, effort: Effort): Promise<BossData> {
   const B = effort.boss;
-  const rng = new Rng("p3/boss/search");
-  const trace: SearchTrace[] = [];
+  const styles: StyleBoss[] = [];
+  for (const { style } of FIGHTING_STYLES) styles.push(await searchStyle(pool, effort, style, true));
+  styles.push(await searchStyle(pool, effort, "smuggler", false));
 
-  let population: Doctrine[] = [
-    ...TEMPLATE_NAMES.map((n) => templateDoctrine(n)),
-    crabber(),
-    ...Array.from({ length: B.random }, (_, i) => randomDoctrine(rng, `r${i}`, SLOTS)),
-  ];
-  let ranked: Scored[] = [];
-  for (let g = 0; g <= B.generations; g++) {
-    ranked = (await score(pool, population, BOSS_TIDE, `boss/search/${g}`, B.searchSeeds)).sort((a, b) => objective(b) - objective(a));
-    trace.push({ generation: g, best: objective(ranked[0]!), bestRate: ranked[0]!.rate });
-    if (g === B.generations) break;
-    const parents = ranked.slice(0, B.keep).map((s) => s.doctrine);
-    population = [...parents];
-    parents.forEach((p, pi) => {
-      for (let m = 0; m < B.perParent; m++) population.push(mutateDoctrine(rng, p, `g${g + 1}p${pi}m${m}`, SLOTS));
-    });
-  }
-  const finalists = (await score(pool, ranked.slice(0, B.finalists).map((s) => s.doctrine), BOSS_TIDE, "boss/heldout", B.heldOut)).sort((a, b) => objective(b) - objective(a));
-  const winner = finalists[0]!.doctrine;
-  const [best] = await score(pool, [winner], BOSS_TIDE, "boss/confirm", B.confirm);
-  if (validateDoctrine(winner, { slots: SLOTS }).length > 0) throw new Error("The search made a doctrine a captain could not save");
-
-  const referenceDoctrines = [...TEMPLATE_NAMES.map((n) => templateDoctrine(n)), crabber()];
-  const references = await score(pool, referenceDoctrines, BOSS_TIDE, "boss/confirm", B.reference);
-
+  const top = styles.filter((s) => s.judged).reduce((a, b) => (b.best.rate > a.best.rate ? b : a));
+  const winner = top.best.doctrine;
+  const starter = templateDoctrine(styleTemplate(top.style));
   // Gate pace: the win chance on each Tide, for the best doctrine and for the starting doctrine.
   const tides = Array.from({ length: 10 }, (_, i) => 5 + i); // Tide 5 to 14
-  const bestByTide = await Promise.all(tides.map((t) => score(pool, [winner], t, `boss/pace/${t}`, B.gateSeeds)));
-  const starterByTide = await Promise.all(tides.map((t) => score(pool, [templateDoctrine(styleTemplate(undefined))], t, `boss/pace/${t}`, B.gateSeeds)));
-  const pace = tides.map((tide, i) => ({ tide, best: bestByTide[i]![0]!.rate, starter: starterByTide[i]![0]!.rate }));
+  const scoredByTide = await scoreAll(pool, top.style, tides.flatMap((tide) => [winner, starter].map((doctrine): Entry => ({ doctrine, tide, label: `boss/pace/${tide}`, seeds: B.gateSeeds }))));
+  const pace = tides.map((tide, i) => ({ tide, best: scoredByTide[2 * i]!.rate, starter: scoredByTide[2 * i + 1]!.rate }));
   const gate = gatePace(pace.map((p) => p.best), tides[0]!);
-  return { best: best!, finalists, references, trace, pace, gate: gate };
+  return { styles, paceStyle: top.style, pace, gate };
 }
 
 // ---------- The gate pace (2.5, D108) ----------
@@ -152,14 +210,24 @@ export function gatePace(chance: readonly number[], firstTide: number, captains 
 
 // ---------- Judgement ----------
 
-export interface BossVerdict {
-  pass: boolean;
+export interface BossRow {
+  style: FightingStyle;
+  judged: boolean;
   rate: number;
   range: [number, number];
+  ok: boolean;
   best: Scored;
 }
 
+export interface BossVerdict {
+  pass: boolean;
+  rows: BossRow[];
+}
+
 export function judgeBoss(data: BossData): BossVerdict {
-  const rate = data.best.rate;
-  return { pass: rate >= BOSS_LOW && rate <= BOSS_HIGH, rate, range: wilson(data.best.result.beaten, data.best.seeds), best: data.best };
+  const rows = data.styles.map((s): BossRow => {
+    const rate = s.best.rate;
+    return { style: s.style, judged: s.judged, rate, range: wilson(s.best.result.beaten, s.best.seeds), ok: rate >= BOSS_LOW && rate <= BOSS_HIGH, best: s.best };
+  });
+  return { pass: rows.filter((r) => r.judged).every((r) => r.ok), rows };
 }

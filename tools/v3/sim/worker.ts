@@ -1,8 +1,10 @@
 // A worker thread of the combat simulator (P3.1): answers one job at a time from pool.ts.
 
-import { parentPort } from "node:worker_threads";
+import { parentPort, workerData } from "node:worker_threads";
 import { JOBS } from "./jobs.ts";
 import type { JobKind } from "./jobs.ts";
+import { applyPatch } from "./patch.ts";
+import type { Patch } from "./patch.ts";
 
 interface Task {
   id: number;
@@ -12,6 +14,7 @@ interface Task {
 
 if (!parentPort) throw new Error("worker.ts runs as a worker thread");
 const port = parentPort;
+applyPatch(((workerData as { patch?: Patch } | null)?.patch) ?? {}); // this worker keeps the patched numbers for good
 
 port.on("message", (task: Task) => {
   try {
