@@ -223,14 +223,19 @@ export const B = {
   // Hotspots (11). Used from P10.
   hotspots: { smallPerArchipelagoPerTide: [1, 2], mediumEveryTides: [8, 10], bigWarningTides: 2 },
 
-  // Old Shellback (2.5, D100). hull, clawHands and decayPerTide are the statline of GAMEPLAY 2.5. cannons, sails and helm are
-  // not in 2.5, so each is the base stat of a fresh sloop (10), the simplest reading, and untuned until P3: his guns, his Sails
-  // (the escape roll and the Power Rating) and his fixed Helm score, which no gauge or terrain changes. In round `rearUpRound`
-  // he rears up and Round shot does `rearUpRoundShot` times the damage to him; from round `grappleFromRound` he grapples.
+  // Old Shellback (docs/specs/fighting-styles.md section 7, D100, D133, D140). hull, clawHands and decayPerTide are his statline.
+  // cannons (D140), sails and helm are not in GAMEPLAY 2.5: his Sails (the escape roll and the Power Rating) stay the base stat of a
+  // fresh sloop, 10, and his Helm score is fixed, so no gauge or terrain changes it.
+  // His shell: every hit on him does armour of its damage, except in the round he rears up. A Mortar shell does mortarFactor
+  // times its damage and ignores the shell. His moods: each fight he rears up in one of rearUpRounds (a seeded roll), closes in
+  // before it and grapples after it. snatch: a ship that crosses his bow at Short or Close while he Closes In is caught in his
+  // claws. He retreats into his shell, and is beaten, when his Hull falls below retreatHull of its full or his claws below
+  // retreatClaws of theirs. pointsBeatHim: whether a Victory on points beats him (it does not).
   shellback: {
-    hull: 300, clawHands: 40, decayPerTide: 0.08,
-    cannons: 10, sails: 10, helm: 10,
-    rearUpRound: 3, grappleFromRound: 4, rearUpRoundShot: 2,
+    hull: 300, clawHands: 52, decayPerTide: 0.08,
+    cannons: 22, sails: 10, helm: 10,
+    armour: 0.8, mortarFactor: 3, rearUpRounds: [2, 3, 4], snatch: true,
+    retreatHull: 0.35, retreatClaws: 0.25, pointsBeatHim: false,
   },
 
   // Agendas (15) and wagers (17). Used from P11.

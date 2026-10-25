@@ -95,7 +95,7 @@ describe("the Boarder's traits (fighting styles spec section 3)", () => {
     const play = (hunter: BattleShip) => fight(hunter, plain("target", big), always("closeIn", "board"), always("hold", "roundShot"));
     const boarder = play(styled("hunter", "boarder", big));
     expect(boarder.rounds[0]!.rangeAfter).toBe("grappled");
-    expect(boarder.rounds[0]!.grapples).toEqual([{ side: "hunter", ok: true, why: "helm" }]);
+    expect(boarder.rounds[0]!.grapples).toEqual([{ side: "hunter", ok: true, from: "short", why: "helm" }]); // and the record says the Board came from Short
     expect(boarder.rounds[0]!.edge).toBe("hunter");
     // Anyone else waits for Close, one round later.
     const other = play(plain("hunter", big));
@@ -123,10 +123,10 @@ describe("the Boarder's traits (fighting styles spec section 3)", () => {
     expect(contest.roll).toBe(battleRng(1, ...FLAGS, 1).stream("grapnel", "ship_hunter").next());
     // A won contest grapples, and the record says why. A lost one leaves the ships apart.
     const won = findSeed(play, (r) => r.rounds[0]!.grapples[0]?.why === "grapnels");
-    expect(play(won).rounds[0]!.grapples).toEqual([{ side: "hunter", ok: true, why: "grapnels" }]);
+    expect(play(won).rounds[0]!.grapples).toEqual([{ side: "hunter", ok: true, from: "short", why: "grapnels" }]);
     expect(play(won).rounds[0]!.rangeAfter).toBe("grappled");
     const lost = findSeed(play, (r) => r.rounds[0]!.grapples[0]?.ok === false);
-    expect(play(lost).rounds[0]!.grapples).toEqual([{ side: "hunter", ok: false, why: "failed" }]);
+    expect(play(lost).rounds[0]!.grapples).toEqual([{ side: "hunter", ok: false, from: "short", why: "failed" }]);
     expect(play(lost).rounds[0]!.rangeAfter).not.toBe("grappled");
     let grapnels = 0;
     for (let seed = 1; seed <= 600; seed++) if (play(seed).rounds[0]!.grapples[0]?.why === "grapnels") grapnels++;

@@ -71,6 +71,6 @@ export {
   emberChance,
 } from "./combat/styles.ts";
 export {
-  SHELLBACK_ID, SHELLBACK_DOCTRINE, isBoss, shellbackStatline, applyStatline, shellbackDoctrine, bossPlan, upkeepBosses, recordBossWin,
-  hasBeaten, bossAtStrait, mayCross,
+  SHELLBACK_ID, SHELLBACK_DOCTRINE, isBoss, isShellback, shellbackStatline, applyStatline, shellbackDoctrine, bossPlan, upkeepBosses,
+  recordBossWin, hasBeaten, bossAtStrait, mayCross, rearUpRoundFor, moodOf, shellFactor, shellArmour, snatches, retreats, retreatCause,
 } from "./combat/shellback.ts";

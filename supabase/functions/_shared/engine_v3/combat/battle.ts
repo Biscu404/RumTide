@@ -25,8 +25,14 @@
 // Fire (fire.ts): Hot Shot, the Mortar, a Firebrand's Fire Pots, a Fireship's embers and a ram on a Firebrand set a ship alight.
 // A burning ship loses Hull at the end of the round, after the deck fight and before the end checks. The fires belong to the
 // battle and burn out with it.
+//
+// Old Shellback (shellback.ts, spec section 7): his shell turns a fifth of every hit on him aside, except in the round he rears up
+// (guns, Rams and fire), and a Mortar shell does three times its damage. Each fight he rears up in one round picked by a roll from
+// a stream of its own, closes in before it and grapples after it: the battle tells his Chooser his mood. A ship that crosses his
+// bow while he Closes In is snatched into a grapple, and he retreats into his shell, beaten, when his Hull or his claws fall low.
 
 import { B } from "../balance.ts";
+import { rngFor } from "../rng.ts";
 import type { ShipId, Terrain, WaterId, WindKind } from "../types.ts";
 import { captureCheckBySide, cutFree, lashedScores } from "./boarding.ts";
 import { crewOrder } from "./deck.ts";
@@ -39,14 +45,15 @@ import type { Shot } from "./fleet.ts";
 import { fireGuns, recordFiring, shotPoints } from "./guns.ts";
 import type { GunsResult } from "./guns.ts";
 import { battleRng, contestRecord, isCrippled, helmScore, resolveHelm, startingRange, windGauge } from "./helm.ts";
+import { isShellback, moodOf, rearUpRoundFor, retreatCause, shellArmour, shellFactor, snatches } from "./shellback.ts";
 import {
   emberChance, firesLongNines, hasGrapnels, hasStyle, isRam, playableOrder, ramHull, ramSelf, shotFireChance, spotters, zeroingFactor,
 } from "./styles.ts";
 import { BATTLE_SIDES, DAMAGE_TRACKS } from "./types.ts";
 import type {
   AmbushRange, BattleOutcome, BattleRecord, BattleShip, BattleSide, BurnRecord, ContestRecord, DamageTrack, DeckOrder, DeckRecord,
-  FireRecord, FireSource, FleetRecord, FleetRoundRecord, GrappleRecord, GunsOrder, HelmMove, MeleeRecord, PotRecord, RamRecord, Range,
-  RoundRecord, RoundShipRecord,
+  FireRecord, FireSource, FleetRecord, FleetRoundRecord, GrappleRecord, GunsOrder, HelmMove, MeleeRecord, Mood, PotRecord, RamRecord,
+  Range, RoundRecord, RoundShipRecord,
 } from "./types.ts";
 
 const C = B.combat;
@@ -71,7 +78,6 @@ export type RoundChoice =
       helm: HelmMove;
       guns: GunsOrder;
       jettison?: boolean; // also throw the cargo overboard; the Helm move and Guns order are whatever the Chooser gave (a doctrine plays Hold and Hold Fire, D65)
-      exposed?: number; // a monster rears up: Round shot does this many times the damage to it this round (D102)
     }
   | { kind: "surrender"; rule: number; abilities: AbilityFire[] };
 
@@ -96,6 +102,7 @@ export interface RoundView {
   ships: Record<BattleSide, BattleShip>;
   last: Record<BattleSide, LastPlay | null>; // null before round 1
   jettisoned: Record<BattleSide, boolean>; // the ship has already thrown its cargo overboard in an earlier round (D66)
+  mood?: Mood; // only in Old Shellback's own view, and not while he is Grappled: what he is doing this round (D202). A captain's Chooser never has one
 }
 
 export type Chooser = (view: RoundView) => RoundChoice;
@@ -169,8 +176,12 @@ function shipRecord(
   score: number,
   shot: Pick<GunsResult, "track" | "damage" | "powderUsed">,
   scrape: number,
-  // the order the doctrine gave; the Mortar's shell; the deck fight; the fire that burned the ship
-  extra: { asked?: GunsOrder; mortar?: RoundShipRecord["mortar"] | undefined; deck?: DeckRecord | undefined; fire?: BurnRecord | undefined } = {},
+  // the order the doctrine gave; the Mortar's shell; the deck fight; the fire that burned the ship; Old Shellback's mood; his shell's
+  // effect on this ship's shot
+  extra: {
+    asked?: GunsOrder; mortar?: RoundShipRecord["mortar"] | undefined; deck?: DeckRecord | undefined; fire?: BurnRecord | undefined;
+    mood?: Mood | undefined; shell?: number | undefined;
+  } = {},
 ): RoundShipRecord {
   return {
     ship: ship.shipId,
@@ -180,7 +191,8 @@ function shipRecord(
     guns,
     ...(extra.asked !== undefined && extra.asked !== guns ? { asked: extra.asked } : {}),
     ...(extra.mortar ? { mortar: { ...extra.mortar } } : {}),
-    ...(choice.kind === "fight" && choice.exposed !== undefined && choice.exposed !== 1 ? { exposed: choice.exposed } : {}),
+    ...(extra.mood ? { mood: extra.mood } : {}),
+    ...(extra.shell !== undefined ? { shell: extra.shell } : {}),
     ...(extra.deck ? { deck: { ...extra.deck, ...(extra.deck.thrown ? { thrown: { ...extra.deck.thrown } } : {}) } } : {}),
     ...(extra.fire ? { fire: { ...extra.fire } } : {}),
     helmScore: score,
@@ -258,6 +270,11 @@ export function runBattle(input: BattleInput): BattleRecord {
   const shipsOf = (side: BattleSide, state: Record<ShipId, BattleShip>): BattleShip[] => ids[side].map((id) => state[id] as BattleShip);
   const sideOf = (id: ShipId): BattleSide => (ids.hunter.includes(id) ? "hunter" : "target");
 
+  // Old Shellback's moods: the round he rears up is the one roll of his fights, drawn once from a stream of its own, and only when
+  // he is in the battle, so no other roll moves (D16, D202).
+  const shellbacks = all.filter((id) => isShellback(ships[id]!));
+  const rearUp = shellbacks.length > 0 ? rearUpRoundFor(rngFor(seed, "battle", flag.hunter, flag.target, "rearUp").next()) : 0;
+
   const gauge = windGauge(ships[flag.hunter]!, ships[flag.target]!, terrain, wind);
   // Spotters: a battle with a Bombardier flagship starts at Far.
   const startRange = startingRange(terrain, input.ambush, spotters([ships[flag.hunter]!, ships[flag.target]!]));
@@ -286,6 +303,16 @@ export function runBattle(input: BattleInput): BattleRecord {
   for (let round = 1; (round <= C.rounds || (range === "grappled" && round <= C.rounds + C.overtime)) && outcome === null; round++) {
     const rng = battleRng(seed, flag.hunter, flag.target, round);
 
+    // What Old Shellback is doing this round: none while the ships are Grappled, when his claws Charge (D175).
+    const mood: Record<ShipId, Mood | undefined> = {};
+    for (const id of shellbacks) mood[id] = range === "grappled" ? undefined : moodOf(round, rearUp);
+    const rearing = (id: ShipId): boolean => mood[id] === "rearing";
+    // The tell: in the round before he rears up he shows it, and only when he really does (D204).
+    if (rounds.length > 0 && shellbacks.some(rearing)) {
+      const before = rounds[rounds.length - 1]!;
+      rounds[rounds.length - 1] = { ...before, ships: before.ships.map((s) => (rearing(s.ship) ? { ...s, tell: true as const } : s)) };
+    }
+
     // A ship sees itself and the enemy flagship (7.5).
     const viewFor = (id: ShipId): RoundView => {
       const side = sideOf(id);
@@ -295,6 +322,7 @@ export function runBattle(input: BattleInput): BattleRecord {
         ships: { [side]: ships[id], [other(side)]: ships[foe] } as Record<BattleSide, BattleShip>,
         last: { [side]: last[id] ?? null, [other(side)]: last[foe] ?? null } as Record<BattleSide, LastPlay | null>,
         jettisoned: { [side]: jettisoned.has(id), [other(side)]: jettisoned.has(foe) } as Record<BattleSide, boolean>,
+        ...(mood[id] ? { mood: mood[id] } : {}),
       };
     };
     const choices: Record<ShipId, RoundChoice> = {};
@@ -329,6 +357,11 @@ export function runBattle(input: BattleInput): BattleRecord {
     const fights = choices as Record<ShipId, Extract<RoundChoice, { kind: "fight" }>>;
     // The order each ship really gives: a doctrine copied from another style may name an order this ship cannot give.
     const orders: Record<ShipId, GunsOrder> = Object.fromEntries(all.map((id) => [id, playableOrder(ships[id]!, fights[id]!.guns)]));
+    // Old Shellback's shell turns a fifth of a hit on him aside, except in the round he rears up, and a Mortar shell does three
+    // times its damage (D201). The factor of each ship's shot is against the enemy flagship; against any other ship it is 1.
+    const armour: Record<ShipId, number> = Object.fromEntries(
+      all.map((id) => [id, shellFactor(ships[flag[other(sideOf(id))]]!, orders[id]!, rearing(flag[other(sideOf(id))]))]),
+    );
 
     // 3. Helm resolves: range changes, rakes and flank shots, terrain overrides (8.4). The flagships move the range.
     const helm = resolveHelm(
@@ -397,6 +430,16 @@ export function runBattle(input: BattleInput): BattleRecord {
       }
     }
 
+    // The claw snatch (spec section 7): a ship that crosses Old Shellback's bow at Short or Close while he Closes In is caught in his
+    // claws, and the ships are Grappled. Only the flagships' moves count, the pair that moves the range (D91, D206).
+    let snatchedBy: BattleSide | null = null;
+    if (!helm.escaped && range !== "grappled") {
+      for (const side of BATTLE_SIDES) {
+        if (isShellback(ships[flag[side]]!) && snatches(helm.moves[side], helm.moves[other(side)], after)) snatchedBy = side;
+      }
+      if (snatchedBy !== null) after = "grappled";
+    }
+
     // Fires lit this round, in the order they were lit.
     const fires: FireRecord[] = [];
     const light = (ship: ShipId, by: ShipId, source: FireSource, rounds: number): void => {
@@ -433,7 +476,7 @@ export function runBattle(input: BattleInput): BattleRecord {
           rams.push({ side, ...mate, hit: false, why: "contest", hull: 0, self: 0 });
           continue;
         }
-        const hull = Math.min(ramHull(ships[foe]!, theirMove, orders[foe]), hullLeft(foe));
+        const hull = Math.min(ramHull(ships[foe]!, theirMove, orders[foe], shellArmour(ships[foe]!, rearing(foe))), hullLeft(foe));
         const self = Math.min(ramSelf(), hullLeft(id));
         ramLoss[foe]! += hull;
         ramLoss[id]! += self;
@@ -468,7 +511,8 @@ export function runBattle(input: BattleInput): BattleRecord {
       // A Board order at Close (at Short too for a Boarder) tries to grapple, once the range is known (8.5). A Board that failed on
       // Helm score gets a Helm contest instead when the ship has Grapnels.
       const grappleIn = { range: after, ids, flagships: flag, orders, moves, scores, ships };
-      grapples = freedNow ? [] : fleetGrapples(grappleIn);
+      grapples = freedNow ? [] : snatchedBy !== null ? [{ side: snatchedBy, ok: true, why: "snatch" }] : fleetGrapples(grappleIn);
+      if (after === "short") grapples = grapples.map((g) => ({ ...g, from: "short" as const })); // only a Boarder's grapnel lines Board from Short
       if (grapples.some((g) => !g.ok && hasGrapnels(ships[g.ship ?? flag[g.side]]!))) {
         const rescued = grapnelRescue(grappleIn, grapples, rng);
         grapples = rescued.grapples;
@@ -486,11 +530,7 @@ export function runBattle(input: BattleInput): BattleRecord {
       const boarded = (id: ShipId): boolean => grapples.some((g) => g.ok && (g.ship ?? flag[g.side]) === id);
 
       // 4. Guns fire at the same time, at the new range (8.5). Every ship fires from the state the round began with.
-      // A monster that reared up this round takes more from Round shot (D102); only the enemy flagship is ever the aim.
-      const exposure: Record<BattleSide, number> = {
-        hunter: fights[flag.hunter]!.exposed ?? 1,
-        target: fights[flag.target]!.exposed ?? 1,
-      };
+      // Only the enemy flagship is ever the aim, so Old Shellback's shell (`armour`, worked out above) counts only against him.
       // The Mortar takes the rake, flank and weakened factors (D137), and Zeroing In grows while the range holds. A Gunline
       // that Holds fires Long Nines. While Grappled the great guns are quiet, and also in the round a ship cuts free (D135). The
       // guns of the round the ships grapple fire at Close, as they come together, and then the grapple happens.
@@ -503,7 +543,7 @@ export function runBattle(input: BattleInput): BattleRecord {
         fired[id] = fireGuns(working[id]!, working[flag[foe]!]!, gunRange, orders[id]!, rng, {
           terrain,
           helmMod: mortar && !B.styles.bombardier.mortarTakesRakes ? NEUTRAL : gunsMod[id]!,
-          exposed: exposure[foe],
+          armour: armour[id]!,
           ...(mortar ? { zeroing: zeroingFactor(zeroingNext[id]!) } : {}),
           ...(firesLongNines(ships[id]!, moves[id]!) ? { longNines: true } : {}),
         });
@@ -616,7 +656,7 @@ export function runBattle(input: BattleInput): BattleRecord {
     for (const id of all) {
       const blaze = blazes[id];
       if (!blaze) continue;
-      const loss = Math.min(next[id]!.hullPoints, fireLoss(next[id]!));
+      const loss = Math.min(next[id]!.hullPoints, fireLoss(next[id]!, shellArmour(next[id]!, rearing(id))));
       next[id] = withLosses(next[id]!, { ...noLosses(), hull: loss });
       const credit = sideShare(shipsOf(sideOf(id), ships), "hull", loss);
       dealt[other(sideOf(id))] += credit;
@@ -644,7 +684,8 @@ export function runBattle(input: BattleInput): BattleRecord {
       contests, grapples, ...(rams.length > 0 ? { rams } : {}), ...(roundEdge !== null ? { edge: roundEdge } : {}),
       ...(fires.length > 0 ? { fires } : {}), ...(round > C.rounds ? { overtime: true as const } : {}), melee, crippled, struck: [],
       ships: all.map((id) => shipRecord(next[id]!, fights[id]!, moves[id]!, orders[id]!, scores[id]!, shots[id]!, scrape[id]!, {
-        asked: fights[id]!.guns, mortar: shellOf(id), deck: deckOf[id], fire: burns[id],
+        asked: fights[id]!.guns, mortar: shellOf(id), deck: deckOf[id], fire: burns[id], mood: mood[id],
+        ...(armour[id] !== NEUTRAL && fired[id]?.track ? { shell: armour[id]! } : {}),
       })),
       ...(fleetRound ? { fleet: fleetRound } : {}),
     });
@@ -661,6 +702,15 @@ export function runBattle(input: BattleInput): BattleRecord {
       if (capture.draw) outcome = { kind: "draw", winner: null, loser: null, round };
       else if (capture.loser) outcome = { kind: "captured", winner: other(capture.loser), loser: capture.loser, round };
     }
+    // Old Shellback retreats into his shell once his Hull or his claws fall low. He is driven off: a Struck Colours the other side
+    // wins, so the Tide loop, the loot and `bossesBeaten` treat it like any other (D105, D205).
+    if (outcome === null) {
+      for (const side of BATTLE_SIDES) {
+        const crab = next[flag[side]]!;
+        const cause = isShellback(crab) ? retreatCause(crab) : null;
+        if (cause) outcome = { kind: "struckColours", winner: other(side), loser: side, round, drivenOff: cause };
+      }
+    }
     if (outcome === null && helm.escaped) outcome = { kind: "escaped", winner: null, loser: null, round };
 
     ships = next;
@@ -670,8 +720,14 @@ export function runBattle(input: BattleInput): BattleRecord {
   }
 
 
-  // After the last round: Victory on points or a Draw (8.7).
-  if (outcome === null) outcome = pointsOutcome(dealt, rounds.length);
+  // After the last round: Victory on points or a Draw (8.7). A Victory on points never beats Old Shellback: with him in the battle
+  // it is a Draw, whoever led, and he has to be sunk, captured or driven off (D105, D205).
+  if (outcome === null) {
+    const points = pointsOutcome(dealt, rounds.length);
+    outcome = points.kind === "victory" && !B.shellback.pointsBeatHim && shellbacks.length > 0
+      ? { kind: "draw", winner: null, loser: null, round: points.round }
+      : points;
+  }
 
   const fleet: FleetRecord | null = isFleet
     ? {

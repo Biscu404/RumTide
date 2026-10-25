@@ -48,12 +48,13 @@ export function ignite(blazes: Blazes, ship: ShipId, by: ShipId, rounds: number)
 
 /**
  * The Hull a fire takes off a burning ship at the end of a round: `combat.fire.hull`, times the fire drill of a Gunline (it
- * loses 60% of it), or times what the pitch in a Firebrand's hold adds (it loses twice as much).
+ * loses 60% of it), or times what the pitch in a Firebrand's hold adds (it loses twice as much), or times Old Shellback's shell
+ * (`armour`, a factor the battle works out: his shell turns the fire aside too, except in the round he rears up).
  */
-export function fireLoss(ship: Pick<BattleShip, "style">): number {
+export function fireLoss(ship: Pick<BattleShip, "style">, armour = NEUTRAL): number {
   const drilled = hasStyle(ship, "gunline") ? S.gunline.fireDrill : NEUTRAL;
   const pitch = hasStyle(ship, "firebrand") ? S.firebrand.ownFire : NEUTRAL;
-  return Math.round(C.fire.hull * drilled * pitch);
+  return Math.round(C.fire.hull * drilled * pitch * armour);
 }
 
 /** The Hull the flash of a Fire Pot costs a ship: `combat.deck.fireHull`, but never so much that the ship is left below 1 Hull. */

@@ -87,6 +87,7 @@ export function conditionHolds(condition: DoctrineCondition, view: RoundView, si
     case "enemyType": return ctx.enemyType === condition.type;
     case "enemyCaptain": return theirs.captainId === condition.captainId;
     case "theirStyle": return theirs.style !== undefined && theirs.style === condition.style; // a ship with no style has none (D128)
+    case "mood": return view.mood === condition.mood; // only Old Shellback's own view has one (D203)
     case "terrain": return view.terrain === condition.terrain;
     case "windGauge": return view.gauge === (condition.holder === "mine" ? side : other(side));
     case "havePowder": return mine.powder > 0;
@@ -118,7 +119,7 @@ export function evaluateDoctrine(doctrine: Doctrine, view: RoundView, ctx: Doctr
     const action = rule.then;
     switch (action?.kind) {
       case "fight":
-        return { kind: "fight", rule: i, abilities, helm: action.helm, guns: action.guns, ...(action.exposed !== undefined ? { exposed: action.exposed } : {}) };
+        return { kind: "fight", rule: i, abilities, helm: action.helm, guns: action.guns };
       case "surrender":
         return { kind: "surrender", rule: i, abilities };
       case "jettison":
@@ -204,6 +205,7 @@ function conditionProblem(c: DoctrineCondition, label: string, registry: Ability
     case "enemyType": return ENEMY_TYPES.includes(c.type) ? null : `${label}: unknown enemy type ${String(c.type)}`;
     case "enemyCaptain": return typeof c.captainId === "string" && c.captainId !== "" ? null : `${label}: an enemy captain test needs a captainId`;
     case "theirStyle": return FIGHTING_STYLES.includes(c.style) ? null : `${label}: unknown Fighting Style ${String(c.style)}`;
+    case "mood": return `${label}: only a monster has moods, a captain's doctrine may not test one`; // D203
     case "terrain": return TERRAINS[c.terrain] ? null : `${label}: unknown terrain ${String(c.terrain)}`;
     case "windGauge": return ["mine", "theirs"].includes(c.holder) ? null : `${label}: the wind gauge is mine or theirs`;
     case "havePowder": return null;
@@ -217,7 +219,6 @@ function actionProblem(a: DoctrineAction, label: string, registry: AbilityRegist
   switch (a?.kind) {
     case "fight":
       if (!HELM_MOVES.includes(a.helm)) return `${label}: unknown Helm move ${String(a.helm)}`;
-      if (a.exposed !== undefined) return `${label}: only a monster rears up, a captain's doctrine may not`; // D102
       return GUNS_ORDERS.includes(a.guns) ? null : `${label}: unknown Guns order ${String(a.guns)}`;
     case "ability": return registry[a.ability] ? null : `${label}: unknown ability ${String(a.ability)}`;
     case "surrender": case "jettison": return null;

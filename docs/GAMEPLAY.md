@@ -7,7 +7,8 @@ Version 0.3, 18 October 2026. Companion to [GAME_DESIGN.md](GAME_DESIGN.md) (v0.
 * This document explains how every gameplay system works inside the game: the objects, their states, the rules that change them, and the numbers that drive them.
 * **Where this conflicts with GAME_DESIGN.md v0.2, this document wins.** Superseded v0.2 sections: 3 (loop and pacing), 4 (world and movement), 5.1 and 5.2 (stats and hulls), 7.1 to 7.4 (combat), 10.1 (exploration deck), 12.4 (catch up timing). Still valid: the pillars, art and audio (2), economy basics (6), co op and fleets (8), anti bullying (9), parley (7.6), architecture (15), risks (17).
 * Every number is a **starting value**. All of them live in `balance.ts`, and bots tune them before any friend plays.
-* Phase tags: **[S0]** in the Season 0 beta, **[S1]** arrives in Season 1, **[Later]** after that. Section 21 has the full scope table.
+* Phase tags: **[S0]** in the Season 0 beta, **[S1]** arrives in Season 1, **[Later]** after that. Section 21 has the full scope table. A tag like **[P5]** names the roadmap task that builds a rule that is decided but not built yet.
+* Combat (section 8), Old Shellback (2.5), Drill, supplies and the Fighting Styles describe the combat as built in `engine_v3` (P3.B2), checked against `balance.ts` on 24 October 2026. A recent rule carries its decision number in brackets (D121 and so on, in `docs/DECISIONS.md`). Where the code and a doc disagree, the code is what is built.
 
 ## What changed since v0.2
 
@@ -16,7 +17,9 @@ Version 0.3, 18 October 2026. Companion to [GAME_DESIGN.md](GAME_DESIGN.md) (v0.
 | Tides | One per day at 21:00 | Two per day at 13:00 and 20:00, identical |
 | Map | 36 node graph, all visible | World, archipelagos, islands, waters; hidden until charted |
 | Movement | Speed in hops | Watches (action points) spent on hops and actions; costs set by WCS and terrain |
-| Combat | 3 round triangle | 5 rounds: range bands, helm, ammo, three damage tracks, programmed doctrines |
+| Combat | 3 round triangle | Up to 5 rounds (2 more of overtime in a deck fight) over six distances: helm, ammo, three damage tracks, programmed doctrines, fire |
+| Fighting Styles | Four template doctrines (first v0.3 draft) | Six styles and the Smuggler, each with a trait, signature moves and a template, on one wheel of counters (8.8a) |
+| Boarding | One melee formula with the guns still firing (first v0.3 draft) | The deck fight: great guns quiet, Deck orders in a cycle, the boarder's edge, Drill as a sixth ship stat (8.6) |
 | Crew | A stat | Named crewmates with roles, skill trees, traits and loyalty; Hands as manpower |
 | Start | Spread across ports | Everyone starts in the Cradle with a story, gated by a boss |
 | New systems | | Backgrounds, captain skills, reputation, supplies, intel, hotspots, events, NPC brains, rivals, pacts, agendas, Gazette services, wagers, scenes |
@@ -91,11 +94,11 @@ Each water has one terrain type.
 | Terrain | Movement | Combat | Other |
 |-|-|-|-|
 | Open | Normal | Neutral; all ranges | Few sites |
-| Shallows | Frigates pay 1 extra Watch to leave | Brigantines and Frigates must win a Helm contest to reach Close range; Sloops +15% Helm | Smuggler coves, fishing |
+| Shallows | Frigates pay 1 extra Watch to leave | Brigantines and Frigates must win a Helm contest to reach Close range, and stop at Short if they lose; Sloops +15% Helm | Smuggler coves, fishing |
 | Reef | 1 extra Watch to leave, unless the water is Charted | Every Cross or Close In costs 10 Hull, unless Charted | Wrecks common |
-| Rocky | Normal | Long range shots 25% weaker (cover) | Caves, hidden coves |
-| Fog | Normal; ships here are invisible to Lookouts outside this water | Battles start at Medium; Long range shots 50% weaker; escape chance +20% | Ambush spots, ghost events |
-| Kelp | 1 extra Watch to leave | Range can never go beyond Medium; boarding +15% | Odd salvage |
+| Rocky | Normal | Shots at Long and Far 25% weaker (cover) | Caves, hidden coves |
+| Fog | Normal; ships here are invisible to Lookouts outside this water | Battles start at Medium (8.1); shots at Long and Far 50% weaker; escape chance +20% | Ambush spots, ghost events |
+| Kelp | 1 extra Watch to leave | Range can never go beyond Medium, so nobody escapes; boarding strength +15% for both crews | Odd salvage |
 | Strong Current | Lanes from it carry strong currents (3.3) | The ship moving with the current gets +15% Helm | |
 | Harbour | Exists only beside a settlement; Dock here | **No combat, ever** | Trade, repair, recruit |
 
@@ -126,19 +129,22 @@ Weather sits on top of terrain (3.3): Calm, Breeze, Gale, plus Storm in the Maw.
 * At Tide 1 you see Gullhaven and Driftwood Key Charted, Tarpot Sketched, and nothing else.
 * Whisper Rock becomes Rumoured through a tavern rumour or a lucky Survey. Hermit's Reach becomes Rumoured only after someone explores Whisper Rock's ruins (or buys that knowledge from someone who has).
 * **The Harbour Mistress's Truce:** no hunting of players in the Cradle until Tide 5. After that, PvP loot in the Cradle is halved for the whole season, so it stays a soft landing.
-* **Exit:** the Narrows strait at Hermit's Reach. Old Shellback blocks it for each captain until they have been on the winning side of a fight against it.
+* **Exit:** the Narrows strait at Hermit's Reach. Old Shellback blocks it for each captain until they have beaten him (2.5).
 
 ## 2.5 Old Shellback (the gate boss)
 
 * Lives in the Narrows: Shallows terrain plus Strong Current.
-* Statline: Hull 300, **no Rigging** (Chain shot does nothing), its claws fight as 40 Hands when grappling.
-* Habits (printed in the bestiary after you watch it fight once): rounds 1 and 2 it Closes In; **round 3 it rears up and exposes its soft underside** (Round shot does double damage); rounds 4 and 5 it grapples.
-* What it teaches: doctrines with round conditions, ammo choice, terrain.
-* **Personal gate:** every captain must be on the winning side of one battle against it. Other captains can join your fight (fleet battle rules, co op prize with the N to the power 1.5 rule).
+* Statline: Hull 300, **no Rigging** (Chain shot does nothing), Cannons 22, a Helm score fixed at 10 that no wind gauge, terrain or crew changes, and claws that fight as 52 Hands when grappling (D100, D101, D140). He has no Fighting Style, so "Their style is X" is never true of him. His claws only Charge: he never Volleys.
+* **His shell:** every hit on him does 80% of its damage, whether it comes from the great guns, a Ram or a fire, except in the round he rears up. A Mortar shell falls on the shell from above and does three times its damage to him in every round, ignoring the shell, which is what a bomb vessel is for (D133, D201).
+* **His moods:** each fight he closes in first, rears up in one round of 2, 3 or 4, and grapples from then on. The round is a seeded roll for each fight, so no doctrine can count on a round, and the replay shows a tell in the round before he rears up (D133, D202 to D204). In the rear-up round he holds still and holds fire, and his shell does not turn the blow aside. While the ships are Grappled his claws Charge and he does not rear up.
+* **The claw snatch:** a ship that crosses his bow at Short or Close while he Closes In is caught. The ships are Grappled and he holds the boarder's edge (8.6), so the rake that wins against ships does not work on him (D206). Once he holds a ship his claws Charge, and he never Opens Range.
+* **Beaten** means he is Sunk, Captured or driven off. He retreats into his shell when his Hull falls below 35% or his claws below 25% of their full strength (D205). **A Victory on points never beats him.**
+* What it teaches: reading the other side's moves instead of the calendar, ammo choice, the Mortar, terrain. The bestiary will print his habits after you watch him fight once [not built].
+* **Personal gate:** every captain must beat him once, which means being on the winning side of a battle in which he was Sunk, Captured or driven off. Other captains can join your fight (fleet battle rules, co op prize with the N to the power 1.5 rule).
 * It never dies for good: beaten, it retreats into its shell and is back next Tide, a little angrier.
-* **Catch up:** from Tide 9 it loses 8% of its Hull every Tide (it is getting tired), so nobody stays stuck.
-* **Reward for each captain who beats it:** the title *Shellback*, gold, and a **Shellback's Chart** found inside its shell: a Sketch of 1 or 2 other archipelagos and the strait routes to them. Each captain's chart is drawn separately from the set, so captains branch out to different archipelagos and immediately hold charts worth trading.
-* Target: median captain passes it by Tide 7 to 9; nobody later than Tide 12.
+* **Catch up:** from Tide 9 it loses 8% of its Hull every Tide, compounding (it is getting tired), so nobody stays stuck.
+* **Reward for each captain who beats it** [P5.6, P7]: the title *Shellback*, gold, and a **Shellback's Chart** found inside its shell: a Sketch of 1 or 2 other archipelagos and the strait routes to them. Each captain's chart is drawn separately from the set, so captains branch out to different archipelagos and immediately hold charts worth trading.
+* Target: median captain passes it by Tide 7 to 9; nobody later than Tide 12. The best doctrine each Fighting Style can write should beat him 35% to 80% of the time (8.9, check 5): every style has a way through, and nobody beats him every time.
 
 ## 2.6 The other archipelagos
 
@@ -360,6 +366,9 @@ Design budget by mid season (bots must confirm it):
 * **Look:** layered pixel portrait and sprite: body, skin, face, hair, hat, coat, one accessory (eyepatch, hook, parrot on the shoulder, tattoo).
 * **Names:** captain, ship, flag (shape, colours, symbol), and a one line Parting Shot.
 * **Background:** one of nine (5.2).
+* **Fighting Style:** one of seven, picked together with the starting doctrine (D122, D123). Six fight: Bombardier, Gunline, Skirmisher, Rammer, Boarder and Firebrand. The seventh is the Smuggler, the trader's style. The style gives a **trait** and a **template doctrine** (8.8a). You start with that template as your first saved doctrine and your default, and you can edit it freely (8.8).
+* The trait belongs to you, not to the doctrine, and pays only in a round its own move or order is played. A captain who writes another style's rules gets the rules and not the trait.
+* Changing style in a City is planned [P5]: the price and any wait are set with the Harbour.
 * **No crewmate yet.** You sail alone through the tutorial (7.1).
 
 ## 5.2 Backgrounds
@@ -444,7 +453,7 @@ Three meters from 0 to 100. Trust starts at 50; Fear and Fame start at 0.
 
 ## 6.2 Stats and upgrades
 
-Five upgradable stats, levels 0 to 10, exponential costs as in v0.2 5.3.
+Six upgradable stats. Hull, Cannons, Sails, Berths and Hold go from level 0 to 10, and Drill from 0 to 15. Costs are exponential as in v0.2 5.3: the next level costs 60 doubloons × 1.35 to the power of the level you have now, times the season preset's cost multiplier. A level of Drill costs what the same level of any other stat costs (D141).
 
 | Stat | Does |
 |-|-|
@@ -453,15 +462,36 @@ Five upgradable stats, levels 0 to 10, exponential costs as in v0.2 5.3.
 | Sails | Rigging points, Helm score, +1 Watch at level 5 |
 | Berths | Max Hands, +12% per level |
 | Hold | Cargo capacity |
+| Drill | Boarding strength, and the three unlocks below |
 
-The old Crew stat is gone. Boarding strength now comes from Hands (6.4) and crewmates.
+The old Crew stat is gone. Boarding strength now comes from Hands (6.4), Drill and crewmates.
+
+**Drill, the Hands track** (D119, D120, D165)
+
+* Three stages of five levels: **Deckhands** (levels 1 to 5), **Cutthroats** (6 to 10) and **Sea Wolves** (11 to 15). Each level adds boarding strength, and a later stage adds more per level: 4% a level in the first stage, 6% in the second, 8% in the third. So Drill 5 is +20%, Drill 10 is +50% and Drill 15 is +90%.
+* Finishing a stage unlocks something:
+
+| Drill | Stage done | Unlock |
+|-|-|-|
+| 5 | Deckhands | **Fire Pots:** the crew can use the Fire Pots order (a Firebrand has it from the start) |
+| 10 | Cutthroats | **Grapnels:** Lashed fast holds for you in every grapple you are in, not only the ones you made, and a Board that would fail on Helm score gets a Helm contest instead (a Boarder has them from the start) |
+| 15 | Sea Wolves | **Second Wave:** in every melee round your crew strikes once more after the exchange, which makes its blow 1.25 times as large |
+
+* Season 0 has all three stages. The cap is `drillMaxLevel` in the season preset, 15 in both seasons, so a later season can lower it. Nothing enforces a cap until buying exists [P5].
+* Drill belongs to the ship. A tow, a Capture or lost Hands never take it away. It is bought like the other upgrades, at a shipwright [P5].
+
+**Power Rating** (parley, the fairness factor, bounties and NPC scaling read it; D26, D136, D144, D166)
+
+* S = (max Hull ÷ 10 + Cannons + Sails + Hands ÷ 3) ÷ 4, and the rating is 10 × (S ÷ 10)^1.6. A fresh Sloop is 10. The exponent makes the rating grow faster than the stats, because Hull, guns and crew multiply in a fight.
+* Hands are the Hands aboard now, counted against the ship's own crew, so a full Bombardier rates as a full crew. They are multiplied by the Drill factor, so a Drill 15 Sloop rates about 1.38 times a fresh one. A monster's claws are not drilled.
+* A Fighting Style does not change the rating: styles are equal on paper. A ship with twice the rating should win 83% to 92% of the battles that are fought (8.9, check 4).
 
 **Materials [S1]:** a shipwright sells every upgrade with materials included. Bring your own Timber (Hull, Hold, Berths) or Canvas (Sails) and the upgrade costs 30% less. This makes traders useful to everyone without ever blocking anyone.
 
 ## 6.3 Damage tracks
 
-* **Hull points:** at 0 the ship is Sunk.
-* **Rigging points** (from Sails): at 0 the ship is Crippled: it cannot Open Range or Cross in battle, and outside battle it limps one hop per Tide until repaired in a Town or City.
+* **Hull points:** at 0 the ship is Sunk, whether guns, a Ram, a Reef scrape or fire took the last of them.
+* **Rigging points** (from Sails): at 0 the ship is Crippled: it cannot Open Range or Cross in battle (those moves play as Hold, so it cannot Cut Free either), and outside battle it limps one hop per Tide until repaired in a Town or City.
 * **Hands:** a headcount (6.4).
 * **Repairs:** any Town or City harbour repairs everything for gold. A Village repairs Hull only, up to 50%. Repair at sea is in 3.2.
 
@@ -469,26 +499,29 @@ The old Crew stat is gone. Boarding strength now comes from Hands (6.4) and crew
 
 Hands are a number, like manpower in a Paradox game.
 
-* **Max Hands:** Sloop 30, Brigantine 60, Frigate 120, each +12% per Berths level.
+* **Max Hands:** Sloop 30, Brigantine 60, Frigate 120, each +12% per Berths level. A **Bombardier** sails with 60% of that (a fresh Bombardier sloop has 18), because the mortar takes the deck (D145). Hiring, healing, the Watch penalty below, gunnery and Capture all read the smaller number, and the Power Rating counts Hands against the ship's own crew (6.2).
 * **What they do:**
   * **Gunnery:** gun damage × min(1, Hands ÷ 60% of max). A ship below 60% of its Hands fires weaker.
-  * **Boarding strength:** Hands × crew modifiers (Bosun, traits, Background).
+  * **Boarding strength:** Hands × (1 + crew modifiers: Bosun, traits, Background) × Drill (6.2). The deck fight (8.6) adds Kelp, First over the rail, Fighters and Tinderbox.
   * **Sailing:** below 40% of max, the ship loses 1 Watch.
-* **Losses:** grapeshot and boarding take Hands. Half of each loss is **wounded** and returns after 2 Tides (1 Tide with a Surgeon); the other half is gone.
+* **Losses:** grapeshot and the deck fight take Hands. Half of each loss is **wounded** and returns after 2 Tides (1 Tide with a Surgeon); the other half is gone.
 * **Hiring:** in a Harbour, from the settlement's pool (Village 5, Town 15, City 40 per Tide), shared by everyone docked there, first come first served during sessions. Cost: 3 doubloons each × the Boom.
 * **Volunteers:** after a Capture, up to 20% of the defeated ship's surviving Hands join you if you have Berth room.
 * **No wages, no upkeep** (v0.2 rule). Hands only cost money to replace.
 
 ## 6.5 Supplies
 
-Kept deliberately light: two supplies, and nothing is ever used while docked or away.
+Kept deliberately light: three supplies, and nothing is ever used while docked or away. A new captain starts with 4 Provisions and 6 Powder.
 
-* **Provisions:** every Tide that ends with you at sea uses Provisions: Sloop 1, Brigantine 2, Frigate 3. Each unit takes 1 Hold space. Cheap at every settlement.
+* **Provisions:** every Tide that ends with you at sea uses Provisions: Sloop 1, Brigantine 2, Frigate 3. Each unit takes half a Hold space (D13). Cheap at every settlement.
   * Out of Provisions means **Short Rations**: 1 Watch less, and crewmates lose 3 Loyalty per Tide. No starvation, no mutiny, no losing the ship.
-* **Powder:** every round your guns fire uses Powder: Sloop 1, Brigantine 2, Frigate 3. Takes Hold space. Out of Powder, guns do half damage.
+* **Powder:** every round your guns fire uses Powder: Sloop 1, Brigantine 2, Frigate 3. Each unit takes half a Hold space. Out of Powder, guns do half damage.
+  * Hot Shot uses twice as much (8.5). A Volley uses as much as a round of guns (8.6). Hold Fire, Board and the other Deck orders use none.
   * Sold in Towns and Cities: cheap in the Crown Keys, dear in the Maw.
+* **Fire Pots** (D167): clay pots of pitch and rum for the deck fight (8.6). Each throw uses one, and each takes half a Hold space. A Firebrand starts with 2 and every other captain with none, and a captain who is not a Firebrand also needs Drill 5 to throw one (6.2). Sold in Towns and Cities like Powder, but the buying screen and the price are [P5].
+  * Like the other supplies they are not cargo: loot never takes them, they never go into a Wreck or Flotsam, and a tow keeps them (9.1). What a battle does not use is still in the hold afterwards.
 * Docked ships use nothing, and standing orders dock you while you are away, so absence costs nothing.
-* **The tension:** supplies compete with cargo for Hold space, and Provisions set how far from settlements you can roam.
+* **The tension:** supplies compete with cargo for Hold space, Provisions set how far from settlements you can roam, and a Fire Pot is Hold space spent on the chance of a fire.
 
 ## 6.6 History and heritage
 
@@ -559,6 +592,12 @@ Kept deliberately light: two supplies, and nothing is ever used while docked or 
 | Surgeon | Field Medic: wounded return faster | Herbalist: crewmate injuries | Shantyman: loyalty and morale | Patch Up: restore Hands mid battle |
 | Navigator | Current Reader: WCS | Cartographer: charting, checking intel | Stargazer: plan steps, Crossings | Read the Water: terrain bonus this battle |
 | Spy | Infiltrator: copy intel in port | Courier: secret messages, pacts | Saboteur: tells, pre battle sabotage | Cut the Lines: enemy starts with Rigging damage |
+
+**Crew and the Fighting Styles** [P8]
+
+* A skill tree may add to a style's trait, and never copies another style's trait (8.8a).
+* The Gunner's Heated Shot gives any style one round of Hot Shot (8.5).
+* The Bosun's Brawler branch adds to boarding strength on top of Drill, and Boarders Away (an instant grapple) also gives the edge (8.6).
 
 **Example: the full Navigator tree**
 
@@ -634,91 +673,209 @@ Every quirky or bad trait carries a hidden Tale that starts after the crewmate h
 ## 8.1 How a battle starts
 
 * From an encounter (3.7), after parley and the escape roll.
-* **Starting range:** Long. In Fog, Medium. A Lurker who springs an ambush chooses Long or Medium.
-* **Wind gauge:** goes to the ship with the higher Helm score at the start (8.4), and Lurkers get +20% on this check. No gauge in Calm. The gauge gives +20% to Helm contests for the whole battle.
-* Parley (v0.2 7.6), the fairness factor, bounties and shields (v0.2 section 9) all still apply.
+* **Starting range:** Long. In Fog, Medium. In Kelp, Medium (the range never goes beyond Medium there). A Lurker who springs an ambush chooses Long or Medium, and its choice wins over Fog (D39).
+* **Spotters:** when either flagship is a Bombardier, a start at Long becomes a start at **Far** (D121, D142). A start at Medium stays Medium, and Kelp never allows Far.
+* **Wind gauge:** goes to the ship with the higher Helm score at the start (8.4), and Lurkers get +20% on this check. No gauge in Calm. The gauge gives +20% to the Helm score, and so to every Helm contest, for the whole battle.
+* Parley (v0.2 7.6), the fairness factor, bounties and shields (v0.2 section 9) all still apply. A Harbour has no battles, ever (2.2).
 
 ## 8.2 Battle state
 
-* **Range:** Long, Medium, Close, Grappled.
-* **Each ship:** Hull points, Rigging points, Hands, Powder, unused crew abilities.
-* **Rounds:** up to 5.
+* **Range:** six distances, from far to near: **Far, Long, Medium, Short, Close, Grappled.** A ship escapes by going past Far.
+* **Each ship:** Hull points, Rigging points, Hands, Powder, Fire Pots, unused crew abilities, and whether it is burning. Its Fighting Style and its Drill are fixed for the battle.
+* **Rounds:** up to 5, then up to 2 more of **overtime** while the ships are still Grappled (8.6). A doctrine can name rounds 1 to 5, and "round at least 5" stays true in overtime.
 
 ## 8.3 A round, step by step
 
-1. Each ship's doctrine is checked from the top; the first rule whose conditions are true gives that ship a **Helm move** and a **Guns order**, or a special action (8.8).
-2. Crew abilities called by those rules resolve first, in order of Helm score.
-3. **Helm** resolves: range changes, rakes and flank shots (8.4).
-4. **Guns** fire at the same time, at the new range (8.5).
-5. If Grappled, the **boarding** melee resolves (8.6).
-6. End checks: Sunk, Captured, Struck Colours, Escaped (8.7).
+1. Each ship's doctrine is checked from the top; the first rule whose conditions are true gives that ship a **Helm move** and a **Guns order**, or a special action (8.8). An order the ship's style cannot give is played as Round shot.
+2. **Surrender** comes first. If a rule says Surrender, the colours come down and nothing else happens this round, fire included (Struck Colours, 8.7).
+3. Crew abilities called by those rules resolve first, in order of Helm score. [P8: the engine records the rules that fired and resolves no ability yet.]
+4. **Helm** resolves: the Helm scores, range changes, Dash, rakes and flank shots, the terrain overrides and the Reef scrape (8.4). If the ships began the round Grappled, the table is skipped and a ship that plays Open Range tries to **Cut Free** instead (8.6).
+5. **The Ram:** a Rammer that played Close In at Close drives into the other flagship (8.4).
+6. **Board:** a Board order is tried at the range the Helm step left, at Close or at Short for a Boarder. If it succeeds the ships are Grappled (8.6).
+7. **Guns** fire at the same time, at the new range (8.5). In the round the ships grapple they fire at Close, as the ships come together. If the round began Grappled the great guns are quiet, and they stay quiet in the round a ship cuts free, because every hand is at the axes. A hit of Hot Shot or of the Mortar may set the enemy flagship alight.
+8. If the ships are Grappled, the **deck fight** resolves (8.6): both crews strike at once with their Deck orders. Then a Volley burns its Powder, each Fire Pot thrown is used up and rolls for a fire, and a Fireship's embers roll.
+9. **Fire:** every burning ship loses Hull (8.5).
+10. End checks, in this order: Sunk, Captured, driven off (Old Shellback only, 2.5), Escaped (8.7). Struck Colours was settled at step 2.
+
+After the last round, one side wins on points or it is a Draw (8.7). A round that ends in an Escape fires no guns and has no deck fight, but fire still burns.
 
 ## 8.4 Helm
 
-Moves: **Close In**, **Hold**, **Open Range**, **Cross Their Bow**.
+Moves: **Close In**, **Hold**, **Open Range**, **Cross Their Bow**. A Crippled ship (Rigging at 0) cannot Open Range or Cross, so those play as Hold (6.3).
 
-**Helm score** = Sails × (current Rigging ÷ max Rigging) × (1 + Helmsman, skill and trait bonuses) × wind gauge (1.2) × terrain (Shallows Sloop 1.15, Local Knowledge 1.15, moving with a Strong Current 1.15).
+**Helm score** = Sails × (current Rigging ÷ max Rigging) × (1 + Helmsman, skill and trait bonuses) × wind gauge (1.2) × terrain (Shallows Sloop 1.15, Local Knowledge 1.15, moving with a Strong Current 1.15), and then the style of the round: a Smuggler that Opens Range counts **Slippery** (× 1.25), and a Boarder that Closes In counts **the chase** (× 1.3). The score counts in every contest of the round. Old Shellback's score is fixed at 10 (2.5).
 
 **Helm contest:** ship A wins with probability A ÷ (A + B), rolled from the Tide seed.
+
+**Distances and bands:** the six distances are Far, Long, Medium, Short, Close and Grappled, and a **band** is one step between two of them. A ship escapes by going past Far.
 
 | A plays | B plays | Result |
 |-|-|-|
 | Close In | Close In | Range shrinks 2 bands (both at Close means Grappled) |
 | Close In | Hold | Range shrinks 1 band |
-| Close In | Open Range | Helm contest: the winner moves range 1 band their way. If Close In wins, it also gets a stern shot (+25% guns) |
+| Close In | Open Range | Helm contest (the chase): the winner moves range 1 band their way. If Close In wins, it also gets a stern shot (+25% guns) |
 | Hold | Hold | No change |
 | Hold | Open Range | Range grows 1 band; the ship that Opens fires 25% weaker (it is turning away) |
-| Open Range | Open Range | Range grows 2 bands; past Long, both disengage and the battle ends as Escaped |
+| Open Range | Open Range | Range grows 2 bands; past Far, both disengage and the battle ends as Escaped |
 | Cross Their Bow | Close In or Hold | **Rake:** the crosser's guns do double damage and the raked ship's guns 25% less. Against Close In, range also shrinks 1 band |
 | Cross Their Bow | Open Range | The cross fails: the ship that Opens gets a flank shot (+25%) and the crosser fires 25% weaker; range grows 1 band |
 | Cross Their Bow | Cross Their Bow | Circling: no range change; both fire 25% weaker |
 
 * **The cycle:** Cross beats Close In and Hold. Open Range beats Cross. Close In and Hold beat Open Range (the ship that Opens loses gun power, and Close In may win the chase). Which range you *want* decides which risk you take.
-* **Escape:** playing Open Range at Long range and winning the contest (or facing Hold or Open) ends the battle as Escaped.
-* **Terrain overrides:** in Shallows, Brigantines and Frigates must win a Helm contest to reach Close, even against Close In. In Kelp, range never goes beyond Medium. On a Reef, every Cross or Close In costs 10 Hull unless that water is Charted for you.
+* **Escape:** the range going past Far ends the battle as Escaped. Opening Range at Long reaches Far, not freedom, so a ship that runs needs one more good turn (D121). From Long, Open Range against Open Range escapes at once (2 bands). Otherwise a ship at Far escapes when it Opens Range against a Hold, wins the chase against Close In, or beats a Cross.
+* **Terrain overrides:** in Shallows, a Brigantine or Frigate without Local Knowledge must win a Helm contest to reach Close, even against Close In, and if it loses the range stops at Short (D42, D142). In Kelp, range never goes beyond Medium, so nobody escapes. On a Reef, every Cross or Close In costs 10 Hull unless that water is Charted for you.
+* **While Grappled** the table is skipped: a ship that plays Open Range tries to **Cut Free**, and any other move keeps the ships together (8.6).
+* **Dash** (Rammer, D150): a Close In that brings the ships nearer moves the range one band further, never past Close and never into a grapple. A Rammer closes two bands a round against a ship that Holds. A chase it loses is not a dash, and two Rammers each add a band.
+* **The dash spoils a rake** (Rammer): when a ship crosses the bow of a Rammer that Closes In, a Helm contest decides, at any distance. If the Rammer wins, the rake counts 1.75 instead of 2.0 and the Rammer is not weakened.
+* **Kite** (Skirmisher): Opening Range does not weaken its guns.
+* **Braced and Steady Deck** (Gunline, in a round it Holds, D148): a rake against it counts 1.35 instead of 2.0 and it is not weakened by the rake, and its guns do 40% more.
+* **The Ram** (Rammer, D151): at Close, a Rammer's Close In is a Ram. It is resolved after the Helm step and before the Board and the guns, and it strikes the enemy flagship.
+  * It misses if the other ship crossed its bow, or got away (it won the chase, so the range is no longer Close). Otherwise a Helm contest, the Rammer's score against the flagship's, decides.
+  * On a hit the struck ship loses 30 Hull and the Rammer loses 4. Against a Gunline that Holds the blow is 70% (21 Hull), and against a Boarder that plays Board it is 50%, because its grapnels are already on the Rammer's bow.
+  * A Ram that lands never grapples: a mutual Close In at Close stays at Close. A Ram that misses is a plain Close In, so a mutual Close In still grapples. A Board in the same round is still tried after the Ram.
+  * A Crippled Rammer can still Close In, so it can still Ram, but with no Rigging its Helm score is 0. Two Rammers can both Ram.
+  * A ship that Rams a Firebrand catches a blaze (8.5).
 
 ## 8.5 Guns
 
-| Order | Hits | Long | Medium | Close | Grappled |
-|-|-|-|-|-|-|
-| Round shot | Hull | 0.6 | 1.0 | 1.0 | 0.5 |
-| Chain shot | Rigging | 1.0 | 0.8 | 0.4 | 0 |
-| Grapeshot | Hands | 0 | 0.5 | 1.2 | 1.0 |
-| Hold Fire | Nothing. Uses no Powder; next round's guns do 1.5 times damage | | | | |
-| Board | Only at Close: try to grapple. Succeeds if your Helm score is at least theirs, or if they also Board or Hold | | | | |
-| Repel | Only when Grappled: no guns, +30% boarding defence | | | | |
+The range factor of each order at the five distances where the great guns fire. While Grappled the great guns are quiet and the deck fight decides (8.6), so there is no Grappled column.
+
+| Order | Hits | Far | Long | Medium | Short | Close | Who can fire it |
+|-|-|-|-|-|-|-|-|
+| Round shot | Hull | 0.2 | 0.6 | 1.0 | 1.0 | 1.0 | Everyone |
+| Chain shot | Rigging | 0.4 | 1.0 | 0.8 | 0.6 | 0.4 | Everyone |
+| Grapeshot | Hands | 0 | 0 | 0.5 | 0.85 | 1.2 | Everyone |
+| Mortar | Hull | 1.1 | 1.1 | 0.85 | 0 | 0 | Bombardier only |
+| Hot Shot | Hull | 0 | 0.3 | 0.3 | 1.0 | 1.0 | Firebrand only |
+
+The orders that fire no great guns:
+
+| Order | What it does |
+|-|-|
+| Hold Fire | Nothing. Uses no Powder; next round's guns do 1.5 times damage |
+| Board | Try to grapple, after the Helm step: only at Close, or at Short for a Boarder. Succeeds if your Helm score is at least theirs, or if they also Board or Hold (8.6) |
+| Charge, Volley, Repel, Fire Pots | The Deck orders (8.6). They count only while Grappled. At any other range they do nothing, fire no guns and use nothing |
 
 **Damage per round:**
 
 `damage = 22 × (Cannons ÷ 10)^0.6 × range factor × gunnery × helm modifier × terrain × powder × luck`
 
 * gunnery = min(1, Hands ÷ 60% of max Hands)
-* helm modifier: rake 2.0, flank or stern shot 1.25, weakened 0.75
+* helm modifier: rake 2.0, flank or stern shot 1.25, weakened 0.75, and a Gunline's Steady Deck 1.4 (8.4)
+* terrain: shots at Long and at Far count 0.75 in Rocky water and 0.5 in Fog
 * powder: 0.5 if out of Powder
 * luck: seeded, 0.9 to 1.1 (19.1)
-* Round shot damage removes Hull points; Chain shot removes Rigging points; Grapeshot removes 1 Hand per 3 damage.
-* **Staleness:** the same Guns order three rounds in a row does 20% less.
+* Hold Fire's 1.5 (the round after it), staleness and the Mortar's Zeroing In multiply on top.
+* Round shot, the Mortar and Hot Shot remove Hull points; Chain shot removes Rigging points (and does nothing to a ship with none); Grapeshot removes 1 Hand per 3 damage. Damage is rounded to whole points and never goes past what the target has left.
+* **Staleness:** the same Guns order three rounds in a row does 20% less, from the third round on. The Mortar never goes stale.
+* **Powder:** a ship that fires burns its hull's Powder per round (6.5). A ship with none fires at half damage and burns none.
 
-## 8.6 Boarding
+**The Mortar** (Bombardier only, D137, D146)
 
-* **Boarding strength** = Hands × (1 + Bosun, trait and Background bonuses), × 1.3 for a ship that plays Repel.
-* Each Grappled round, each side removes Hands from the other equal to 20% of its own boarding strength.
-* **Captured:** when one side's Hands fall below 40% of the other side's, or below 20% of its own max, it surrenders.
-* **Cut Free:** a Grappled ship can play Open Range; if it wins a Helm contest, range returns to Close.
+* Hits Hull, by the table above, and is the best Hull shot at Far and Long. It takes the rake, flank and weakened factors of the Helm step like any gun.
+* Each shell hits 80% of the time. A shell that misses does nothing, but still uses its Powder.
+* A hit starts a fire 40% of the time, which burns for 2 rounds.
+* **Zeroing In:** the Mortar does 10% more for each round in a row it is fired with the range unchanged, the first such round already counting, up to 50% more. Any other order, or a change of range, starts it again.
+* Any ship that is not a Bombardier and is given the Mortar fires Round shot instead.
+
+**Hot Shot** (Firebrand only, D138, D169)
+
+* Hits Hull, by the table above, and is strong only at Short and Close. The shot is heated in the galley fire, so it uses twice the Powder of other shot. With less than that left it still fires and uses up the rest.
+* 30% of the hits start a fire, which burns for 3 rounds.
+* Any ship that is not a Firebrand and is given Hot Shot fires Round shot instead. In P8 the Gunner's Heated Shot gives any style one round of Hot Shot (7.3).
+
+**Fire** (D138, D170)
+
+* A burning ship loses **12 Hull** at the end of each round, after the deck fight, for as many rounds as the fire burns, the round it was lit included. A fire can sink a ship, and a Sunk ship is towed as always (8.7).
+* Fires start from: a Hot Shot hit (30%, 3 rounds), a Mortar hit (40%, 2 rounds), a Firebrand's Fire Pot (30% of throws, 3 rounds, 8.6), the embers of a Fireship (40% each round while Grappled with a Firebrand, 2 rounds) and a Ram on a Firebrand (2 rounds, 8.4). Hot Shot, the Mortar, Fire Pots and embers set the enemy flagship alight. A Ram sets the ramming ship alight.
+* A **Gunline** drills for fire: a burning Gunline loses only 60% of the fire's Hull (7). A burning **Firebrand** loses twice as much (24), because of the pitch in its hold.
+* A new fire on a burning ship keeps whichever fire burns longer.
+* A fire's Hull counts as damage dealt by the other side for Victory on points (8.7).
+* A round that ends in an Escape still burns. A round of Struck Colours stops everything, fire too. Fires belong to the battle and burn out with it: none carries into the next battle or the next Tide.
+
+## 8.6 Boarding: the deck fight
+
+**Getting Grappled**
+
+* Two ways: both ships Close In while already at Close, or a **Board** order. A Board is tried after the Helm step, at the range that step left: at Close, or at Short for a Boarder (grapnel lines). It succeeds if your Helm score is at least theirs, or if they also Board or Hold. A third way belongs to Old Shellback alone: his claw snatch (2.5), which counts as his Board, so he holds the edge.
+* **Grapnels:** a Board that would fail on Helm score gets a Helm contest instead. A Boarder has Grapnels from Drill 0, and its score counts 3 times in that contest. Any other ship unlocks them at Drill 10, and its score counts once (6.2).
+* A grapple that comes from Close In against Close In never tries the Board orders. A Ram that lands never grapples, but a Board in the same round still can (8.4).
+* The guns of the round the ships grapple fire at Close, as the ships come together, and then the deck fight begins in the same round (D163).
+
+**While Grappled**
+
+* The great guns are quiet. Round shot, Chain shot, Grapeshot, the Mortar and Hot Shot fire nothing, roll no luck and use no Powder, which is why the 8.5 table has no Grappled column (D160).
+* The Helm table is skipped. A ship that plays Open Range tries to **Cut Free**; any other move keeps the ships together. A Crippled ship cannot Cut Free.
+* The order a rule gives is a **Deck order**. If the rule gives a Guns order instead (a rule written for another range), the crew fights with Fists.
+
+**The Deck orders**
+
+| Order | Weapons | Hit | Guard | Beats | Uses |
+|-|-|-|-|-|-|
+| Charge | Cutlasses | 1.5 | 1.25 | Volley: the charge reaches the muskets before they reload | Nothing |
+| Volley | Muskets and swivel guns | 1.1 | 1.0 | Repel: the crew massed at the rail is an easy target | Powder, like a round of guns |
+| Repel | Pikes at the rail | 0.6 | 0.6 | Charge: the charge runs onto the pikes | Nothing |
+| Fire Pots | Clay pots of pitch and rum, lit and thrown | 1.4 | 1.0 | Nothing, but it ignores the guard of Repel | 1 Fire Pot a throw. A Firebrand may throw from Drill 0, any other style from Drill 5 |
+| Fists | Fists and belaying pins | 1.0 | 1.0 | Nothing | Nothing |
+
+* **Hit** is how hard a crew strikes. **Guard** is how much of the other crew's strike it takes, so Repel guards well and a Charge leaves the crew open.
+* **The cycle** works like the Helm cycle of 8.4: Charge beats Volley, Volley beats Repel, Repel beats Charge. In a pairing the order that wins strikes 1.8 times harder and the order that loses strikes at 0.75. Fire Pots and Fists are outside the cycle.
+* **Fists** is what a crew fights with when its order is a Guns order, a Volley with no Powder, or Fire Pots with no pot or no right to throw one. It is never a choice in a doctrine. Fists against Fists is the plain melee: each side removes 20% of its own boarding strength.
+* **In the round the ships grapple,** only a crew whose own Board made the grapple (or joined it, because both ships Boarded) fights as a Charge. Every other crew fights with Fists, whatever its rule said, so the first round cannot be Repelled. A grapple from Close In against Close In gives both crews Fists. From the next round a Charge and a Repel count as given, a Volley counts if the ship had Powder when the round began, and Fire Pots count with a pot and the right to throw it (D161).
+
+**The melee** (both crews strike at once)
+
+`Hands lost by B = 0.2 × strength of A × hit of A's order × pairing × guard of B's order`
+
+* **strength** = Hands × (1 + Bosun, trait and Background bonuses) × the Drill factor (6.2) × Kelp (1.15, for both ships) × First over the rail (1.25, below) × Fighters (1.2, a Boarder's crew) × Tinderbox (0.8, a crew fighting a Firebrand on deck).
+* **pairing:** 1.8 for the order that wins the cycle, 0.75 for the one that loses it, otherwise 1.
+* **Second Wave** (Drill 15): after the exchange the crew strikes once more at a quarter of its strength, which makes the whole strike 1.25 times as large.
+* Losses are whole Hands. Half of all lost Hands are wounded (6.4).
+* **Captured:** after a deck fight, a side whose Hands fall below 40% of the other side's, or below 20% of its own max, surrenders (8.7). Grapeshot thinning a crew never captures it, only a deck fight does.
+* **There is no luck roll in the deck fight itself.** The dice are the Cut Free contests, the grapnels and whether a Fire Pot catches. Between equal ships that makes a small edge in strength decisive at the starting numbers (D181, D198), and whether the melee should get a luck roll is a call for P3.2.
+
+**Fire Pots**
+
+* A throw uses up one pot, caught or not, and rolls 30% for a fire.
+* A **Firebrand's** pot that catches sets the enemy flagship alight for 3 rounds (fire is in 8.5).
+* Any **other style's** pot that catches is a flash: the throwing ship and the enemy flagship each lose 8 Hull at once, and neither is ever taken below 1 Hull. Nothing burns after it.
+
+**The boarder's edge** (D117, D162)
+
+* The **boarder** is the ship whose Board made the grapple. If both ships Board in the same round, or the grapple came from Close In against Close In, nobody holds the edge. Any captain can earn it by boarding, whatever their style.
+* **First over the rail:** in the round it grapples, the boarder's Board fights as a Charge with its strength × 1.25. The other crew chose its order before the grapple and fights with Fists.
+* **Lashed fast:** while the grapple lasts, the boarder's Helm score counts 2 times in every Cut Free contest of the ship it holds, so an equal ship wins about 1 try in 3. A ship with Grapnels (a Boarder, or any ship at Drill 10) is lashed fast in every grapple it is in, not only the ones it made. A boarder that cuts free of the ship it boarded gets no help.
+* **Harder to repel:** the first round cannot be Repelled, and Lashed fast keeps the defender in the fight. In later rounds Repel still beats Charge, on purpose; the boarder's answer to Repel is Volley.
+* The edge ends when the grapple does. A new grapple makes a new boarder.
+
+**Cut Free**
+
+* A Grappled ship that plays Open Range rolls a Helm contest against the enemy flagship (a fleet mate rolls its own). If either ship wins, the range returns to Close.
+* In that round there is no deck fight, no new grapple is tried, and the great guns of both ships stay quiet, because every hand is at the axes (D135, D162).
+
+**Overtime**
+
+* A deck fight still going when round 5 ends goes on for up to 2 more rounds (D127, D164). The guns stay quiet, Cut Free still works, and the battle ends as before: a Capture, a Sinking, or points after the last round played. If the ships have cut free and are no longer Grappled when round 5 ends, there is no overtime.
+
+**Crew** [P8]: the Bosun's Brawler branch adds to boarding strength on top of Drill, and Boarders Away (an instant grapple) gives the edge (7.3).
 
 ## 8.7 Outcomes
 
 | Outcome | How | Winner gets | Loser |
 |-|-|-|-|
-| Sunk | Hull reaches 0 | 25% of the loser's plunder and cargo, grabbed from the water; Fear | Towed to the nearest known Harbour, half patched, sailing again next Tide. The rest of its cargo becomes a **Wreck** in that water |
-| Captured | Wins the boarding | 40% of plunder and cargo, plus one pick: an intel original, two intel copies, or one crewmate prisoner; volunteers (6.4) | Towed as above. Nothing permanent is lost |
-| Struck Colours | The loser's doctrine says Surrender | 15% of plunder and cargo | Ship stops taking damage |
-| Crippled | Rigging reaches 0 | Battle goes on; the crippled ship cannot Open or Cross, so this usually ends in a Capture | Limps one hop per Tide until repaired |
-| Escaped | Range goes past Long | Nothing | Nothing |
-| Victory on points | After 5 rounds, one side leads by 10 points of damage share | 20% of plunder and cargo | |
+| Sunk | Hull reaches 0, from guns, a Ram, a Reef scrape or fire | 25% of the loser's plunder and cargo, grabbed from the water; Fear | Towed to the nearest known Harbour, Hull raised to at least half, sailing again next Tide. The rest of its cargo becomes a **Wreck** in that water |
+| Captured | Wins the deck fight (8.6): the loser's Hands fall below 40% of the winner's, or below 20% of its own max | 40% of plunder and cargo, plus one pick: an intel original, two intel copies, or one crewmate prisoner; volunteers (6.4) | Towed as above. Nothing permanent is lost |
+| Struck Colours | The loser's doctrine says Surrender. It is settled first in the round: the colours come down and nothing else happens, fire included | 15% of plunder and cargo | Ship stops taking damage |
+| Driven off | Old Shellback only: his Hull falls below 35% or his claws below 25% of their full strength (D205) | Counts as Struck Colours: 15% of plunder and cargo. It beats him (2.5) | He retreats into his shell and is back next Tide |
+| Crippled | Rigging reaches 0 | Battle goes on; the crippled ship cannot Open Range or Cross (it plays Hold, so it cannot Cut Free either), so this usually ends in a Capture | Limps one hop per Tide until repaired |
+| Escaped | Range goes past Far | Nothing | Nothing |
+| Victory on points | After the last round played (5, or up to 7 in overtime), one side leads by 5 points of damage share (D132) | 20% of plunder and cargo | |
 | Draw | Otherwise | Nothing | Nothing |
 
-* All loot is multiplied by the fairness factor and capped per battle (v0.2 section 9).
+* **End checks run in this order:** Sunk, then Captured (only after a deck fight), then driven off (Old Shellback only), then Escaped. If both ships reach 0 Hull in the same round, the side that dealt more damage in the battle wins the Sinking, and equal damage is a Draw. A ship that fire sinks in the round a Capture would have happened is Sunk. A fire can sink a ship (8.5), and the Sunk ship is towed as always. If both sides fall below the Capture line, the side with fewer Hands is Captured, and equal Hands is a Draw.
+* **Damage share** (for Victory on points): a hit counts as its share of the victim's max on that track (Hull, Rigging or Hands), averaged over the victim's tracks (three, or two for a ship with no Rigging). Hull lost to a Ram, to fire or to a Fire Pot flash counts as damage dealt by the other side, and a Reef scrape does not. A lead of exactly 5 points counts.
+* **Old Shellback is never beaten on points** (2.5): a fight with him that reaches the end on points is a Draw, whoever led (D205).
+* All loot is multiplied by the fairness factor and capped per battle (v0.2 section 9). When a fleet splits the loot, the Hull a fire took counts for the ship that lit the fire.
 * **Spill:** cargo thrown overboard (the Jettison ability or a doctrine rule) becomes **Flotsam** in that water for 2 Tides. Anyone can Salvage it.
 * **Wrecks** last 4 Tides. Each Salvage takes 5 units.
 * Sinking pays less than capturing but is safer. Greed pushes you to board, which is riskier.
@@ -727,23 +884,36 @@ Moves: **Close In**, **Hold**, **Open Range**, **Cross Their Bow**.
 
 * A doctrine is an ordered list of **rules**. Each round, the first rule whose conditions are true fires.
 * A rule is: **IF** up to 2 conditions **THEN** a Helm move and a Guns order, or Surrender, or Jettison.
-* **Ability rules** are the exception: when one fires, the crew ability triggers and the doctrine keeps checking the rules below it to find this round's Helm move and Guns order.
+* **Ability rules** are the exception: when one fires, the crew ability triggers and the doctrine keeps checking the rules below it to find this round's Helm move and Guns order. [P8: the engine has the slot and no abilities yet.]
 * The last rule is always *Otherwise*, with no condition.
-* **Slots:** 3, plus Command ranks 1 and 4 (+1 each), plus a Helmsman (+1), plus Navy Deserter (+1). Cap 7.
+* **Slots** count the rules that have conditions: 3, plus Command ranks 1 and 4 (+1 each), plus a Helmsman (+1), plus Navy Deserter (+1). Cap 7. The Otherwise rule is always there and is free (D64).
 * **Conditions:**
-  * Range is X, at least X, or at most X
-  * Round is N, or at least N
+  * Range is X, at least X, or at most X, over the six distances. Far is the farthest and Grappled the nearest, so "range at least Long" means Long or Far
+  * Round is N, or at least N. A doctrine can name rounds 1 to 5, and "round at least 5" stays true in overtime
   * My or their Hull, Rigging or Hands above or below N%
-  * Their last Helm move or Guns order was X
+  * Their last Helm move or Guns order was X. The Deck orders are Guns orders, so "their last order was Repel" works
+  * **Their style is X** (D128): one rule for the counter you fear. It is false against a ship with no style, such as Old Shellback
   * Enemy type: merchant, navy, monster, player, Brethren captain, or a named captain
   * Terrain is X; the wind gauge is mine or theirs
-  * I have Powder; an ability is still unused
-* **Abilities in rules:** *IF range is Medium AND round at least 2 THEN Gunner: Heated Shot.*
+  * I have Powder; **I have Fire Pots**; an ability is still unused
+* **Orders a rule can give** next to its Helm move: Round shot, Chain shot, Grapeshot, Hold Fire, Board, Mortar and Hot Shot (8.5), and the Deck orders Charge, Volley, Repel and Fire Pots (8.6). Fists is never a choice: it is what a crew falls back to.
+* **A copied doctrine always plays** (D146, D173). The Mortar, given to a ship that is not a Bombardier, and Hot Shot, given to one that is not a Firebrand, are played as Round shot, and the replay says so. Fire Pots with no pot or no right to throw one, and a Volley with no Powder, are played as Fists. A Deck order at any other range does nothing, fires no guns and uses nothing. The doctrine editor will warn about all of these [client, not built].
+* **Abilities in rules** [P8]: *IF range is Medium AND round at least 2 THEN Gunner: Heated Shot.*
 * Each captain saves **3 named doctrines**; voyage plan steps pick which one to use (*"intercept with Boarders"*).
-* **Templates** for beginners: Brawler, Skirmisher, Runner (flees), Coward (Strikes Colours at 50% Hull).
-* **Fleet battles:** each ship's doctrine is judged against the enemy flagship's moves (v0.2 7.5).
-* **Information:** replays are public and show which rule fired each round, so careful viewers can reconstruct a captain's doctrine. A **Doctrine Copy** can also be taken on a Capture (10.2).
-* **Battle preview:** the browser runs 200 simulated battles against the target's last known doctrine (rebuilt from replays) or a template.
+* **Templates** are the beginner doctrines, one for each Fighting Style (8.8a), and a captain starts with the template of their style as their first saved doctrine. Each is at most 3 rules with conditions and an Otherwise, so every one fits the base slots (D64). They replace the four of the first v0.3 draft: the Brawler became the Rammer and the Boarder, the Runner and the Coward became the Smuggler, and the Skirmisher was rewritten (D123). A captain with no style starts with the Boarder (D172). Their rules, exactly as built:
+  * **Bombardier:** IF Grappled THEN Open Range, Repel. IF range is at most Short THEN Open Range, Round shot. IF range is Medium THEN Open Range, Mortar. Otherwise Hold, Mortar.
+  * **Gunline:** IF Grappled THEN Open Range, Repel. IF range is at most Close THEN Hold, Grapeshot. IF range is at least Long THEN Close In, Round shot. Otherwise Hold, Round shot.
+  * **Skirmisher:** IF Grappled THEN Open Range, Repel. IF their last Helm move was Close In THEN Cross Their Bow, Round shot. IF range is at least Medium THEN Close In, Round shot. Otherwise Cross Their Bow, Round shot.
+  * **Rammer:** IF Grappled THEN Open Range, Repel. IF their last Helm move was Cross Their Bow THEN Open Range, Round shot. Otherwise Close In, Round shot.
+  * **Boarder:** IF Grappled AND their last order was Repel THEN Hold, Volley. IF Grappled THEN Hold, Charge. IF range is at most Short THEN Close In, Board. Otherwise Close In, Round shot.
+  * **Firebrand:** IF Grappled THEN Hold, Fire Pots. IF their last Helm move was Cross Their Bow THEN Open Range, Hot Shot. IF range is at least Medium THEN Close In, Round shot. Otherwise Close In, Hot Shot. Hot Shot is weak beyond Short and costs double Powder, so the template saves it for Short and Close.
+  * **Smuggler:** IF my Hull is below 40% THEN Surrender. IF Grappled THEN Open Range, Repel. Otherwise Open Range, Chain shot. It strikes its colours early to keep most of its cargo (8.7).
+* **Fleet battles** (v0.2 7.5, D91 to D95, D152, D174):
+  * One range, moved by the two flagships. Each ship's doctrine is judged against the enemy flagship's moves, and each ship uses its own trait.
+  * A Ram, a Mortar shell, a Hot Shot and a Firebrand's fire land on the enemy flagship, as guns aim at it. The flash of a Fire Pot from any other style costs the throwing ship and the enemy flagship. A mate's Close In never moves the range, and Spotters read the two flagships only.
+  * In the deck fight each ship's Deck order is judged against the enemy flagship's. The side's crews are added up, and the side bonus applies once. The edge goes to the side whose ship made the grapple, a mate's Board included, and Lashed fast doubles the flagship's score in a mate's Cut Free contest too.
+* **Information:** replays are public and show which rule fired each round and each ship's style, so careful viewers can reconstruct a captain's doctrine. A **Doctrine Copy** can also be taken on a Capture (10.2).
+* **Battle preview** [client, not built]: the browser runs 200 simulated battles against the target's last known doctrine (rebuilt from replays) or a template, and shows the target's style.
 
 Example doctrine, *Boarders*:
 
@@ -753,7 +923,45 @@ Example doctrine, *Boarders*:
 4. IF round is 3 AND Gunner ability unused THEN Gunner: Double Shot
 5. Otherwise: Cross Their Bow, Round shot
 
-Example round: the *Salty Gull* (Boarders) meets the *Wet Sock* at Medium range in Open water. Round 3: the Gull's rule 4 fires (Double Shot, then its rule 5 move, Cross Their Bow). The Sock's doctrine says "IF round is 3 THEN Hold, Round shot". Cross against Hold is a rake: the Gull's doubled shot does about 4 times normal damage and the Sock's guns do 25% less. The replay shows the Gull swinging across the Sock's bow, the Gunner's cut in, and a huge splinter cloud.
+Example round: the *Salty Gull* (Boarders) meets the *Wet Sock* at Medium range in Open water. Round 3: the Gull's rule 4 fires (Double Shot, then its rule 5 move, Cross Their Bow). The Sock's doctrine says "IF round is 3 THEN Hold, Round shot". Cross against Hold is a rake: the Gull's doubled shot does about 4 times normal damage and the Sock's guns do 25% less. The replay shows the Gull swinging across the Sock's bow, the Gunner's cut in, and a huge splinter cloud. (Had the Sock been a Gunline, Braced would have cut the rake from 2.0 to 1.35.)
+
+Example deck rules, *Reading the Rail*, written to read the other crew (8.6):
+
+1. IF Grappled AND their last order was Charge THEN Hold, Repel
+2. IF Grappled AND their last order was Repel THEN Hold, Volley
+3. IF Grappled THEN Hold, Charge
+4. Otherwise: Close In, Round shot
+
+Repel beats Charge, Volley beats Repel and Charge beats Volley, so rules 1 and 2 answer what the other crew did last round and rule 3 beats a Volley.
+
+## 8.8a The Fighting Styles
+
+* A captain picks a **Fighting Style** at creation, with the starting doctrine (5.1, D122). It gives a **trait** and a **template** (8.8). Six styles fight and sit on one wheel. The Smuggler is the trader's style and sits outside it.
+* The trait belongs to the captain, not to the rules, and pays only in a round its own move or order is played. A captain who copies another style's doctrine gets the rules and not the trait.
+* The battle record carries each ship's style, so replays and the battle preview show it as a badge and no trait is a hidden bonus (D122, D143).
+* **The wheel:** each fighting style beats two, loses to two and is even with one. These are soft counters, so no style is a free pick and none is a dead one. The simulator holds each designed win to 55% to 80% of decided battles and each even pair to 35% to 65% (8.9, check 6).
+
+| Style | Home distance | Trait | Signature move | Beats | Loses to | Even with |
+|-|-|-|-|-|-|-|
+| Bombardier | Far and Long | Spotters, Zeroing In, small crew | Mortar | Gunline, Firebrand | Rammer, Boarder | Skirmisher |
+| Gunline | Medium | Braced, Steady Deck, Long Nines, fire drill | Holding its ground | Skirmisher, Boarder | Rammer, Bombardier | Firebrand |
+| Skirmisher | Short | Kite | Cross Their Bow | Rammer, Firebrand | Gunline, Boarder | Bombardier |
+| Rammer | Close | Dash | Ram | Gunline, Bombardier | Skirmisher, Firebrand | Boarder |
+| Boarder | Grappled | Grapnel lines, Fighters, the chase, grapnels catch the prow | Board from Short | Skirmisher, Bombardier | Gunline, Firebrand | Rammer |
+| Firebrand | Short and Close | Fireship, Tinderbox, Fire Pots from the start | Hot Shot | Boarder, Rammer | Skirmisher, Bombardier | Gunline |
+| Smuggler | None | Slippery | Strikes early | Outside the wheel | | |
+
+**The traits, one by one** (every number is in `balance.ts` under `styles` and `combat.fire`):
+
+* **Bombardier:** the **Mortar** (8.5), **Spotters** (the battle starts at Far, 8.1), **Zeroing In** (the Mortar does 10% more for each round in a row the range has not changed, up to 50% more), and a **small crew**: the mortar takes the deck, so a Bombardier sails with 60% of the Hands (6.4). Boarders love it.
+* **Gunline**, in a round it Holds: **Braced** (a rake against it counts 1.35 instead of 2.0, it is not weakened by the rake, and a Ram against it does 70%), **Steady Deck** (its guns do 40% more) and **Long Nines** (its Round shot at Long counts 0.8 instead of 0.6). **Fire drill:** a burning Gunline loses only 60% of the fire's Hull.
+* **Skirmisher:** **Kite.** Opening Range does not weaken its guns.
+* **Rammer:** **Dash** (Close In moves one band further), the **Ram**, and the **dash spoils a rake** (all in 8.4).
+* **Boarder:** **Grapnel lines** (Board works from Short, and a Board that fails on Helm score becomes a Helm contest with its score counted 3 times), **Fighters** (its crew fights with 20% more boarding strength), **the chase** (its Helm score counts 1.3 times in a round it Closes In), and **grapnels catch the prow** (a Ram against it in a round it plays Board does half). It also earns the boarder's edge (8.6), as any ship does by boarding.
+* **Firebrand:** **Hot Shot** (8.5), **Fire Pots from Drill 0** with 2 pots to start (8.6), **Fireship** (a ship that Rams a Firebrand catches a blaze of 2 rounds, and while Grappled with a Firebrand the enemy deck catches fire 40% of the time each round) and **Tinderbox** (a crew fighting a Firebrand on deck fights at 80% of its strength, and the pitch in the hold burns both ways: a burning Firebrand loses twice the fire's Hull). Fire is in 8.5.
+* **Smuggler:** **Slippery** (its Helm score counts 1.25 times in a round it Opens Range). Its template strikes its colours below 40% Hull.
+
+Changing style in a City is [P5]: the price and any wait are set with the Harbour, and the change has to cap or fill the Hands (D145). Styles are equal on paper and do not change the Power Rating (6.2). In P8, skill trees may add to a trait but never copy another style's, and the Gunner's Heated Shot gives any style one round of Hot Shot (7.3). Two more styles, the Trickster and the Dread, wait for Season 1 (`docs/IDEAS.md`).
 
 ## 8.9 Verify before building
 
@@ -765,17 +973,37 @@ The bot simulator must show all of these before this combat system is locked:
 * A ship with twice the Power Rating wins about 85 to 90% of the time.
 * Old Shellback is beatable by a fresh Sloop with a good doctrine, about half the time.
 
+Those five lines say "about" and "the field", so the simulator (`npm run sim:v3`, `tools/v3/sim/`) draws a line for each. Since the Fighting Styles, the deck fight and Drill it also runs five more checks, ten in all (`-- --check` takes 1 to 10). **These are the lines the simulator draws** (D109 to D115, D182 to D200). They are test lines, not gameplay numbers, so they live in the simulator and not in `balance.ts`. The fights run the real engine with ships that really have their style, in 9 scenes (open water in a Breeze, a Calm and a Gale, the Shallows, a Reef both Charted and not, Rocky, Fog and Kelp) and in both seats. Check 5 plays the Narrows instead.
+
+| # | Measured as | Passes when |
+|-|-|-|
+| 1 The field | The six style templates against each other, equal fresh sloops | Every style wins from 25% to 60% of the field, averaged over the scenes |
+| 2 Best play | Situations grouped by the distance the round starts at, every play tried on the same seeds. 17 plays: the 4 Helm moves; the Guns orders Round shot, Chain shot, Grapeshot, Hold Fire, Board, Repel, Mortar, Hot Shot, Charge, Volley and Fire Pots; the Ram; and Board from Short | Each of the 17 is clearly best (2 standard errors ahead of every other play) in at least one situation. Fire Pots are judged between ships at Drill 5. Fists is a fallback, so it is not checked |
+| 3 Seat split | The battles of check 1 without the doctrines: of the battles somebody won, the hunter's share, pooled and in each mirror match | The 95% range of the hunter's share reaches into 45% to 55%. A mirror with no decided battle passes |
+| 4 Power Rating | Random plans (the v0.2 7.3 method): a fresh sloop against a balanced stronger sloop at rating ratios 1, 1.25, 1.5 and 2. Battles that end Escaped are left out | The stronger ship wins 83% to 92% of the fought battles at ratio 2, and the share rises with the ratio |
+| 5 Old Shellback | A fresh sloop on Tide 6 through the real Tide loop. A search finds the best doctrine a new captain of that style can save, and it is confirmed on fights it never saw. It runs once for each style; the Smuggler is searched and printed, not judged | Each style's confirmed share is from 35% to 80% (D140) |
+| 6 The wheel | The 15 pairs of the styles, read from the battles of check 1 | The 12 designed wins from 55% to 80% of decided battles, the 3 even pairs from 35% to 65% |
+| 7 Equal spending | The same levels N (5 and 10) spent the way each style would: the Boarder on Drill, the Rammer on Hull, the other four on Cannons | No style above 60% of the field |
+| 8 Drill | Boarder against Boarder | Drill 5 against Drill 0 wins 55% to 80% of decided battles. Drill 15 against Drill 0 wins a share between the shares check 4 finds for the rating ratios either side of 1.38 (a Drill 15 sloop rates 1.38 times a fresh one) |
+| 9 Lashed fast | An equal fresh sloop that tries to Cut Free from a Boarder holding the edge | It wins at most 40% of its tries (a third, with room for noise), from at least 100 tries |
+| 10 The Smuggler | A fresh Smuggler against each of the six styles | It escapes at least 30% of its battles against every style |
+
+* Beside the ten checks the report prints the **gate pace** of 2.5, worked out from the win chance on each Tide: the median captain should pass by Tide 7 to 9 and nobody later than Tide 12. It is printed, not pass or fail.
+* The results and the findings that P3.2 tunes from are in `docs/DECISIONS.md` (D197 to D200). The brief is `docs/briefs/P3-combat-testing.md`.
+
 # 9. Trade and economy
 
 ## 9.1 Goods
 
 | Category | Goods | Used for | Phase |
 |-|-|-|-|
-| Supplies | Provisions, Powder | Range at sea, gunfire | S0 |
+| Supplies | Provisions, Powder, Fire Pots | Range at sea, gunfire, the deck fight | S0 |
 | Staples | Rum, Sugar, Spice | Profit; Rum also raises crew loyalty | S0 |
 | Materials | Timber, Canvas | Repair at sea (Timber), cheaper upgrades | Timber S0, Canvas S1 |
 | Luxuries | Pearls, Ghostwood, Kraken Ink | High profit, found only far from the Cradle | S1 |
 | Contraband | Cursed Gold, Forbidden Relics | Huge profit, illegal in the Crown Keys | S1 |
+
+* Supplies are not cargo (D167): hunters do not look for them, loot never takes them, they never go into a Wreck or Flotsam, and a tow keeps them. Fire Pots are sold in Towns and Cities like Powder; the buying screen and the price are [P5].
 
 ## 9.2 Markets
 
@@ -814,7 +1042,7 @@ The bot simulator must show all of these before this combat system is locked:
 
 ## 9.6 How trade connects everything
 
-* Traders supply Powder (fighters need it), Provisions (explorers need range), and Timber and Canvas (everyone's upgrades get cheaper).
+* Traders supply Powder and Fire Pots (fighters need them), Provisions (explorers need range), and Timber and Canvas (everyone's upgrades get cheaper).
 * Price Sheets and Charts are intel, so traders buy information and explorers sell it.
 * Cargo means weight (fewer Watches when the Hold is over 80% full) and risk (loot), so traders hire escorts through pacts (14) or choose routes through terrain where small ships win.
 * Guild shares turn ports into territory; blockades turn territory into conflict.
@@ -984,6 +1212,7 @@ All NPC ships (merchants, navy, pirates, rookies, lords) and the test bots run o
 4. **Choice:** the best plan, plus a doctrine from its own doctrine set.
 
 * NPCs follow the same rules as players: Watches, WCS, supplies, fog. Locals know the currents of their home archipelago (Local Knowledge).
+* **Fighting Styles [P9]:** the brain picks a style and its template for each NPC: merchants and locals fight as Smugglers, navy patrols as Gunlines, and pirates and the Brethren use the other styles (8.8a). Until P9 an NPC ship has no style and no trait and starts with the Boarder template (D172); Old Shellback has a doctrine of his own (2.5).
 * Everything is seeded from the Tide seed, so NPC behaviour replays exactly.
 
 ## 13.2 Kinds of NPC captains
@@ -1198,11 +1427,11 @@ The **Bookie** (an NPC in every tavern; the markets are shared everywhere) posts
 
 ## 19.1 Fair luck
 
-* **Where luck exists, and only there:** damage variance (0.9 to 1.1), Helm contest rolls, escape rolls, event draws, and trait procs.
+* **Where luck exists, and only there:** damage variance (0.9 to 1.1), Helm contest rolls (the chase, Cut Free, the Ram, the dash, grapnels), Mortar shells hitting, fires catching, escape rolls, event draws, and trait procs. The deck fight itself has no roll (8.6).
 * **Telegraphed:** you knew it was possible (a forecast, a cursed item you chose to keep).
 * **Earned:** it comes from your choices (Lucky Pete fires because you recruited Lucky Pete).
 * **Bounded:** luck shifts a result at most one step (a loss into a draw), never a rout into a win.
-* **Streak breaker:** after 3 battles in a row where luck went against you, your next battle's luck range becomes 1.0 to 1.1. The *Lucky Fool* trait makes this happen after 2.
+* **Streak breaker** [not built: it needs a luck history for each captain, D34]: after 3 battles in a row where luck went against you, your next battle's luck range becomes 1.0 to 1.1. The *Lucky Fool* trait makes this happen after 2.
 * **Mostly funny:** most luck moments are flavour, like a whale surfacing between the ships so nobody can fire for a round.
 
 ## 19.2 Cinematics
@@ -1228,7 +1457,9 @@ All of them are skippable, at most 10 seconds long, and built from pixel art plu
 | Interactions per captain | One every 2 to 3 Tides |
 | Old Shellback passed | Median by Tide 7 to 9; everyone by Tide 12 |
 | Chart coverage at mid season | 50 to 70% for every good archetype; no more than 40% from own exploring alone |
-| Doctrine balance | No template above 60% against the field |
+| Fighting Style balance | No style above 60% of the field or below 25%. The wheel holds: each designed win 55% to 80% of decided battles, each even pair 35% to 65%. With equal levels spent the way each style would, no style above 60% |
+| Old Shellback by style | The best doctrine each style's captain can write beats him 35% to 80% of fights |
+| Drill, Lashed fast, the Smuggler | In a Boarder against Boarder fight, Drill 5 beats Drill 0 in 55% to 80% of decided battles; an equal ship wins at most 40% of its Cut Free tries against a boarder's edge; the Smuggler escapes at least 30% of its battles against every style |
 | First Brigantine | Median around one third of the season |
 | Longest stretch without a purchase | Under 4 Tides |
 | Missed Tides | A captain who misses 3 days ends above 85% of an unbroken captain's earnings |
@@ -1249,10 +1480,11 @@ All of them are skippable, at most 10 seconds long, and built from pixel art plu
 | Backgrounds | 6 of 9, with short Sagas | All 9, full Sagas | More |
 | Captain skills | All three skills, ranks 1 to 3 | Ranks 4 and 5 | |
 | Reputation | Trust, Fear, Fame, titles, basic effects | All effects | |
-| Ship | Sloop and Brigantine, 5 stats, 3 damage tracks, Hands, Provisions and Powder | Frigate, materials, Old Moorings | |
+| Ship | Sloop and Brigantine, 6 stats (Drill included, all three stages), 3 damage tracks, Hands, Provisions, Powder and Fire Pots | Frigate, materials, Old Moorings | |
 | History | Scars and the Ship's Log | Trophies, figureheads, ship traits | |
 | Crew | 2 slots, 8 roles, trees with all branches, traits, loyalty | Poaching, prisoners, Mascots, Brethren recruits | |
-| Combat | Full doctrine combat: range, helm, ammo, boarding, terrain | Crew ability cut ins | |
+| Fighting Styles | Six styles and the Smuggler, with their traits, moves and template doctrines; the wheel (8.8a). Changing style in a City is [P5] | Trickster and Dread (`docs/IDEAS.md`) | |
+| Combat | Full doctrine combat: six distances, helm, ammo, the deck fight, Drill, fire, overtime, terrain | Crew ability cut ins | |
 | Trade | Supplies and Staples, markets, contracts | Materials, Luxuries, Contraband, guild shares, blockades | |
 | Hotspots | Small and Big | Medium | |
 | Events | 30 Squalls, 8 Tales, 4 trait Tales | Mirror Tales, full Sagas | |
@@ -1265,7 +1497,7 @@ All of them are skippable, at most 10 seconds long, and built from pixel art plu
 | Scenes | Deck, Cabin, Tavern, Harbour as a menu | Hold, Crow's Nest, Brig, Gazette Office, Brethren Cove, Old Moorings | The rest |
 | Cinematics | Tide Turn, replays, front page spin | Cut ins, poster slams, panels, the Big Reveal | Battle GIFs |
 
-**A note on size:** even this Season 0 column is several times the v0.2 MVP. My rough guess is 2 to 3 months of evenings solo instead of 3 to 4 weeks. Options: accept the later date, or run an earlier "Season 0 lite" (the Cradle only, combat, crew, Watches and WCS, charting, pacts and agendas) and add the rest before Season 1.
+**A note on size:** even this Season 0 column is several times the v0.2 MVP. My rough guess is 2 to 3 months of evenings solo instead of 3 to 4 weeks. On 18 October 2026 Biscu chose the full column over an earlier "Season 0 lite" (the Cradle only, combat, crew, Watches and WCS, charting, pacts and agendas). The Fighting Styles, Drill and fire add to that size.
 
 # 22. Open decisions
 
@@ -1274,6 +1506,7 @@ All of them are skippable, at most 10 seconds long, and built from pixel art plu
 3. **Medium Hotspots:** the rarest surprise tier (as written), or between Small and Big.
 4. **Cradle Truce:** no PvP in the Cradle until Tide 5. Right length?
 5. **The Forger:** one unique NPC plus 2 kits per season, or the NPC only.
-6. **Season 0 shape:** the full Season 0 column, or Season 0 lite first (section 21).
-7. **Working names** to keep or replace: the Cradle, Gullhaven, Old Shellback, Polly Quillsworth, Inkfinger Isolde, Wendell Proudfoot, Marigold Teach, Bones McGill, Watches, WCS.
-8. **GAME_DESIGN.md:** fold this document into a v0.3 of the main design doc once these decisions are made, so there is one source of truth for Claude Code.
+6. **Working names** to keep or replace: the Cradle, Gullhaven, Old Shellback, Polly Quillsworth, Inkfinger Isolde, Wendell Proudfoot, Marigold Teach, Bones McGill, Watches, WCS.
+7. **GAME_DESIGN.md:** fold this document into a v0.3 of the main design doc once these decisions are made, so there is one source of truth for Claude Code.
+
+Decided and removed: **Season 0 shape.** Biscu chose the full Season 0 column of section 21 on 18 October 2026, and Fighting Styles joined that column (D122).

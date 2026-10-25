@@ -94,13 +94,15 @@ export const isRam = (ship: Pick<BattleShip, "style">, move: HelmMove, range: Ra
 
 /**
  * The Hull a Ram that lands takes off the struck ship: `ramHull`, times `bracedRam` against a Gunline that Holds, and times
- * `ramWhileBoarding` against a Boarder that plays Board, because its grapnels are already on the Rammer's bow.
+ * `ramWhileBoarding` against a Boarder that plays Board, because its grapnels are already on the Rammer's bow, and times Old
+ * Shellback's shell (`armour`, a factor the battle works out: his shell turns a prow aside, except in the round he rears up).
  */
-export const ramHull = (struck: Pick<BattleShip, "style">, struckMove: HelmMove, struckOrder?: GunsOrder): number =>
+export const ramHull = (struck: Pick<BattleShip, "style">, struckMove: HelmMove, struckOrder?: GunsOrder, armour = NEUTRAL): number =>
   Math.round(
     S.rammer.ramHull
     * (hasStyle(struck, "gunline") && struckMove === "hold" ? S.gunline.bracedRam : NEUTRAL)
-    * (hasStyle(struck, "boarder") && struckOrder === "board" ? S.boarder.ramWhileBoarding : NEUTRAL),
+    * (hasStyle(struck, "boarder") && struckOrder === "board" ? S.boarder.ramWhileBoarding : NEUTRAL)
+    * armour,
   );
 
 /** The Hull a Ram that lands costs the Rammer itself (D139). */

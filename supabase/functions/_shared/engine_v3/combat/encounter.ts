@@ -335,7 +335,9 @@ export function towShip(
 
 // ---------- The resolver ----------
 
-const resultOf = (kind: OutcomeKind): string => (kind === "escaped" ? "disengaged" : kind);
+/** What the encounter says it came to: the outcome, "disengaged" for an Escape, and "drivenOff" when Old Shellback retreated into his shell (D205). */
+const resultOf = (outcome: { kind: OutcomeKind; drivenOff?: "hull" | "claws" }): string =>
+  outcome.drivenOff ? "drivenOff" : outcome.kind === "escaped" ? "disengaged" : outcome.kind;
 
 const battleShipFor = (side: EncounterSide, role: BattleSide): BattleShip =>
   battleShipOf(side.ship, side.captain, role, { charted: side.charted, withCurrent: side.withCurrent, lurker: side.lurking });
@@ -447,7 +449,7 @@ export const combatEncounter: EncounterResolver = (ctx: EncounterContext): Encou
   });
   events.push({ t, kind: "battle", record, aftermath: applied.aftermath });
   return {
-    result: resultOf(record.outcome.kind),
+    result: resultOf(record.outcome),
     freeze: BATTLE_SIDES.flatMap((role) => sides[role].map((s) => s.ship.id)),
     events,
     tow: applied.tow,

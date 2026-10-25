@@ -146,6 +146,7 @@ export function conditionText(c: DoctrineCondition): string {
     case "enemyType": return `enemy type is ${c.type}`;
     case "enemyCaptain": return `enemy captain is ${c.captainId}`;
     case "theirStyle": return `their style is ${c.style}`;
+    case "mood": return `his mood is ${c.mood}`; // Old Shellback's own doctrine only; the search never writes one
     case "terrain": return `terrain is ${c.terrain}`;
     case "windGauge": return `the wind gauge is ${c.holder}`;
     case "havePowder": return "I have Powder";

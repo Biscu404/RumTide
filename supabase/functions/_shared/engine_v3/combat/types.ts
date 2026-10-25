@@ -42,6 +42,13 @@ export const DECK_ORDERS: readonly DeckOrder[] = ["charge", "volley", "repel", "
 /** How a Deck order met the enemy flagship's: it won the pairing of the cycle, lost it, or neither (8.6). */
 export type Pairing = "won" | "lost" | "even";
 
+/**
+ * Old Shellback's moods (fighting styles spec section 7): he closes in, rears up in one round of `shellback.rearUpRounds`, and
+ * grapples after it. Only a monster has a mood, and a captain's doctrine cannot test one.
+ */
+export type Mood = "closing" | "rearing" | "grappling";
+export const MOODS: readonly Mood[] = ["closing", "rearing", "grappling"];
+
 /** The three things a ship can lose in battle (6.3). */
 export type DamageTrack = "hull" | "rigging" | "hands";
 export const DAMAGE_TRACKS: readonly DamageTrack[] = ["hull", "rigging", "hands"];
@@ -139,7 +146,9 @@ export interface RoundShipRecord {
   guns: GunsOrder; // the order played: a ship given an order its style cannot give plays Round shot (see `asked`)
   asked?: GunsOrder; // the order the doctrine gave, only when the ship could not give it and played `guns` instead
   mortar?: { roll: number; hit: boolean; zeroing: number }; // only when the Mortar was fired: its hit roll, and the Zeroing In factor
-  exposed?: number; // a monster reared up this round: Round shot does this many times the damage to it. Absent for every other round (D102)
+  mood?: Mood; // only for Old Shellback, in every round he is not Grappled when it begins: what he is doing (the replay shows it)
+  tell?: true; // only for Old Shellback, in the round before he rears up: the sign the replay shows, which a doctrine cannot read (D204)
+  shell?: number; // only when this ship's guns hit Old Shellback: what his shell did to the shot, 0.8 or 3 for a Mortar shell (D201)
   deck?: DeckRecord; // only in a round of the deck fight (the ships were Grappled when the guns had fired)
   fire?: BurnRecord; // only for a ship that burned at the end of this round
   helmScore: number;
@@ -159,9 +168,11 @@ export interface GrappleRecord {
   side: BattleSide;
   ship?: ShipId; // set for a fleet mate that is not its side's flagship (P2.5)
   ok: boolean;
+  from?: "short"; // only for a Board played at Short, which only a ship with grapnel lines can do (a Boarder's Board works from Short, D168)
   // The first reason that let it succeed, or "failed". "grapnels" is the Helm contest a failed Board gets (kind "grapnel" in the
   // round's contests).
-  why: "helm" | "theyBoard" | "theyHold" | "grapnels" | "failed";
+  // "snatch" is Old Shellback's claws catching a ship that crossed his bow while he Closed In (fighting styles spec section 7).
+  why: "helm" | "theyBoard" | "theyHold" | "grapnels" | "snatch" | "failed";
 }
 
 /**
@@ -231,6 +242,7 @@ export interface BattleOutcome {
   winner: BattleSide | null; // null for Escaped and Draw
   loser: BattleSide | null; // null for Escaped and Draw
   round: number; // the round it was decided in
+  drivenOff?: "hull" | "claws"; // only for Old Shellback retreating into his shell, and why: a Struck Colours the other side did not ask for (D205)
 }
 
 // ---------- Doctrines (8.8) ----------
@@ -247,6 +259,7 @@ export type DoctrineCondition =
   | { kind: "enemyType"; type: EnemyType }
   | { kind: "enemyCaptain"; captainId: CaptainId }
   | { kind: "theirStyle"; style: FightingStyle } // false against a ship with no style (D128)
+  | { kind: "mood"; mood: Mood } // Old Shellback only: a captain's saved doctrine may not test it (D203)
   | { kind: "terrain"; terrain: Terrain }
   | { kind: "windGauge"; holder: "mine" | "theirs" }
   | { kind: "havePowder" }
@@ -254,7 +267,7 @@ export type DoctrineCondition =
   | { kind: "abilityUnused"; ability: string };
 
 export type DoctrineAction =
-  | { kind: "fight"; helm: HelmMove; guns: GunsOrder; exposed?: number } // `exposed` is for monsters only: a captain's saved doctrine may not carry it (D102)
+  | { kind: "fight"; helm: HelmMove; guns: GunsOrder }
   | { kind: "ability"; ability: string } // fires the crew ability, then the rules below still give the Helm move and Guns order
   | { kind: "surrender" } // Struck Colours
   | { kind: "jettison" }; // cargo overboard becomes Flotsam; the round plays Hold and Hold Fire, and the rule fires once per battle (D65)
