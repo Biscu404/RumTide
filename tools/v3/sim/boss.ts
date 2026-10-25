@@ -10,7 +10,9 @@
 // search cannot flatter itself. The check passes when every style of the wheel is from 35% to 80% (D140, replacing the single
 // band of 40% to 60%). The Smuggler is searched too and reported, but it is not judged.
 //
-// Old Shellback has no style, so a "their style is X" condition never holds against him, and the search does not write one.
+// Old Shellback has no style, so a "their style is X" condition never holds against him, and the search does not write one. He is the
+// reworked boss of docs/specs/fighting-styles.md section 7 (P3.B2 piece 3): his shell, his seeded rear up, the claw snatch, and a retreat
+// into his shell that beats him. Nothing here knows his rules: the fight is the Tide loop and "beaten" is `bossesBeaten`.
 //
 // Alongside it: the templates and the Crabber for each style on the confirming fights, and the gate pace of GAMEPLAY 2.5 (the
 // median captain passes by Tide 7 to 9, nobody later than Tide 12) worked out from the win chance on each Tide, with one fight a
@@ -38,7 +40,11 @@ export const BOSS_TIDE = 6; // the Tide of the challenge; his Hull is still 300
 export const SLOTS = 3; // rules with conditions a new captain can save (D64)
 const PART = 100; // fights in one job, so a long run of fights spreads over every worker
 
-/** The Crabber of the P2.6 notes: Close In, a Round shot when he rears up, Grapeshot once the claws are on, else Cross Their Bow. */
+/**
+ * The Crabber of the P2.6 notes: Close In, a Round shot in round 3, Grapeshot once the claws are on, else Cross Their Bow. Round 3 is the
+ * middle of the rounds he may rear up in (2, 3 or 4, D202), so the Crabber is a plain reference plan for the search to beat, not a
+ * plan for his habits; Cross Their Bow is the move he snatches (D206).
+ */
 export const crabber = (): Doctrine => ({
   name: "Crabber",
   rules: [

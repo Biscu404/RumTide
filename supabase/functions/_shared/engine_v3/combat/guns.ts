@@ -69,7 +69,7 @@ function terrainFactor(range: Range, terrain: Terrain): number {
 export interface GunsContext {
   terrain: Terrain;
   helmMod: number; // this ship's rake, flank or stern shot, or weakened modifier from resolveHelm (gunsMod); NEUTRAL for none
-  exposed?: number; // the defender reared up: Round shot does this many times the damage this round (D102); absent means NEUTRAL
+  armour?: number; // what Old Shellback's shell makes of the shot (shellFactor, shellback.ts): 0.8, 1 when he rears up, 3 for a Mortar shell; absent means NEUTRAL
   zeroing?: number; // the Mortar's Zeroing In factor this round (styles.ts zeroingFactor); absent means NEUTRAL
   longNines?: boolean; // a Gunline that Holds: its Round shot at Long counts the longNines factor instead of the table's
 }
@@ -83,7 +83,7 @@ export interface GunsFactors {
   gunnery: number;
   helm: number;
   terrain: number;
-  exposed: number; // Round shot against a monster that has reared up, else neutral
+  armour: number; // Old Shellback's shell: a fifth of the blow turned aside, or a Mortar shell doing three times as much, else neutral
   powder: number; // the out of Powder factor, else neutral
   charged: number; // Hold Fire's bonus the round after it, else neutral
   stale: number; // the stale factor from the third round in a row with the same order, else neutral (the Mortar never goes stale)
@@ -140,7 +140,7 @@ export function fireGuns(
     gunnery: gunnery(attacker),
     helm: ctx.helmMod,
     terrain: terrainFactor(range, ctx.terrain),
-    exposed: ammo.key === "round" ? ctx.exposed ?? NEUTRAL : NEUTRAL,
+    armour: ctx.armour ?? NEUTRAL,
     powder: dry ? C.outOfPowder : NEUTRAL,
     charged: attacker.guns.charged ? C.holdFireNext : NEUTRAL,
     stale: staleNow(attacker.guns, order) ? C.stale : NEUTRAL,

@@ -657,5 +657,5 @@ describe("the templates (GAMEPLAY 8.8, Fighting Styles spec section 6)", () => {
     }
     expect(kinds.has("escaped")).toBe(true);
     expect(kinds.size).toBeGreaterThanOrEqual(3);
-  });
+  }, 30_000); // about 2000 battles twice over: over the default 5 seconds when the whole suite shares a busy machine
 });

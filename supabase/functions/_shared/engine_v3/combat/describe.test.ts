@@ -3,7 +3,7 @@ import { formatReplay, resolveTide } from "../index.ts";
 import type { Orders, ReplayEvent } from "../types.ts";
 import { season, world } from "../testing.ts";
 import { runBattle } from "./battle.ts";
-import { describeBattle, describeCarried } from "./describe.ts";
+import { describeBattle, describeCarried, lineVariants } from "./describe.ts";
 import type { BattleAftermath } from "./types.ts";
 import { always, battleOf, scripted, surrendersAt, testShip } from "./testing.ts";
 
@@ -45,7 +45,7 @@ describe("a battle in words (P2.4)", () => {
     const lines = describeBattle(fight(), none, words);
     expect(lines).toContain("  Round 1, at Long range.");
     expect(lines).toContain("    The hunter plays Close In and Round shot (rule 1).");
-    expect(lines).toContain("    The range goes from Long to Short."); // both Close In: two bands of the six
+    expect(lineVariants("range.closes2", { from: "Long", to: "Short", range: "Short" }).some((v) => lines.includes("    " + v))).toBe(true); // both Close In: two bands of the six
     expect(lines.some((l) => /^ {4}The hunter's Round shot takes \d+ Hull off The target\.$/.test(l))).toBe(true);
   });
 
@@ -72,13 +72,13 @@ describe("a battle in words (P2.4)", () => {
     expect(struck).toContain("The target strikes its colours. Nothing else happens this round.");
     expect(struck).toContain("The target has struck its colours. The hunter wins.");
     const apart = describeBattle(fight(always("openRange", "roundShot"), always("openRange", "roundShot")), none, words).join("\n");
-    expect(apart).toContain("Both ships turn away past Far range, and the fight is over.");
+    expect(lineVariants("outcome.escaped.both", {}).some((v) => apart.includes(v))).toBe(true);
     expect(apart).toContain("Escaped: the ships part in round 1.");
   });
 
   it("tells the end of a battle that goes the distance", () => {
     const draw = describeBattle(fight(always("hold", "holdFire"), always("hold", "holdFire")), none, words).join("\n");
-    expect(draw).toContain("A draw after round 5. Nobody wins and nobody loses anything.");
+    expect(lineVariants("outcome.draw", { round: 5 }).some((v) => draw.includes(v))).toBe(true);
     const sunk = runBattle(battleOf(testShip("hunter"), testShip("target", "sloop", { hullPoints: 4 }), { hunter: always("hold", "roundShot"), target: scripted({}, ["hold", "holdFire"]) }));
     expect(describeBattle(sunk, none, words).join("\n")).toContain("The target is sunk in round 1. The hunter wins.");
   });

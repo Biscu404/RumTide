@@ -34,7 +34,7 @@ export const CHECK_TITLES: Record<CheckId, string> = {
   2: "Every Helm move, Guns order and style play is the best choice somewhere",
   3: "Equal ships split wins evenly",
   4: "Twice the Power Rating wins 85 to 90% of the time",
-  5: "Old Shellback falls to a fresh sloop with a good doctrine about half the time, for every style",
+  5: `Old Shellback falls to a fresh sloop with a good doctrine ${pct(BOSS_LOW)} to ${pct(BOSS_HIGH)} of the time, for every style`,
   6: "The wheel: each style beats two, loses to two and is even with one",
   7: "Equal spending: no style goes above 60% of the field at 5 or 10 levels",
   8: "Drill matters without deciding alone",
