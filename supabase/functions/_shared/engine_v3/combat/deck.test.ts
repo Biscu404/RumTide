@@ -3,7 +3,8 @@
 
 import { describe, expect, it } from "vitest";
 import { B } from "../balance.ts";
-import { crewOrder, deckKill, hasSecondWave, pairFactor, pairing } from "./deck.ts";
+import { Rng } from "../rng.ts";
+import { crewOrder, deckKill, drillLuck, hasSecondWave, pairFactor, pairing } from "./deck.ts";
 import { boardingStrength } from "./boarding.ts";
 import { fleetMelee, sideBonus } from "./fleet.ts";
 import { styleShip, testShip } from "./testing.ts";
@@ -226,5 +227,47 @@ describe("the melee with Deck orders, Drill and the traits (boarding spec sectio
   it("is judged on the same strength in Kelp, 15% more for both", () => {
     const m = melee(hunter(), target(), ["charge", "charge"], { terrain: "kelp" });
     expect(m.record.strength).toEqual({ hunter: expect.closeTo(34.5), target: expect.closeTo(34.5) });
+  });
+});
+
+describe("Drill luck (P3.2, D198)", () => {
+  const rng = () => new Rng("test/drill-luck");
+  const hunter = (over: Partial<BattleShip> = {}) => testShip("hunter", "sloop", over);
+  const target = (over: Partial<BattleShip> = {}) => testShip("target", "sloop", over);
+
+  it("is a draw from 1 minus luck to 1 plus luck, the same for the same ship and stream, and another for another ship", () => {
+    for (const id of ["ship_a", "ship_b", "ship_c", "ship_d", "ship_e", "ship_f"]) {
+      const x = drillLuck(rng(), id);
+      expect(x).toBeGreaterThanOrEqual(1 - B.drill.luck);
+      expect(x).toBeLessThanOrEqual(1 + B.drill.luck);
+    }
+    expect(drillLuck(rng(), "ship_a")).toBe(drillLuck(rng(), "ship_a"));
+    expect(drillLuck(rng(), "ship_a")).not.toBe(drillLuck(rng(), "ship_b"));
+  });
+
+  it("can take a drilled crew below an undrilled one, and can double its bonus: it scales the Drill bonus and nothing else", () => {
+    const drilled = hunter({ drill: 5 }); // +0.2 of its strength at the starting numbers
+    const bonus = 30 * B.drill.perLevel[0] * 5;
+    expect(boardingStrength(drilled, "open")).toBeCloseTo(30 + bonus);
+    expect(boardingStrength(drilled, "open", { drillLuck: 1 })).toBeCloseTo(30 + bonus);
+    expect(boardingStrength(drilled, "open", { drillLuck: 0 })).toBeCloseTo(30);
+    expect(boardingStrength(drilled, "open", { drillLuck: 2 })).toBeCloseTo(30 + 2 * bonus);
+    expect(boardingStrength(drilled, "open", { drillLuck: -1 })).toBeCloseTo(30 - bonus); // a bad day: worse than an untrained crew
+    for (const luck of [-1, 0, 2, 4]) expect(boardingStrength(hunter(), "open", { drillLuck: luck })).toBe(30); // no Drill, nothing to vary
+  });
+
+  it("is in the melee only for a drilled crew, and a fight between crews with no Drill is as it was", () => {
+    const strength = (luck: Record<string, number> | undefined) =>
+      fleetMelee({
+        ids: { hunter: ["ship_hunter"], target: ["ship_target"] }, flagships: { hunter: "ship_hunter", target: "ship_target" },
+        ships: { ship_hunter: hunter({ drill: 5 }), ship_target: target() }, decks: { ship_hunter: "charge", ship_target: "charge" },
+        terrain: "open", bonus: { hunter: sideBonus(1, 1, false), target: sideBonus(1, 1, false) },
+        ...(luck ? { drillLuck: luck } : {}),
+      }).record;
+    const plain = strength(undefined);
+    expect(strength({ ship_hunter: 1 })).toEqual(plain);
+    expect(strength({ ship_hunter: 2 }).strength.hunter).toBeGreaterThan(plain.strength.hunter);
+    expect(strength({ ship_hunter: -1 }).strength.hunter).toBeLessThan(plain.strength.target);
+    expect(strength({ ship_target: 3 }).strength.target).toBe(plain.strength.target); // no Drill: the draw is not read
   });
 });

@@ -8,8 +8,9 @@
 //
 //   Drill 15 against Drill 0: it must stay inside the Power Rating line of check 4. A Drill 15 sloop rates about 1.38 times a
 //   fresh one (D166), so its win share must lie between the shares check 4 measures for the two ratios on either side of that, in
-//   the same run. The share is the one check 4 uses (wins as a share of the fought battles, the ones that did not end Escaped),
-//   so the two are comparable. The value check 4's line gives at the Drill 15 rating, between its neighbours, is printed.
+//   the same run. Both are shares of the decided battles, wins over wins and losses (P3.2, D2xx): in check 4 a third of the fights
+//   at a ratio of 1 to 1.25 are draws, in a boarding fight none are, so shares of the fought battles could not meet. The value
+//   check 4's line gives at the Drill 15 rating, between its neighbours, is printed.
 //
 // Printed and not judged: the same Boarder at Drill 0, 5 and 15 against an undrilled Gunline, which D181 measured (a Gunline never
 // boards, so Drill only helps the Boarder if it can grapple).
@@ -88,7 +89,10 @@ export async function runDrill(pool: Pool, effort: Effort): Promise<DrillData> {
   return { rows: experiments.map((e, i) => rowOf(e.drill, e.against, totals[i]!)), ratio: drillRatio(DRILL_LONG) };
 }
 
-/** The line of check 4 at one rating: the share of the fought battles the stronger ship wins, between the two rows either side. */
+/** The share of the decided battles (wins and losses, draws and escapes left out) that the stronger ship won in a row of check 4. */
+export const strongerDecided = (row: PowerRow): number => (row.strongerWins + row.weakerWins > 0 ? row.strongerWins / (row.strongerWins + row.weakerWins) : 0.5);
+
+/** The line of check 4 at one rating: the share of the decided battles the stronger ship wins, between the two rows either side. */
 export interface PowerLine {
   ratio: number;
   below: PowerRow;
@@ -104,8 +108,9 @@ export function powerLineAt(power: PowerData, ratio: number): PowerLine {
   const below = [...rows].reverse().find((r) => r.actual <= ratio) ?? rows[0]!;
   const above = rows.find((r) => r.actual >= ratio) ?? rows[rows.length - 1]!;
   const t = above.actual > below.actual ? (ratio - below.actual) / (above.actual - below.actual) : 0;
-  const interpolated = below.strongerWins + (above.strongerWins - below.strongerWins) * Math.min(1, Math.max(0, t));
-  return { ratio, below, above, interpolated, low: Math.min(below.strongerWins, above.strongerWins), high: Math.max(below.strongerWins, above.strongerWins) };
+  const [lo, hi] = [strongerDecided(below), strongerDecided(above)];
+  const interpolated = lo + (hi - lo) * Math.min(1, Math.max(0, t));
+  return { ratio, below, above, interpolated, low: Math.min(lo, hi), high: Math.max(lo, hi) };
 }
 
 export interface DrillVerdict {
@@ -122,7 +127,7 @@ export function judgeDrill(data: DrillData, power: PowerData): DrillVerdict {
   const fifteen = find(DRILL_LONG, "boarder");
   const line = powerLineAt(power, data.ratio);
   const fivePass = five.decided >= DRILL5_LOW && five.decided <= DRILL5_HIGH;
-  const fifteenPass = fifteen.fought >= line.low && fifteen.fought <= line.high;
+  const fifteenPass = fifteen.decided >= line.low && fifteen.decided <= line.high;
   return {
     pass: fivePass && fifteenPass,
     drill5: { row: five, pass: fivePass },

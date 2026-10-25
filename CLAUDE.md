@@ -6,7 +6,7 @@ The full design is in `docs/GAME_DESIGN.md`. It is long, so do not read it all a
 
 ## Current focus
 
-* Next task: P3.2, tune `balance.ts` until the ten checks of `npm run sim:v3` pass: the five of GAMEPLAY 8.9, the wheel, equal spending, Drill, Lashed fast and the Smuggler. P3.B2 (the Fighting Styles, the deck fight, Drill, fire and the reworked Old Shellback, D142 to D212) and P3.B3 (the simulator that knows them, D182 to D200) are built, and `docs/GAMEPLAY.md` is rewritten to match (D213). The numbers P3.2 starts from are in `docs/DECISIONS.md`: the table under D197 and the first reading of check 5 in D212. Start with check 8, and with a luck roll in the deck fight, because no `drill.perLevel` fixes it (D198). Check 5 is over its band for three styles (Gunline 86%, Boarder 100%, Firebrand 88% on the quick run). The brief is `docs/briefs/P3-combat-testing.md`. Task ids come from the Rumtide Roadmap tracker on claude.ai.
+* Next task: P3.2b, bring Old Shellback's check 5 into its band (Gunline 86%, Boarder 100% and Firebrand 88% are over the 80% top) with `B.shellback` and the numbers he reads, and keep the other nine checks passing. P3.2 was split on 26 October 2026: P3.2a Drill luck and check 8 is done (D216, D217), then P3.2b, P3.2c (the decision on D108 with the gate pace) and P3.2d (the guard test, the full run, the golden Tide and the docs). The findings and the order are in `docs/DECISIONS.md` under "What is left of P3.2". The brief is `docs/briefs/P3-combat-testing.md`. Task ids come from the Rumtide Roadmap tracker on claude.ai.
 * Done work is in `git log` and `docs/DECISIONS.md`.
 * Decisions waiting on Biscu are in `docs/STATUS.md`.
 

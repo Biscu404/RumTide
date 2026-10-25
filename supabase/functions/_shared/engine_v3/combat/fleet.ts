@@ -269,6 +269,7 @@ export interface MeleeInput {
   terrain: Terrain;
   bonus: Record<BattleSide, SideBonus>;
   firstOver?: readonly ShipId[]; // crews whose Board fights as a Charge with First over the rail
+  drillLuck?: Record<ShipId, number>; // the share of its Drill bonus each drilled crew brings this round (deck.ts drillLuck)
 }
 
 export interface FleetMelee {
@@ -296,7 +297,7 @@ export function fleetMelee(i: MeleeInput): FleetMelee {
     const theirs = decks[i.flagships[other(side)]] as DeckOrder;
     for (const ship of crew(side)) {
       const mine = decks[ship.shipId] as DeckOrder;
-      strengthOf[ship.shipId] = boardingStrength(ship, terrain, { firstOver: i.firstOver?.includes(ship.shipId) ?? false, foes });
+      strengthOf[ship.shipId] = boardingStrength(ship, terrain, { firstOver: i.firstOver?.includes(ship.shipId) ?? false, foes, drillLuck: i.drillLuck?.[ship.shipId] ?? 1 });
       pairings[ship.shipId] = pairing(mine, theirs);
       strength[side] += strengthOf[ship.shipId] as number;
       killed[side] += deckKill(strengthOf[ship.shipId] as number, mine, theirs, hasSecondWave(ship));

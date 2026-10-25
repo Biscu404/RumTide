@@ -582,21 +582,22 @@ describe("equal spending (check 7)", () => {
 });
 
 describe("Drill (check 8)", () => {
-  const power = (rows: [number, number][]): PowerData => ({
-    rows: rows.map(([actual, strongerWins]): PowerRow => ({
-      ratio: actual, actual, spec: {}, tally: emptyTally(), kinds: {}, fought: 100, escaped: 0, strongerWins, weakerWins: 0, draws: 0,
+  // Rows of check 4 as [rating, wins, losses] shares of the fought battles: the line is read on the decided ones.
+  const power = (rows: [number, number, number][]): PowerData => ({
+    rows: rows.map(([actual, strongerWins, weakerWins]): PowerRow => ({
+      ratio: actual, actual, spec: {}, tally: emptyTally(), kinds: {}, fought: 100, escaped: 0, strongerWins, weakerWins, draws: 1 - strongerWins - weakerWins,
     })),
   });
-  const line = power([[1, 0.33], [1.25, 0.52], [1.5, 0.7], [2, 0.88]]);
+  const line = power([[1, 0.33, 0.33], [1.25, 0.6, 0.2], [1.5, 0.72, 0.08], [2, 0.88, 0.02]]); // decided shares 50%, 75%, 90%, 97.8%
 
   it("finds the line of check 4 between the two ratios either side of a rating", () => {
     const at = powerLineAt(line, 1.38);
     expect(at.below.actual).toBe(1.25);
     expect(at.above.actual).toBe(1.5);
-    expect(at.low).toBe(0.52);
-    expect(at.high).toBe(0.7);
-    expect(at.interpolated).toBeCloseTo(0.52 + (0.7 - 0.52) * ((1.38 - 1.25) / 0.25));
-    expect(powerLineAt(line, 1.25).interpolated).toBeCloseTo(0.52);
+    expect(at.low).toBeCloseTo(0.75);
+    expect(at.high).toBeCloseTo(0.9);
+    expect(at.interpolated).toBeCloseTo(0.75 + (0.9 - 0.75) * ((1.38 - 1.25) / 0.25));
+    expect(powerLineAt(line, 1.25).interpolated).toBeCloseTo(0.75);
     expect(powerLineAt(line, 5).above.actual).toBe(2); // past the last row, the last row
     expect(powerLineAt(line, 0.5).below.actual).toBe(1);
   });
@@ -610,8 +611,8 @@ describe("Drill (check 8)", () => {
     rows: [row(5, "boarder", ...five), row(15, "boarder", ...fifteen), row(0, "gunline", 39, 61), row(5, "gunline", 87, 13), row(15, "gunline", 100, 0)],
   });
 
-  it("passes Drill 5 at 55% to 80% of decided battles and Drill 15 inside the Power Rating line", () => {
-    const good = judgeDrill(drillData([70, 30], [60, 40]), line);
+  it("passes Drill 5 at 55% to 80% of decided battles and Drill 15 inside the Power Rating line, read on decided battles", () => {
+    const good = judgeDrill(drillData([70, 30], [85, 15]), line);
     expect(good.drill5.pass).toBe(true);
     expect(good.drill15.pass).toBe(true);
     expect(good.pass).toBe(true);
@@ -619,10 +620,10 @@ describe("Drill (check 8)", () => {
   });
 
   it("fails a Drill 5 ship that wins every fight or loses most, and a Drill 15 ship outside the line", () => {
-    expect(judgeDrill(drillData([100, 0], [60, 40]), line).drill5.pass).toBe(false); // the deck fight has no luck roll (D181)
-    expect(judgeDrill(drillData([50, 50], [60, 40]), line).drill5.pass).toBe(false);
+    expect(judgeDrill(drillData([100, 0], [85, 15]), line).drill5.pass).toBe(false); // a deck fight with no luck (D198)
+    expect(judgeDrill(drillData([50, 50], [85, 15]), line).drill5.pass).toBe(false);
     expect(judgeDrill(drillData([70, 30], [100, 0]), line).drill15.pass).toBe(false);
-    expect(judgeDrill(drillData([70, 30], [40, 60]), line).drill15.pass).toBe(false);
+    expect(judgeDrill(drillData([70, 30], [60, 40]), line).drill15.pass).toBe(false);
     expect(judgeDrill(drillData([100, 0], [100, 0]), line).pass).toBe(false);
   });
 });

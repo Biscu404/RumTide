@@ -468,7 +468,7 @@ The old Crew stat is gone. Boarding strength now comes from Hands (6.4), Drill a
 
 **Drill, the Hands track** (D119, D120, D165)
 
-* Three stages of five levels: **Deckhands** (levels 1 to 5), **Cutthroats** (6 to 10) and **Sea Wolves** (11 to 15). Each level adds boarding strength, and a later stage adds more per level: 4% a level in the first stage, 6% in the second, 8% in the third. So Drill 5 is +20%, Drill 10 is +50% and Drill 15 is +90%.
+* Three stages of five levels: **Deckhands** (levels 1 to 5), **Cutthroats** (6 to 10) and **Sea Wolves** (11 to 15). Each level adds boarding strength, and a later stage adds more per level: 4% a level in the first stage, 6% in the second, 8% in the third. So Drill 5 is +20%, Drill 10 is +50% and Drill 15 is +90%. In a deck fight (8.6) the bonus is not the same every round: each round a drilled crew brings a seeded share of it, from minus 2 times to 4 times (an average of 1), so a drilled crew wins most deck fights and loses some, and now and then has a bad day worse than an untrained crew. A crew with no Drill has no bonus to vary.
 * Finishing a stage unlocks something:
 
 | Drill | Stage done | Unlock |
@@ -827,7 +827,7 @@ The orders that fire no great guns:
 
 `Hands lost by B = 0.2 × strength of A × hit of A's order × pairing × guard of B's order`
 
-* **strength** = Hands × (1 + Bosun, trait and Background bonuses) × the Drill factor (6.2) × Kelp (1.15, for both ships) × First over the rail (1.25, below) × Fighters (1.2, a Boarder's crew) × Tinderbox (0.8, a crew fighting a Firebrand on deck).
+* **strength** = Hands × (1 + Bosun, trait and Background bonuses) × the Drill factor (6.2, with its luck of that round) × Kelp (1.15, for both ships) × First over the rail (1.25, below) × Fighters (1.2, a Boarder's crew) × Tinderbox (0.8, a crew fighting a Firebrand on deck).
 * **pairing:** 1.8 for the order that wins the cycle, 0.75 for the one that loses it, otherwise 1.
 * **Second Wave** (Drill 15): after the exchange the crew strikes once more at a quarter of its strength, which makes the whole strike 1.25 times as large.
 * Losses are whole Hands. Half of all lost Hands are wounded (6.4).

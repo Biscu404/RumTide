@@ -35,7 +35,7 @@ import { B } from "../balance.ts";
 import { rngFor } from "../rng.ts";
 import type { ShipId, Terrain, WaterId, WindKind } from "../types.ts";
 import { captureCheckBySide, cutFree, lashedScores } from "./boarding.ts";
-import { crewOrder } from "./deck.ts";
+import { crewOrder, drillLuck } from "./deck.ts";
 import { blazeRounds, fireLoss, flashLoss, ignite } from "./fire.ts";
 import type { Blazes } from "./fire.ts";
 import {
@@ -592,8 +592,10 @@ export function runBattle(input: BattleInput): BattleRecord {
           all.map((id) => [id, crewOrder(ships[id]!, orders[id]!, { grappleRound, boarded: boarded(id) })]),
         );
         const firstOver = grappleRound && edge !== null ? all.filter((id) => sideOf(id) === edge && boarded(id)) : [];
-        const m = fleetMelee({ ids, flagships: flag, ships: next, decks, terrain, bonus, firstOver });
-        melee = { ...m.record, ...(firstOver.length > 0 ? { firstOver: edge! } : {}) };
+        const drilled = all.filter((id) => (next[id]!.drill ?? 0) > 0);
+        const luck = drilled.length > 0 ? Object.fromEntries(drilled.map((id) => [id, drillLuck(rng, id)])) : undefined;
+        const m = fleetMelee({ ids, flagships: flag, ships: next, decks, terrain, bonus, firstOver, ...(luck ? { drillLuck: luck } : {}) });
+        melee = { ...m.record, ...(firstOver.length > 0 ? { firstOver: edge! } : {}), ...(luck ? { drillLuck: luck } : {}) };
         for (const id of all) next[id] = withHands(next[id]!, next[id]!.hands - m.lost[id]!);
         for (const side of BATTLE_SIDES) {
           const credit = sideShare(shipsOf(side, next), "hands", m.record.lost[side]);
