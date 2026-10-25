@@ -78,7 +78,7 @@ export const B = {
   combat: {
     rounds: 5,
     k: 22,
-    exponent: 0.6,
+    exponent: 0.3, // D118
     luckMin: 0.9,
     luckMax: 1.1,
     windGaugeBonus: 1.2,
@@ -91,9 +91,9 @@ export const B = {
     holdFireNext: 1.5,
     gunneryFullShare: 0.6,
     outOfPowder: 0.5,
-    grapeDamagePerHand: 3,
+    grapeDamagePerHand: 6, // D117
     range: {
-      round: { long: 0.6, medium: 1.0, close: 1.0, grappled: 0.5 },
+      round: { long: 0.6, medium: 1.0, close: 0.5, grappled: 0.5 }, // close: D120
       chain: { long: 1.0, medium: 0.8, close: 0.4, grappled: 0 },
       grape: { long: 0, medium: 0.5, close: 1.2, grappled: 1.0 },
     },
@@ -103,13 +103,13 @@ export const B = {
     bands: { closeClose: 2, closeHold: 1, chase: 1, holdOpen: 1, openOpen: 2, rakeCloseIn: 1, crossFails: 1 },
     reefScrape: 10,
     kelpBoarding: 1.15,
-    boarding: { killShare: 0.2, repel: 1.3, captureRatio: 0.4, captureOwnShare: 0.2 },
+    boarding: { killShare: 0.2, repel: 2.6, captureRatio: 0.4, captureOwnShare: 0.2 }, // repel: D116
     victoryMargin: 0.1,
     // Doctrines (8.8). Slots count the rules that have conditions; the Otherwise rule is always there and is free (D64).
     // slotRanks: the Command ranks that each give +1 slot. templates: the thresholds the four beginner doctrines use.
     doctrine: {
       baseSlots: 3, maxSlots: 7, savedDoctrines: 3, slotRanks: [1, 4], maxConditions: 2,
-      templates: { brawlerBoardHandsPct: 50, skirmisherChainRiggingPct: 50, runnerChainRiggingPct: 50, cowardStrikesHullPct: 50 },
+      templates: { brawlerBoardHandsPct: 50, skirmisherChainRiggingPct: 100, runnerChainRiggingPct: 50, cowardStrikesHullPct: 50 }, // skirmisherChainRiggingPct: D119
     },
   },
 
@@ -160,13 +160,14 @@ export const B = {
   // Hotspots (11). Used from P10.
   hotspots: { smallPerArchipelagoPerTide: [1, 2], mediumEveryTides: [8, 10], bigWarningTides: 2 },
 
-  // Old Shellback (2.5, D100). hull, clawHands and decayPerTide are the statline of GAMEPLAY 2.5. cannons, sails and helm are
-  // not in 2.5, so each is the base stat of a fresh sloop (10), the simplest reading, and untuned until P3: his guns, his Sails
-  // (the escape roll and the Power Rating) and his fixed Helm score, which no gauge or terrain changes. In round `rearUpRound`
-  // he rears up and Round shot does `rearUpRoundShot` times the damage to him; from round `grappleFromRound` he grapples.
+  // Old Shellback (2.5, D100). hull, clawHands and decayPerTide are the statline of GAMEPLAY 2.5, and hull, clawHands and helm
+  // were tuned in P3.2 (D121). cannons and sails are not in 2.5, so each is the base stat of a fresh sloop (10), the simplest
+  // reading: his guns and his Sails (the escape roll and the Power Rating). helm is his fixed Helm score, which no gauge or
+  // terrain changes. In round `rearUpRound` he rears up and Round shot does `rearUpRoundShot` times the damage to him; from round
+  // `grappleFromRound` he grapples.
   shellback: {
-    hull: 300, clawHands: 40, decayPerTide: 0.08,
-    cannons: 10, sails: 10, helm: 10,
+    hull: 150, clawHands: 80, decayPerTide: 0.08,
+    cannons: 10, sails: 10, helm: 15,
     rearUpRound: 3, grappleFromRound: 4, rearUpRoundShot: 2,
   },
 

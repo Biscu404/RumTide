@@ -21,7 +21,7 @@ describe("boarding strength (P2.2, GAMEPLAY 8.6)", () => {
     expect(boardingStrength(hunter({ boardingBonus: 0.1 }), "roundShot", "open")).toBeCloseTo(33);
   });
 
-  it("is 1.3 times for a ship that plays Repel, and no other order", () => {
+  it("is the Repel factor times for a ship that plays Repel, and no other order", () => {
     expect(boardingStrength(hunter(), "repel", "open")).toBeCloseTo(30 * C.boarding.repel);
     for (const order of ["roundShot", "chainShot", "grapeshot", "holdFire", "board"] as const) {
       expect(boardingStrength(hunter(), order, "open")).toBe(30);
@@ -72,10 +72,12 @@ describe("the boarding melee (P2.2, GAMEPLAY 8.6)", () => {
     expect(m.hands.target).toBe(0);
   });
 
-  it("makes a Repelling ship kill 30% more", () => {
+  it("makes a Repelling ship fight as if its crew were the Repel factor times as big", () => {
     const m = melee(hunter(), target(), sides<GunsOrder>("grapeshot", "repel"));
-    expect(m.strength.target).toBeCloseTo(39);
-    expect(m.lost).toEqual({ hunter: 8, target: 6 }); // the target's 7.8 rounds to 8
+    expect(m.strength.target).toBeCloseTo(30 * C.boarding.repel);
+    // The hunter loses 20% of the Repelling target's strength, and the target 20% of the hunter's 30.
+    expect(m.lost).toEqual({ hunter: Math.round(C.boarding.killShare * 30 * C.boarding.repel), target: Math.round(C.boarding.killShare * 30) });
+    expect(m.lost.hunter).toBeGreaterThan(m.lost.target);
   });
 
   it("makes Repel cancel when both ships play it", () => {

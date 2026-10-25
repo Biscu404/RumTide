@@ -12,6 +12,8 @@ import { doctrineLines, gunsWord, helmWord } from "./plans.ts";
 import type { Pool } from "./pool.ts";
 import { judgeSituations, runSituations } from "./situations.ts";
 import type { SituationData, SituationVerdict } from "./situations.ts";
+import { patchText } from "./patch.ts";
+import type { Patch } from "./patch.ts";
 import { pct, pctWithRange } from "./stats.ts";
 
 export const CHECK_IDS = [1, 2, 3, 4, 5] as const;
@@ -27,6 +29,8 @@ export const CHECK_TITLES: Record<CheckId, string> = {
 
 export interface Results {
   effort: Effort["name"];
+  /** Numbers of balance.ts changed for this run with --set. */
+  patch: Patch;
   seconds: Partial<Record<CheckId, number>>;
   field?: { data: FieldData; verdict: FieldVerdict };
   seats?: { verdict: SeatVerdict };
@@ -36,8 +40,8 @@ export interface Results {
 }
 
 /** Runs the chosen checks. Checks 1 and 3 share their battles, so asking for either runs the field once. */
-export async function runChecks(pool: Pool, effort: Effort, which: readonly CheckId[] = CHECK_IDS): Promise<Results> {
-  const out: Results = { effort: effort.name, seconds: {} };
+export async function runChecks(pool: Pool, effort: Effort, which: readonly CheckId[] = CHECK_IDS, patch: Patch = {}): Promise<Results> {
+  const out: Results = { effort: effort.name, patch, seconds: {} };
   const timed = async <T>(id: CheckId, work: () => Promise<T>): Promise<T> => {
     const t0 = Date.now();
     const r = await work();
@@ -85,7 +89,8 @@ const mark = (pass: boolean): string => (pass ? "PASS" : "FAIL");
 export function render(r: Results): string[] {
   const out: string[] = [];
   const effort = EFFORTS[r.effort];
-  out.push(`Rumtide combat simulator, ${r.effort} run. The five checks of GAMEPLAY 8.9, on engine_v3.`, "");
+  out.push(`Rumtide combat simulator, ${r.effort} run. The five checks of GAMEPLAY 8.9, on engine_v3.`);
+  out.push(`With: ${patchText(r.patch)}.`, "");
 
   if (r.field) {
     const { verdict } = r.field;
@@ -146,7 +151,9 @@ export function render(r: Results): string[] {
     for (const ref of data.references) out.push(`      ${pad(ref.doctrine.name, 12)}${pctWithRange(ref.result.beaten, ref.seeds)} beaten  ${Object.entries(ref.result.kinds).map(([k, v]) => `${k} ${v}`).join(", ")}`);
     out.push(`   Win chance by Tide (best doctrine, starting Brawler): ${data.pace.map((p) => `T${p.tide} ${pct(p.best)}/${pct(p.brawler)}`).join("  ")}`);
     const g = data.gate;
-    out.push(`   The gate (D108, one fight a Tide): ${g.captains} captains at his door from Tide ${g.firstTide}. The median captain passes on Tide ${g.medianTide.toFixed(1)} (target 7 to 9), the last on Tide ${g.lastTide.toFixed(1)}, by Tide 12 in ${pct(g.lastByTwelve)} of seasons (target: nobody later).`);
+    const q = data.queue;
+    out.push(`   The gate (D108, he fights every captain who reaches him each Tide): ${g.captains} captains at his door from Tide ${g.firstTide}. The median captain passes on Tide ${g.medianTide.toFixed(1)} (target 7 to 9), the last on Tide ${g.lastTide.toFixed(1)}, by Tide 12 in ${pct(g.lastByTwelve)} of seasons (target: nobody later).`);
+    out.push(`   For comparison, one fight a Tide as P2.6 built it: the median captain passes on Tide ${q.medianTide.toFixed(1)}, the last on Tide ${q.lastTide.toFixed(1)}, by Tide 12 in ${pct(q.lastByTwelve)} of seasons.`);
     out.push("");
   }
 

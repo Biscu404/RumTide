@@ -277,7 +277,7 @@ export type ReplayEvent =
   | { t: number; kind: "escape"; hunter: ShipId; target: ShipId; chance: number; roll: number; escaped: boolean }
   | { t: number; kind: "battle"; record: BattleRecord; aftermath: BattleAftermath }
   | { t: number; kind: "towed"; ship: ShipId; from: WaterId; to: WaterId; hullPoints: number; banked: number }
-  | { t: number; kind: "bossRecovers"; ship: ShipId; hullPoints: number; maxHullPoints: number } // a boss is whole again at the start of the Tide (2.5)
+  | { t: number; kind: "bossRecovers"; ship: ShipId; hullPoints: number; maxHullPoints: number } // a boss is whole again at the start of the Tide (2.5) and after each fight (D108)
   | { t: number; kind: "islandCharted"; captain: CaptainId; island: IslandId }
   | { t: number; kind: "supplies"; ship: ShipId; provisionsUsed: number; provisionsLeft: number; shortRations: boolean }
   | { t: number; kind: "tideEnd"; tide: number };

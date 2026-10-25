@@ -86,22 +86,30 @@ export const bossPlan = (captain: Pick<Captain, "id" | "defaultDoctrine">): Voya
 // ---------- Upkeep ----------
 
 /**
+ * Makes Old Shellback whole with this Tide's statline (D106): full Hull, claws and magazine, whatever the last fight left of
+ * him. Returns the replay event when anything changed, `t` being the tick it happens on (0 at the start of a Tide).
+ */
+export function restoreBoss(state: SeasonState, ship: Ship, tide: number, t = 0): ReplayEvent | null {
+  const before = JSON.stringify([ship.statline, ship.hullPoints, ship.hands]);
+  applyStatline(ship, shellbackStatline(tide, SEASON_PRESETS[state.preset].shellbackDecayFromTide));
+  if (JSON.stringify([ship.statline, ship.hullPoints, ship.hands]) === before) return null;
+  return { t, kind: "bossRecovers", ship: ship.id, hullPoints: ship.hullPoints, maxHullPoints: ship.statline?.maxHull ?? ship.hullPoints };
+}
+
+/**
  * Run at the start of every Tide, before anyone sails: each boss is whole again, with this Tide's Hull (D106). Beaten, he
- * "retreats into his shell and is back next Tide, a little angrier". Changes `state` and returns the replay events of the
+ * "retreats into his shell and is back next Tide, a little angrier". He is also made whole after every fight, so the next
+ * captain who reaches him meets him whole (D108, see encounter.ts). Changes `state` and returns the replay events of the
  * bosses that had something to recover, in captain id order. No randomness and no clock.
  */
 export function upkeepBosses(state: SeasonState, tide: number): ReplayEvent[] {
   const events: ReplayEvent[] = [];
-  const decayFrom = SEASON_PRESETS[state.preset].shellbackDecayFromTide;
   for (const id of Object.keys(state.captains).sort()) {
     const captain = state.captains[id] as Captain;
     const ship = state.ships[captain.shipId];
     if (!ship || !isBoss(captain) || captain.id !== SHELLBACK_ID) continue;
-    const before = JSON.stringify([ship.statline, ship.hullPoints, ship.hands]);
-    applyStatline(ship, shellbackStatline(tide, decayFrom));
-    if (JSON.stringify([ship.statline, ship.hullPoints, ship.hands]) !== before) {
-      events.push({ t: 0, kind: "bossRecovers", ship: ship.id, hullPoints: ship.hullPoints, maxHullPoints: ship.statline?.maxHull ?? ship.hullPoints });
-    }
+    const event = restoreBoss(state, ship, tide);
+    if (event) events.push(event);
   }
   return events;
 }

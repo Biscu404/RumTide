@@ -465,10 +465,23 @@ describe("the four templates (GAMEPLAY 8.8)", () => {
     expect(play("Brawler", view({ range: "long" }, {}, { hands: 14 }))).toMatchObject({ rule: 2, helm: "closeIn", guns: "board" }); // a thin crew: go and take them
   });
 
-  it("Skirmisher crosses their bow, shoots the Rigging first and chases a runner", () => {
-    expect(play("Skirmisher", view())).toMatchObject({ rule: 1, helm: "crossTheirBow", guns: "chainShot" });
+  it("Skirmisher crosses their bow, rakes the Hull and chases a runner with Chain shot", () => {
+    // Their Rigging is never above 100%, so the Chain shot opening of rule 1 does not fire (D119).
+    expect(play("Skirmisher", view())).toMatchObject({ rule: 2, helm: "crossTheirBow", guns: "roundShot" });
     expect(play("Skirmisher", view({}, {}, { riggingPoints: 40 }))).toMatchObject({ rule: 2, helm: "crossTheirBow", guns: "roundShot" });
     expect(play("Skirmisher", view({ last: { hunter: null, target: { helm: "openRange", guns: "roundShot" } } }))).toMatchObject({ rule: 0, helm: "closeIn", guns: "chainShot" });
+  });
+
+  it("Skirmisher opens with Chain shot again when its Rigging threshold is lowered", () => {
+    const templates = B.combat.doctrine.templates as { skirmisherChainRiggingPct: number };
+    const was = templates.skirmisherChainRiggingPct;
+    templates.skirmisherChainRiggingPct = 50;
+    try {
+      expect(play("Skirmisher", view())).toMatchObject({ rule: 1, helm: "crossTheirBow", guns: "chainShot" });
+      expect(play("Skirmisher", view({}, {}, { riggingPoints: 40 }))).toMatchObject({ rule: 2, guns: "roundShot" });
+    } finally {
+      templates.skirmisherChainRiggingPct = was;
+    }
   });
 
   it("Runner opens the range every round and tries to cut free when grappled", () => {
@@ -491,7 +504,7 @@ describe("the four templates (GAMEPLAY 8.8)", () => {
     ));
 
   it("play out in a battle: the Brawler closes on a Coward who holds, and boards at Close", () => {
-    const r = duel("Brawler", "Coward");
+    const r = duel("Brawler", "Coward", 1);
     expect(r.doctrines).toEqual({ hunter: "Brawler", target: "Coward" });
     expect(r.rounds[0]!.ships.map((s) => [s.helm, s.guns])).toEqual([["closeIn", "roundShot"], ["hold", "roundShot"]]);
     expect(r.rounds[0]!.rangeAfter).toBe("medium"); // Close In against Hold: one band
@@ -499,7 +512,7 @@ describe("the four templates (GAMEPLAY 8.8)", () => {
     expect(r.rounds[2]!.ships[0]).toMatchObject({ rule: 1, helm: "closeIn", guns: "board" });
     expect(r.rounds[2]!.grapples).toEqual([{ side: "hunter", ok: true, why: "helm" }]);
     expect(r.rounds[2]!.rangeAfter).toBe("grappled");
-    expect(r.outcome.winner).toBe("hunter");
+    expect(r.outcome).toMatchObject({ kind: "captured", winner: "hunter" }); // the melee takes all five rounds now that Hands are harder to shoot (D117)
   });
 
   it("play out in a battle: the Runner escapes a Coward in the first round", () => {
@@ -508,17 +521,17 @@ describe("the four templates (GAMEPLAY 8.8)", () => {
     expect(r.rounds[0]!.row).toBe("holdOpen");
   });
 
-  it("play out in a battle: the Skirmisher rakes a Brawler that closes in and shoots its Rigging", () => {
-    const r = duel("Skirmisher", "Brawler");
+  it("play out in a battle: the Skirmisher rakes a Brawler that closes in and shoots its Hull", () => {
+    const r = duel("Skirmisher", "Brawler", 1);
     expect(r.rounds[0]!.row).toBe("crossClose");
-    expect(r.rounds[0]!.ships[0]).toMatchObject({ rule: 1, helm: "crossTheirBow", guns: "chainShot" });
-    expect(r.rounds[0]!.ships[0]!.shot.track).toBe("rigging");
+    expect(r.rounds[0]!.ships[0]).toMatchObject({ rule: 2, helm: "crossTheirBow", guns: "roundShot" });
+    expect(r.rounds[0]!.ships[0]!.shot.track).toBe("hull");
     expect(r.rounds[0]!.ships[0]!.shot.damage).toBeGreaterThan(r.rounds[0]!.ships[1]!.shot.damage); // the raked ship's guns are weaker
     expect(r.outcome.winner).toBe("hunter");
   });
 
   it("play out in a battle: a Coward strikes its colours once its Hull falls below half", () => {
-    const r = duel("Brawler", "Coward", 1234, { cannons: 30 });
+    const r = duel("Brawler", "Coward", 1234, { cannons: 60 });
     expect(r.outcome.kind).toBe("struckColours");
     expect(r.outcome).toMatchObject({ winner: "hunter", loser: "target" });
     const last = r.rounds.at(-1)!;

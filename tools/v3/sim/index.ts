@@ -5,12 +5,16 @@
 //   npm run sim:v3 -- --quick           a smaller run for tuning loops
 //   npm run sim:v3 -- --check 1,4       only those checks (1 to 5)
 //   npm run sim:v3 -- --json out.json   also write every number to a file, to compare runs
-//   npm run sim:v3 -- --workers 4       threads to use (default: one fewer than the cores)
+//   npm run sim:v3 -- --workers 4       threads to use (default: one fewer than the cores, at most 8)
+//   npm run sim:v3 -- --set combat.rake=1.5 --set shellback.cannons=20
+//                                       try numbers of balance.ts for this run without editing the file
 //
 // The exit code is 1 when a check that ran did not pass.
 
 import { writeFileSync } from "node:fs";
 import { EFFORTS } from "./effort.ts";
+import { parseSet } from "./patch.ts";
+import type { Patch } from "./patch.ts";
 import { inlinePool, workerPool } from "./pool.ts";
 import { CHECK_IDS, failedChecks, render, runChecks } from "./run.ts";
 import type { CheckId } from "./run.ts";
@@ -31,10 +35,12 @@ if (chosen && which.length === 0) {
   process.exit(2);
 }
 const workers = Number(value("--workers") ?? 0);
+const patch: Patch = {};
+args.forEach((a, i) => { if (a === "--set") Object.assign(patch, parseSet(args[i + 1] ?? "")); });
 
-const pool = workers === 1 ? inlinePool() : workerPool(workers > 1 ? workers : undefined);
+const pool = workers === 1 ? inlinePool(patch) : workerPool(workers > 1 ? workers : undefined, patch);
 try {
-  const results = await runChecks(pool, effort, which);
+  const results = await runChecks(pool, effort, which, patch);
   for (const line of render(results)) console.log(line);
   const file = value("--json");
   if (file) {

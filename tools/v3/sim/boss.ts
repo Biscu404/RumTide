@@ -8,7 +8,8 @@
 // search cannot flatter itself. The check passes when it is from 40% to 60%.
 //
 // Alongside it: the four templates, the Crabber of the P2.6 notes, and the gate pace of GAMEPLAY 2.5 (the median captain
-// passes by Tide 7 to 9, nobody later than Tide 12) worked out from the win chance on each Tide, with one fight a Tide (D108).
+// passes by Tide 7 to 9, nobody later than Tide 12) worked out from the win chance on each Tide. D108 decided that he fights
+// every captain who reaches him each Tide, and the pace under the old one fight a Tide is printed beside it.
 
 import { Rng, TEMPLATE_NAMES, templateDoctrine, validateDoctrine } from "../../../supabase/functions/_shared/engine_v3/index.ts";
 import type { Doctrine } from "../../../supabase/functions/_shared/engine_v3/index.ts";
@@ -68,7 +69,10 @@ export interface BossData {
   trace: SearchTrace[];
   /** Win chance of the best doctrine and of the starting Brawler on each Tide, from the first Tide he can be fought. */
   pace: { tide: number; best: number; brawler: number }[];
+  /** Every captain at his door fights him each Tide, each against a whole Old Shellback (D108 as decided in P3.2). */
   gate: GatePace;
+  /** The same win chances with one fight a Tide, as P2.6 built it: a queue. */
+  queue: GatePace;
 }
 
 export async function runBoss(pool: Pool, effort: Effort): Promise<BossData> {
@@ -105,13 +109,17 @@ export async function runBoss(pool: Pool, effort: Effort): Promise<BossData> {
   const bestByTide = await Promise.all(tides.map((t) => score(pool, [winner], t, `boss/pace/${t}`, B.gateSeeds)));
   const brawlerByTide = await Promise.all(tides.map((t) => score(pool, [templateDoctrine("Brawler")], t, `boss/pace/${t}`, B.gateSeeds)));
   const pace = tides.map((tide, i) => ({ tide, best: bestByTide[i]![0]!.rate, brawler: brawlerByTide[i]![0]!.rate }));
-  const gate = gatePace(pace.map((p) => p.best), tides[0]!);
-  return { best: best!, finalists, references, trace, pace, gate: gate };
+  const chances = pace.map((p) => p.best);
+  const gate = gatePace(chances, tides[0]!, CAPTAINS, SEASONS, CAPTAINS);
+  const queue = gatePace(chances, tides[0]!, CAPTAINS, SEASONS, 1);
+  return { best: best!, finalists, references, trace, pace, gate, queue };
 }
 
 // ---------- The gate pace (2.5, D108) ----------
 
 export interface GatePace {
+  /** Fights he takes in a Tide: 1 is a queue, and as many as there are captains is "every captain who reaches him". */
+  fightsPerTide: number;
   captains: number;
   firstTide: number;
   /** Averaged over many seasons: the Tide the median captain and the last captain pass. */
@@ -126,10 +134,12 @@ const SEASONS = 4000;
 
 /**
  * Six captains who are all at the gate from `firstTide`, each with the same chance to win a fight on each Tide, `chance[tide - firstTide]`
- * (the last one holds for later Tides). One fight a Tide (D81, D108): one captain who has not passed yet, at random, fights him.
- * A captain who wins passes and leaves the queue. A loser goes to the back of it at once, which is kinder than the real tow home.
+ * (the last one holds for later Tides). He takes `fightsPerTide` fights a Tide, against captains who have not passed yet, picked at
+ * random (D108): with 1 that is the queue P2.6 built, and with as many as there are captains each one fights him every Tide, each
+ * fight against a whole Old Shellback. A captain who wins passes. A loser tries again next Tide, which is kinder than the real tow
+ * home and the sail back, so the pace is the best the gate can do.
  */
-export function gatePace(chance: readonly number[], firstTide: number, captains = CAPTAINS, seasons = SEASONS): GatePace {
+export function gatePace(chance: readonly number[], firstTide: number, captains = CAPTAINS, seasons = SEASONS, fightsPerTide = 1): GatePace {
   const rng = new Rng("p3/boss/gate");
   let median = 0;
   let last = 0;
@@ -139,15 +149,22 @@ export function gatePace(chance: readonly number[], firstTide: number, captains 
     const passed: number[] = [];
     for (let tide = firstTide; waiting.length > 0 && tide < firstTide + 200; tide++) {
       const p = chance[Math.min(chance.length - 1, tide - firstTide)] ?? 0;
-      const at = Math.floor(rng.next() * waiting.length);
-      if (rng.next() < p) { waiting.splice(at, 1); passed.push(tide); }
+      const left = [...waiting];
+      const fighters: number[] = [];
+      const fights = Math.min(fightsPerTide, left.length);
+      for (let i = 0; i < fights; i++) fighters.push(left.splice(Math.floor(rng.next() * left.length), 1)[0]!);
+      for (const captain of fighters) {
+        if (rng.next() >= p) continue;
+        waiting.splice(waiting.indexOf(captain), 1);
+        passed.push(tide);
+      }
     }
     passed.sort((a, b) => a - b);
     median += passed[Math.ceil(captains / 2) - 1] ?? firstTide + 200;
     last += passed[captains - 1] ?? firstTide + 200;
     if ((passed[captains - 1] ?? Infinity) <= 12) byTwelve++;
   }
-  return { captains, firstTide, medianTide: median / seasons, lastTide: last / seasons, lastByTwelve: byTwelve / seasons };
+  return { fightsPerTide, captains, firstTide, medianTide: median / seasons, lastTide: last / seasons, lastByTwelve: byTwelve / seasons };
 }
 
 // ---------- Judgement ----------

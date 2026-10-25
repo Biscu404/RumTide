@@ -111,7 +111,7 @@ describe("the damage formula (P2.1, GAMEPLAY 8.5)", () => {
     expect(fire(hunter(), { range: "long", terrain: "fog" }).raw).toBeCloseTo(base(C.range.round.long) * C.terrainGuns.fogLong);
     expect(fire(hunter(), { range: "long", terrain: "open" }).raw).toBeCloseTo(base(C.range.round.long));
     expect(fire(hunter(), { range: "medium", terrain: "rocky" }).raw).toBeCloseTo(C.k);
-    expect(fire(hunter(), { range: "close", terrain: "fog" }).raw).toBeCloseTo(C.k);
+    expect(fire(hunter(), { range: "close", terrain: "fog" }).raw).toBeCloseTo(base(C.range.round.close));
     expect(fire(hunter(), { range: "long", order: "chainShot", terrain: "fog" }).raw).toBeCloseTo(base(C.range.chain.long) * C.terrainGuns.fogLong);
   });
 
@@ -205,7 +205,7 @@ describe("Hold Fire (P2.1, GAMEPLAY 8.5)", () => {
     let a = hunter();
     a = recordFiring(a, "holdFire", fireGuns(a, target(), "close", "holdFire", rng()));
     a = recordFiring(a, "board", fireGuns(a, target(), "close", "board", rng()));
-    expect(fireGuns(a, target(), "close", "roundShot", rng()).raw).toBeCloseTo(C.k);
+    expect(fireGuns(a, target(), "close", "roundShot", rng()).raw).toBeCloseTo(base(C.range.round.close));
   });
 
   it("stacks with a rake, as every other factor does", () => {

@@ -131,11 +131,11 @@ Weather sits on top of terrain (3.3): Calm, Breeze, Gale, plus Storm in the Maw.
 ## 2.5 Old Shellback (the gate boss)
 
 * Lives in the Narrows: Shallows terrain plus Strong Current.
-* Statline: Hull 300, **no Rigging** (Chain shot does nothing), its claws fight as 40 Hands when grappling.
+* Statline: Hull 150, **no Rigging** (Chain shot does nothing), its claws fight as 80 Hands when grappling. Its Helm score is a fixed 15, which nothing changes: it out-turns a fresh sloop (11.5 in the Shallows), so it grapples whoever stays at Close in rounds 4 and 5.
 * Habits (printed in the bestiary after you watch it fight once): rounds 1 and 2 it Closes In; **round 3 it rears up and exposes its soft underside** (Round shot does double damage); rounds 4 and 5 it grapples.
 * What it teaches: doctrines with round conditions, ammo choice, terrain.
 * **Personal gate:** every captain must be on the winning side of one battle against it. Other captains can join your fight (fleet battle rules, co op prize with the N to the power 1.5 rule).
-* It never dies for good: beaten, it retreats into its shell and is back next Tide, a little angrier.
+* It never dies for good: beaten, it retreats into its shell and comes out whole for the next captain, and again next Tide. It fights every captain who reaches it, once a Tide each, so friends do not queue at the gate.
 * **Catch up:** from Tide 9 it loses 8% of its Hull every Tide (it is getting tired), so nobody stays stuck.
 * **Reward for each captain who beats it:** the title *Shellback*, gold, and a **Shellback's Chart** found inside its shell: a Sketch of 1 or 2 other archipelagos and the strait routes to them. Each captain's chart is drawn separately from the set, so captains branch out to different archipelagos and immediately hold charts worth trading.
 * Target: median captain passes it by Tide 7 to 9; nobody later than Tide 12.
@@ -681,27 +681,27 @@ Moves: **Close In**, **Hold**, **Open Range**, **Cross Their Bow**.
 
 | Order | Hits | Long | Medium | Close | Grappled |
 |-|-|-|-|-|-|
-| Round shot | Hull | 0.6 | 1.0 | 1.0 | 0.5 |
+| Round shot | Hull | 0.6 | 1.0 | 0.5 | 0.5 |
 | Chain shot | Rigging | 1.0 | 0.8 | 0.4 | 0 |
 | Grapeshot | Hands | 0 | 0.5 | 1.2 | 1.0 |
 | Hold Fire | Nothing. Uses no Powder; next round's guns do 1.5 times damage | | | | |
 | Board | Only at Close: try to grapple. Succeeds if your Helm score is at least theirs, or if they also Board or Hold | | | | |
-| Repel | Only when Grappled: no guns, +30% boarding defence | | | | |
+| Repel | Only when Grappled: no guns, boarding strength ×2.6 (8.6) | | | | |
 
 **Damage per round:**
 
-`damage = 22 × (Cannons ÷ 10)^0.6 × range factor × gunnery × helm modifier × terrain × powder × luck`
+`damage = 22 × (Cannons ÷ 10)^0.3 × range factor × gunnery × helm modifier × terrain × powder × luck`
 
 * gunnery = min(1, Hands ÷ 60% of max Hands)
 * helm modifier: rake 2.0, flank or stern shot 1.25, weakened 0.75
 * powder: 0.5 if out of Powder
 * luck: seeded, 0.9 to 1.1 (19.1)
-* Round shot damage removes Hull points; Chain shot removes Rigging points; Grapeshot removes 1 Hand per 3 damage.
+* Round shot damage removes Hull points; Chain shot removes Rigging points; Grapeshot removes 1 Hand per 6 damage.
 * **Staleness:** the same Guns order three rounds in a row does 20% less.
 
 ## 8.6 Boarding
 
-* **Boarding strength** = Hands × (1 + Bosun, trait and Background bonuses), × 1.3 for a ship that plays Repel.
+* **Boarding strength** = Hands × (1 + Bosun, trait and Background bonuses), × 2.6 for a ship that plays Repel.
 * Each Grappled round, each side removes Hands from the other equal to 20% of its own boarding strength.
 * **Captured:** when one side's Hands fall below 40% of the other side's, or below 20% of its own max, it surrenders.
 * **Cut Free:** a Grappled ship can play Open Range; if it wins a Helm contest, range returns to Close.

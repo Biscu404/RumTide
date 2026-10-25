@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Rng, TEMPLATE_NAMES, powerRating, templateDoctrine, validateDoctrine } from "../../../supabase/functions/_shared/engine_v3/index.ts";
+import { B, Rng, TEMPLATE_NAMES, powerRating, templateDoctrine, validateDoctrine } from "../../../supabase/functions/_shared/engine_v3/index.ts";
 import { OPEN_BREEZE, SCENES, buildShip, duel, evenLevels, ratingOf, sceneByName, seedFor, sloopForRatio, verdictFor } from "./arena.ts";
 import { crabber, gatePace } from "./boss.ts";
 import { chunked } from "./chunks.ts";
@@ -8,6 +8,7 @@ import { fieldShares, judgeSeats, runField } from "./field.ts";
 import { runDuels } from "./jobs.ts";
 import type { SituationResult } from "./jobs.ts";
 import { ALL_PLAYS } from "./jobs.ts";
+import { applyPatch, parseSet, patchText } from "./patch.ts";
 import { doctrineLines, mutateDoctrine, randomDoctrine, randomPlan } from "./plans.ts";
 import { inlinePool, workerPool } from "./pool.ts";
 import { failedChecks, render, runChecks } from "./run.ts";
@@ -174,6 +175,16 @@ describe("the gate pace (D108)", () => {
     expect(gatePace([0], 5, 6, 3).lastByTwelve).toBe(0);
   });
 
+  it("is much faster when he fights every captain each Tide than when he fights one (D108)", () => {
+    const queue = gatePace([0.5], 5, 6, 400, 1);
+    const everyone = gatePace([0.5], 5, 6, 400, 6);
+    expect([queue.fightsPerTide, everyone.fightsPerTide]).toEqual([1, 6]);
+    expect(everyone.medianTide).toBeLessThan(queue.medianTide);
+    expect(everyone.lastTide).toBeLessThan(queue.lastTide);
+    expect(everyone.lastByTwelve).toBeGreaterThan(queue.lastByTwelve);
+    expect(gatePace([1], 5, 6, 50, 6)).toMatchObject({ medianTide: 5, lastTide: 5, lastByTwelve: 1 }); // everybody wins on the first Tide
+  });
+
   it("gets faster when the chance rises with the Tide, as Old Shellback tires", () => {
     const flat = gatePace([0.3], 5, 6, 600);
     const tiring = gatePace([0.3, 0.3, 0.3, 0.3, 0.5, 0.6, 0.7, 0.8], 5, 6, 600);
@@ -204,6 +215,87 @@ describe("the jobs and the pool", () => {
       await pool.close();
     }
   }, 30000);
+
+  it("keep two runs that are in flight at once apart, each with its own answers", async () => {
+    const first = [job, { ...job, label: "test/two1" }];
+    const second = [{ ...job, scene: "kelp", label: "test/two2" }, { ...job, a: fighter("Runner"), label: "test/two3" }, { ...job, label: "test/two4", count: 10 }];
+    const here = inlinePool();
+    const wantFirst = await here.run("duels", first);
+    const wantSecond = await here.run("duels", second);
+    expect(wantSecond).not.toEqual(wantFirst.slice(0, 3));
+    const pool = workerPool(2);
+    try {
+      const [a, b] = await Promise.all([pool.run("duels", first), pool.run("duels", second)]);
+      expect(a).toEqual(wantFirst);
+      expect(b).toEqual(wantSecond);
+    } finally {
+      await pool.close();
+    }
+  }, 30000);
+});
+
+describe("trying a number without editing balance.ts (--set)", () => {
+  it("reads path=number and refuses anything else", () => {
+    expect(parseSet("combat.rake=1.5")).toEqual({ "combat.rake": 1.5 });
+    expect(parseSet("shellback.hull=0")).toEqual({ "shellback.hull": 0 });
+    for (const bad of ["combat.rake", "combat.rake=", "=2", "combat.rake=fast"]) expect(() => parseSet(bad)).toThrow("path=number");
+  });
+
+  it("changes a number for as long as it is held and puts it back", () => {
+    const before = B.combat.rake;
+    const restore = applyPatch({ "combat.rake": 1 });
+    expect(B.combat.rake).toBe(1);
+    restore();
+    expect(B.combat.rake).toBe(before);
+    expect(patchText({ "combat.rake": 1, "shellback.hull": 600 })).toBe("combat.rake=1, shellback.hull=600");
+    expect(patchText({})).toBe("no changes to balance.ts");
+  });
+
+  it("refuses a path that is not a number, and leaves every number it had already changed as it was", () => {
+    const before = B.combat.rake;
+    expect(() => applyPatch({ "combat.rake": 1, "combat.nothing": 2 })).toThrow("There is no number at B.combat.nothing");
+    expect(() => applyPatch({ "combat.range": 2 })).toThrow("There is no number at B.combat.range");
+    expect(() => applyPatch({ "nowhere.rake": 2 })).toThrow("There is no B.nowhere.rake");
+    expect(B.combat.rake).toBe(before);
+  });
+
+  it("is held by this thread and by every worker until the pool closes", async () => {
+    // The template thresholds are read when this thread builds a doctrine, the damage numbers when a worker fights.
+    const strikes = (): number => (templateDoctrine("Coward").rules[0]!.if[0] as { pct: number }).pct;
+    const original = strikes();
+    const damage = B.combat.k;
+    const patch = { "combat.doctrine.templates.cowardStrikesHullPct": 90, "combat.k": damage * 2 };
+    const job = { a: fighter("Brawler"), b: fighter("Coward"), scene: "fog", label: "test/patch", from: 0, count: 40 };
+    const plain = await inlinePool().run("duels", [job]);
+
+    const inline = inlinePool(patch);
+    const here = await inline.run("duels", [job]);
+    await inline.close();
+    expect(strikes()).toBe(original);
+    expect(here).not.toEqual(plain);
+
+    const pool = workerPool(2, patch);
+    try {
+      expect(strikes()).toBe(90);
+      expect(await pool.run("duels", [job])).toEqual(here);
+    } finally {
+      await pool.close();
+    }
+    expect(strikes()).toBe(original);
+    expect(B.combat.k).toBe(damage);
+  }, 30000);
+
+  it("a run says which numbers it was run with", async () => {
+    const patch = { "combat.rake": 1 };
+    const pool = inlinePool(patch);
+    try {
+      const r = await runChecks(pool, EFFORTS.tiny, [4], patch);
+      expect(r.patch).toEqual(patch);
+      expect(render(r).join("\n")).toContain("With: combat.rake=1.");
+    } finally {
+      await pool.close();
+    }
+  });
 });
 
 describe("a run of the five checks", () => {

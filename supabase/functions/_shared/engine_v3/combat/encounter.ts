@@ -19,7 +19,7 @@ import { runBattle } from "./battle.ts";
 import type { BattleInput, BattleMate } from "./battle.ts";
 import { doctrineChooser, pickDoctrine } from "./doctrine.ts";
 import { apportion, pickFlagship } from "./fleet.ts";
-import { isBoss, recordBossWin } from "./shellback.ts";
+import { isBoss, recordBossWin, restoreBoss } from "./shellback.ts";
 import { cargoValue, carriedBy, jettison, scale, settleLoot, splitByHolding, splitCarried, sumCarried } from "./loot.ts";
 import type { Carried, SalvagePile } from "./loot.ts";
 import { BATTLE_SIDES } from "./types.ts";
@@ -344,9 +344,10 @@ const sideRating = (ships: readonly EncounterSide[]): number => ships.reduce((su
 
 /**
  * Parley, then the escape roll, then battle (3.7 step 6). A parley paid or an escape lets the ships sail on (the hunter
- * freezes when the target slips away); a battle freezes everyone in it. Neither happens in a mutual encounter: both ships
- * chose the fight. Fleet mates who joined (v0.2 7.5) take no part in a parley or an escape, which are between the two
- * leads, but their strength counts in the parley offer and they fight and freeze with their side if a battle follows.
+ * freezes when the target slips away); a battle freezes everyone in it, a boss excepted (D108). Neither happens in a
+ * mutual encounter: both ships chose the fight. Fleet mates who joined (v0.2 7.5) take no part in a parley or an escape,
+ * which are between the two leads, but their strength counts in the parley offer and they fight and freeze with their
+ * side if a battle follows.
  */
 export const combatEncounter: EncounterResolver = (ctx: EncounterContext): EncounterOutcome => {
   const { hunter, target, tide, t } = ctx;
@@ -440,9 +441,17 @@ export const combatEncounter: EncounterResolver = (ctx: EncounterContext): Encou
     refusedParley,
   });
   events.push({ t, kind: "battle", record, aftermath: applied.aftermath });
+  // A boss does not stop for the rest of the Tide (D108): it goes back into its shell and comes out whole for the next
+  // captain who reaches it, so a group of friends does not queue at the gate one fight a Tide.
+  const everyone = BATTLE_SIDES.flatMap((role) => sides[role]);
+  for (const s of everyone) {
+    if (!isBoss(s.captain)) continue;
+    const recovered = restoreBoss(ctx.state, s.ship, tide, t);
+    if (recovered) events.push(recovered);
+  }
   return {
     result: resultOf(record.outcome.kind),
-    freeze: BATTLE_SIDES.flatMap((role) => sides[role].map((s) => s.ship.id)),
+    freeze: everyone.filter((s) => !isBoss(s.captain)).map((s) => s.ship.id),
     events,
     tow: applied.tow,
     bounties: applied.bounties,

@@ -6,7 +6,7 @@ The full design is in `docs/GAME_DESIGN.md`. It is long, so do not read it all a
 
 ## Current focus
 
-* Next task: P3.2, run the five checks of GAMEPLAY 8.9 with `npm run sim:v3` and tune the combat numbers in `balance.ts` until they pass. The brief is `docs/briefs/P3-combat-testing.md`. Task ids come from the Rumtide Roadmap tracker on claude.ai.
+* Next task: P3.3, build `npm run sim:v3 -- --replays`, which prints ten sample battles in plain words, then Biscu reads them and signs off or lists what feels wrong. The brief is `docs/briefs/P3-combat-testing.md`. Task ids come from the Rumtide Roadmap tracker on claude.ai.
 * Done work is in `git log` and `docs/DECISIONS.md`.
 * Decisions waiting on Biscu are in `docs/STATUS.md`.
 
@@ -89,7 +89,7 @@ A task is done when its own checks pass and all of this is true:
 * Check everything at once: `npm run check` (types and all tests, v0.2 and v0.3)
 * Resolve one v0.3 Tide and print it: `npm run tide:demo` (`npm run tide:demo -- --shellback` plays a challenge to Old Shellback instead)
 * Rewrite the v0.3 golden Tide after an intentional rule change: `npm run golden:update`
-* Run the v0.3 combat simulator, the five checks of GAMEPLAY 8.9: `npm run sim:v3` (about two minutes; `-- --quick` for tuning loops, `-- --check 1,4` for some checks, `-- --json file` to keep the numbers; exits 1 if a check fails)
+* Run the v0.3 combat simulator, the five checks of GAMEPLAY 8.9: `npm run sim:v3` (about two minutes; `-- --quick` for tuning loops, `-- --check 1,4` for some checks, `-- --set combat.rake=1` to try a number of `balance.ts` for one run without editing it, `-- --json file` to keep the numbers; exits 1 if a check fails)
 * Run a bot season: `npm run bots` (six scripted captains and a six raider brawl play Season 0 on the real engine over 30 seeds each, `npm run bots -- 100` for more; every season is played twice, directly and through the Edge Function handlers, and the two must end identically; fails on any impossible state, crash, non deterministic season or insane total)
 
 ## Crew (specialist roles)

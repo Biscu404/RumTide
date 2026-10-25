@@ -25,6 +25,8 @@ const S = B.shellback;
 const NARROWS = "the_narrows";
 const BREEZE = { cradle: { kind: "breeze" as const, from: 270 } };
 const DECAY_FROM = SEASON_PRESETS.season0.shellbackDecayFromTide;
+/** His Hull after `n` Tides of decay: each Tide he keeps (1 - decayPerTide) of the Hull he had. */
+const tired = (n: number): number => Math.round(S.hull * (1 - S.decayPerTide) ** n);
 
 // ---------- Fixtures ----------
 
@@ -59,6 +61,11 @@ const battles = (r: TideResult) => r.replay.flatMap((e) => (e.kind === "battle" 
 const only = <K extends ReplayEvent["kind"]>(r: TideResult, kind: K) =>
   r.replay.filter((e): e is Extract<ReplayEvent, { kind: K }> => e.kind === kind);
 const SHIP = `ship_${SHELLBACK_ID}`;
+/** Wounds him to a sliver just before each fight, so that the challenger wins in the first round. */
+const woundedFirst: EncounterResolver = (ctx) => {
+  ctx.state.ships[SHIP]!.hullPoints = 3;
+  return combatEncounter(ctx);
+};
 /** Did the player ship `ship_p` win the first battle of the Tide? */
 const playerWon = (r: TideResult): boolean => {
   const { record } = battles(r)[0]!;
@@ -100,16 +107,16 @@ describe("Old Shellback in the season (2.5)", () => {
     expect(Object.keys(newSeason({ seasonId: "s", preset: "season0", seed: 1, world, captains: [] }).ships)).toEqual([SHIP]);
   });
 
-  it("has Hull 300, no Rigging and claws that fight as 40 Hands", () => {
+  it("has his Hull, no Rigging and claws that fight as Hands (2.5, D121)", () => {
     const ship = crabSeason().ships[SHIP]!;
-    expect(maxHullPoints(ship)).toBe(300);
-    expect(ship.hullPoints).toBe(300);
+    expect(maxHullPoints(ship)).toBe(S.hull);
+    expect(ship.hullPoints).toBe(S.hull);
     expect(maxRiggingPoints(ship)).toBe(0);
     expect(ship.riggingPoints).toBe(0);
-    expect(maxHands(ship)).toBe(40);
-    expect(ship.hands).toBe(40);
+    expect(maxHands(ship)).toBe(S.clawHands);
+    expect(ship.hands).toBe(S.clawHands);
     expect([cannonsOf(ship), sailsOf(ship)]).toEqual([S.cannons, S.sails]);
-    expect(powerRating(ship)).toBeCloseTo((300 / B.power.hullPer + S.cannons + S.sails + 40 / B.power.handsPer) / B.power.divisor);
+    expect(powerRating(ship)).toBeCloseTo((S.hull / B.power.hullPer + S.cannons + S.sails + S.clawHands / B.power.handsPer) / B.power.divisor);
   });
 
   it("is at home in the Narrows: the water is Charted for him, so he has Local Knowledge there (D79)", () => {
@@ -120,18 +127,20 @@ describe("Old Shellback in the season (2.5)", () => {
 });
 
 describe("his statline across the season (2.5, D106)", () => {
-  it("is Hull 300 until Tide 8, then 8% less every Tide from Tide 9, compounding", () => {
-    for (let tide = 1; tide < DECAY_FROM; tide++) expect(shellbackStatline(tide, DECAY_FROM).maxHull).toBe(300);
+  it("is his full Hull until Tide 8, then 8% less every Tide from Tide 9, compounding", () => {
+    for (let tide = 1; tide < DECAY_FROM; tide++) expect(shellbackStatline(tide, DECAY_FROM).maxHull).toBe(S.hull);
     expect(DECAY_FROM).toBe(9);
-    expect(shellbackStatline(9, DECAY_FROM).maxHull).toBe(276); // 300 x 0.92
-    expect(shellbackStatline(10, DECAY_FROM).maxHull).toBe(254); // 253.92
-    expect(shellbackStatline(12, DECAY_FROM).maxHull).toBe(215); // the slowest captain is through by Tide 12
-    expect(shellbackStatline(28, DECAY_FROM).maxHull).toBe(57);
+    expect(S.decayPerTide).toBe(0.08);
+    expect(shellbackStatline(9, DECAY_FROM).maxHull).toBe(tired(1));
+    expect(shellbackStatline(10, DECAY_FROM).maxHull).toBe(tired(2));
+    expect(shellbackStatline(12, DECAY_FROM).maxHull).toBe(tired(4));
+    expect(shellbackStatline(28, DECAY_FROM).maxHull).toBe(tired(20));
+    expect(tired(1)).toBeLessThan(S.hull);
   });
 
   it("never reaches 0, and keeps the rest of the statline", () => {
     expect(shellbackStatline(500, DECAY_FROM).maxHull).toBe(1);
-    expect(shellbackStatline(20, DECAY_FROM)).toMatchObject({ maxRigging: 0, maxHands: 40, cannons: S.cannons, sails: S.sails, helm: S.helm });
+    expect(shellbackStatline(20, DECAY_FROM)).toMatchObject({ maxRigging: 0, maxHands: S.clawHands, cannons: S.cannons, sails: S.sails, helm: S.helm });
   });
 
   it("makes him whole at the start of a Tide, and says so only when something changed", () => {
@@ -141,8 +150,8 @@ describe("his statline across the season (2.5, D106)", () => {
     ship.hullPoints = 12;
     ship.hands = 3;
     const events = upkeepBosses(state, 6);
-    expect(events).toEqual([{ t: 0, kind: "bossRecovers", ship: SHIP, hullPoints: 300, maxHullPoints: 300 }]);
-    expect(ship).toMatchObject({ hullPoints: 300, hands: 40, riggingPoints: 0 });
+    expect(events).toEqual([{ t: 0, kind: "bossRecovers", ship: SHIP, hullPoints: S.hull, maxHullPoints: S.hull }]);
+    expect(ship).toMatchObject({ hullPoints: S.hull, hands: S.clawHands, riggingPoints: 0 });
     expect(state.ships.ship_p!.hullPoints).toBe(100); // nobody else is touched
   });
 
@@ -150,12 +159,12 @@ describe("his statline across the season (2.5, D106)", () => {
     const state = crabSeason([{ id: "p", water: "gh_harbour" }], 8);
     state.ships[SHIP]!.hullPoints = 40;
     const t8 = resolve(state, {});
-    expect(only(t8, "bossRecovers")).toMatchObject([{ ship: SHIP, hullPoints: 300, maxHullPoints: 300 }]);
+    expect(only(t8, "bossRecovers")).toMatchObject([{ ship: SHIP, hullPoints: S.hull, maxHullPoints: S.hull }]);
     expect(t8.replay[1]!.kind).toBe("bossRecovers"); // right after the Tide begins, before anyone sails
     const t9 = resolve(t8.state, {});
-    expect(only(t9, "bossRecovers")).toMatchObject([{ ship: SHIP, hullPoints: 276, maxHullPoints: 276 }]);
-    expect(t9.state.ships[SHIP]).toMatchObject({ hullPoints: 276, statline: { maxHull: 276 } });
-    expect(only(resolve(t9.state, {}), "bossRecovers")).toMatchObject([{ hullPoints: 254, maxHullPoints: 254 }]);
+    expect(only(t9, "bossRecovers")).toMatchObject([{ ship: SHIP, hullPoints: tired(1), maxHullPoints: tired(1) }]);
+    expect(t9.state.ships[SHIP]).toMatchObject({ hullPoints: tired(1), statline: { maxHull: tired(1) } });
+    expect(only(resolve(t9.state, {}), "bossRecovers")).toMatchObject([{ hullPoints: tired(2), maxHullPoints: tired(2) }]);
   });
 
   it("lives off the sea: no Provisions eaten and no short rations", () => {
@@ -199,7 +208,8 @@ describe("his habits (2.5)", () => {
 
   it("is played out in a battle: the rule, the move, and the rear up recorded on round 3 only", () => {
     const crab = battleShipOf(newBoss(world, "season0", world.map.bosses[0]!)!.ship, { id: SHELLBACK_ID }, "target", { charted: true, withCurrent: false, lurker: true });
-    const record = runBattle(battleOf(testShip("hunter"), crab, {
+    // A crew big enough to last all five rounds under his claws, and not so big that it takes his in round 4.
+    const record = runBattle(battleOf(testShip("hunter", "sloop", { hands: 60, maxHands: 60 }), crab, {
       hunter: always("hold", "holdFire"), target: doctrineChooser(shellbackDoctrine(), { enemyType: "player" }),
     }, { terrain: "shallows" }));
     const mine = record.rounds.map((r) => r.ships.find((s) => s.ship === SHIP)!);
@@ -220,8 +230,8 @@ describe("the statline in a battle (2.5)", () => {
 
   it("builds a BattleShip from the statline, with a fixed Helm score", () => {
     expect(asBattleShip()).toMatchObject({
-      hull: "sloop", cannons: S.cannons, sails: S.sails, maxHullPoints: 300, maxRiggingPoints: 0, maxHands: 40, hullPoints: 300,
-      riggingPoints: 0, hands: 40, fixedHelm: S.helm,
+      hull: "sloop", cannons: S.cannons, sails: S.sails, maxHullPoints: S.hull, maxRiggingPoints: 0, maxHands: S.clawHands, hullPoints: S.hull,
+      riggingPoints: 0, hands: S.clawHands, fixedHelm: S.helm,
     });
     expect(testShip("hunter").fixedHelm).toBeUndefined(); // no player ship has one
   });
@@ -362,22 +372,23 @@ describe("fighting Old Shellback in a Tide (2.5)", () => {
     expect(resolve(crabSeason([{ id: "p" }], 5), { p: idle(5) }).encounters).toHaveLength(1);
   });
 
-  it("is beaten by a fresh sloop with a sensible doctrine, and the captain passes the gate (2.5, 8.9)", () => {
-    // Close In, a Round shot when he rears up, Grapeshot once the claws are on, else Cross Their Bow for the rake.
-    const crabber: Doctrine = {
-      name: "Crabber",
+  it("is beaten by a fresh sloop with a good doctrine about as often as not, and the captain passes the gate (2.5, 8.9)", () => {
+    // Cross Their Bow while he is far off, Open Range once he is near. It wins when the chase goes its way (D121); the
+    // simulator measures how often (npm run sim:v3, check 5).
+    const kiter: Doctrine = {
+      name: "Kiter",
       rules: [
-        { if: [{ kind: "round", op: "is", n: S.rearUpRound }], then: { kind: "fight", helm: "closeIn", guns: "roundShot" } },
-        { if: [{ kind: "range", op: "is", range: "grappled" }], then: { kind: "fight", helm: "closeIn", guns: "grapeshot" } },
-        { if: [], then: { kind: "fight", helm: "crossTheirBow", guns: "roundShot" } },
+        { if: [{ kind: "range", op: "is", range: "long" }], then: { kind: "fight", helm: "crossTheirBow", guns: "roundShot" } },
+        { if: [], then: { kind: "fight", helm: "openRange", guns: "roundShot" } },
       ],
     };
-    expect(validateDoctrine(crabber, { slots: 3 })).toEqual([]);
+    expect(validateDoctrine(kiter, { slots: 3 })).toEqual([]);
+    const fights = 40;
     let wins = 0;
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < fights; i++) {
       const state = crabSeason();
-      state.captains.p!.doctrines = [crabber];
-      state.captains.p!.defaultDoctrine = "Crabber";
+      state.captains.p!.doctrines = [kiter];
+      state.captains.p!.defaultDoctrine = "Kiter";
       const r = resolve(state, { p: challenge(6) }, 1000 + i * 37);
       if (playerWon(r)) {
         wins++;
@@ -386,44 +397,74 @@ describe("fighting Old Shellback in a Tide (2.5)", () => {
         expect(r.state.captains.p!.bossesBeaten).toEqual([]);
       }
     }
-    expect(wins).toBeGreaterThan(0);
+    expect(wins).toBeGreaterThan(fights * 0.2);
+    expect(wins).toBeLessThan(fights * 0.7);
   });
 
-  it("is beaten by the starting Brawler too, at these untuned numbers, and the battle tells the story", () => {
-    const state = crabSeason();
-    const r = resolve(state, { p: challenge(6) });
+  it("is not beaten by the starting Brawler any more: his claws take its ship, and the battle tells the story", () => {
+    const r = resolve(crabSeason(), { p: challenge(6) });
     const [battle] = battles(r);
     expect(battle!.record.outcome).toMatchObject({ kind: "captured" });
-    expect(playerWon(r)).toBe(true);
-    expect(battle!.aftermath).toMatchObject({ pvp: false, towed: false, beaten: { boss: SHELLBACK_ID, by: ["p"] } });
-    expect(r.state.captains.p!.bossesBeaten).toEqual([SHELLBACK_ID]);
+    expect(playerWon(r)).toBe(false);
+    expect(battle!.aftermath).toMatchObject({ pvp: false, towed: true });
+    expect(battle!.aftermath.beaten).toBeUndefined();
+    expect(r.state.captains.p!.bossesBeaten).toEqual([]);
+    expect(only(r, "towed").map((e) => e.ship)).toEqual(["ship_p"]);
 
     const text = formatReplay(world, r.state, r.replay).join("\n");
-    expect(text).toContain("It rears up and shows its soft underside: Round shot does 2 times the damage to it.");
+    expect(text).toContain("Old Shellback wins the boarding in round 2. The p is captured.");
+    expect(text).not.toContain("has beaten Old Shellback");
+  });
+
+  it("tells the story of a captain who beats him", () => {
+    // Wounded first, he falls to the first Round shot, and the replay carries the gate's line.
+    const r = resolveTide({ state: crabSeason(), world, orders: { p: challenge(6) }, seed: 1000, windOverride: BREEZE, resolveEncounter: woundedFirst });
+    expect(playerWon(r)).toBe(true);
+    const text = formatReplay(world, r.state, r.replay).join("\n");
     expect(text).toContain("The p has beaten Old Shellback, and may now pass the gate it guards. Old Shellback will be back next Tide.");
   });
 
-  it("retreats into his shell where he lay: never towed, never sunk for good, whole again next Tide", () => {
-    const first = resolve(crabSeason(), { p: challenge(6) });
+  it("retreats into his shell where he lay: never towed, never sunk for good, whole again at once (D108)", () => {
+    const first = resolveTide({ state: crabSeason(), world, orders: { p: challenge(6) }, seed: 1000, windOverride: BREEZE, resolveEncounter: woundedFirst });
     expect(first.state.captains.p!.bossesBeaten).toEqual([SHELLBACK_ID]);
     expect(only(first, "towed")).toEqual([]); // the loser is the boss and is not towed
     const crab = first.state.ships[SHIP]!;
     expect(crab).toMatchObject({ waterId: NARROWS, docked: false });
-    expect(crab.hullPoints).toBeLessThan(300);
-    expect(crab.hands).toBeLessThan(40);
+    // He came out of his shell right after the battle, in the same Tide, and the replay says so.
+    expect(crab).toMatchObject({ hullPoints: S.hull, hands: S.clawHands });
+    const afterBattle = first.replay[first.replay.findIndex((e) => e.kind === "battle") + 1];
+    expect(afterBattle).toMatchObject({ kind: "bossRecovers", ship: SHIP, hullPoints: S.hull, maxHullPoints: S.hull });
 
     const second = resolve(first.state, { p: idle(7) }, 2000);
-    expect(only(second, "bossRecovers")).toMatchObject([{ ship: SHIP, hullPoints: 300, maxHullPoints: 300 }]);
+    expect(only(second, "bossRecovers")).toEqual([]); // nothing left to mend at the start of the next Tide
     expect(second.encounters).toEqual([]); // and the captain who beat him is left alone
-    expect(second.state.ships[SHIP]).toMatchObject({ hullPoints: 300, hands: 40, waterId: NARROWS });
+    expect(second.state.ships[SHIP]).toMatchObject({ hullPoints: S.hull, hands: S.clawHands, waterId: NARROWS });
+  });
+
+  it("fights every captain who reaches him in a Tide, each against a whole Old Shellback (D108)", () => {
+    const ids = ["p1", "p2", "p3"];
+    const r = resolve(crabSeason(ids.map((id) => ({ id }))), Object.fromEntries(ids.map((id) => [id, challenge(6)])));
+    expect(r.encounters).toHaveLength(3);
+    expect(battles(r)).toHaveLength(3);
+    for (const { record } of battles(r)) {
+      expect([record.hunter, record.target]).toContain(SHIP);
+      // The third meets him as whole as the first.
+      expect(record.ships.find((s) => s.shipId === SHIP)).toMatchObject({ hullPoints: S.hull, hands: S.clawHands });
+    }
+    // Each battle is followed by his coming out of his shell, and the three challengers are the ones who are towed home.
+    const kinds = r.replay.map((e) => e.kind).filter((k) => k === "battle" || k === "bossRecovers");
+    expect(kinds).toEqual(["battle", "bossRecovers", "battle", "bossRecovers", "battle", "bossRecovers"]);
+    expect(only(r, "towed").map((e) => e.ship).sort()).toEqual(ids.map((id) => `ship_${id}`));
+    expect(r.state.ships[SHIP]).toMatchObject({ hullPoints: S.hull, hands: S.clawHands, waterId: NARROWS, docked: false });
+  });
+
+  it("meets a captain once a Tide, though he does not stop after a fight", () => {
+    const r = resolve(crabSeason(), { p: challenge(6) });
+    expect(r.encounters).toHaveLength(1);
+    expect(battles(r)).toHaveLength(1);
   });
 
   it("is never towed even when he is sunk, and the captain who sank him passes the gate", () => {
-    // He starts the Tide whole, so wound him just before the fight: one Round shot from the bottom.
-    const woundedFirst: EncounterResolver = (ctx) => {
-      ctx.state.ships[SHIP]!.hullPoints = 3;
-      return combatEncounter(ctx);
-    };
     const r = resolveTide({ state: crabSeason(), world, orders: { p: challenge(6) }, seed: 1000, windOverride: BREEZE, resolveEncounter: woundedFirst });
     const [battle] = battles(r);
     expect(battle!.record.outcome).toMatchObject({ kind: "sunk" });
@@ -433,8 +474,9 @@ describe("fighting Old Shellback in a Tide (2.5)", () => {
     expect(battle!.aftermath).toMatchObject({ towed: false, beaten: { boss: SHELLBACK_ID, by: ["p"] } });
     expect(r.state.ships[SHIP]).toMatchObject({ waterId: NARROWS, docked: false });
     expect(r.state.captains.p!.bossesBeaten).toEqual([SHELLBACK_ID]);
-    // Sunk, he is whole again next Tide.
-    expect(resolve(r.state, {}, 3).state.ships[SHIP]!.hullPoints).toBe(300);
+    // Sunk, he is whole again at once (D108), and stays so next Tide.
+    expect(r.state.ships[SHIP]!.hullPoints).toBe(S.hull);
+    expect(resolve(r.state, {}, 3).state.ships[SHIP]!.hullPoints).toBe(S.hull);
   });
 
   it("gets every player in the same fleet through the gate when they win together (2.5)", () => {

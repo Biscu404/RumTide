@@ -44,9 +44,9 @@ describe("six ship golden Tide (P1.9, P2.4)", () => {
     expect(kinds.filter((k) => k === "escape")).toHaveLength(2); // both targets tried to slip away and were caught
     expect(kinds.filter((k) => k === "battle")).toHaveLength(2);
     const battles = r.replay.flatMap((e) => (e.kind === "battle" ? [e] : []));
-    expect(battles.map((b) => b.record.rounds.length)).toEqual([5, 4]);
-    expect(battles[1]!.aftermath).toMatchObject({ winner: "ship_cap_e", loser: "ship_cap_d", towed: true, loot: { taken: { plunder: 20 } } });
-    expect(r.replay.filter((e) => e.kind === "towed")).toMatchObject([{ ship: "ship_cap_d", to: "gh_harbour", banked: 80, hullPoints: 80 }]);
+    expect(battles.map((b) => b.record.rounds.length)).toEqual([5, 5]);
+    expect(battles[1]!.aftermath).toMatchObject({ winner: "ship_cap_e", loser: "ship_cap_d", towed: true, loot: { taken: { plunder: 18 } } });
+    expect(r.replay.filter((e) => e.kind === "towed")).toMatchObject([{ ship: "ship_cap_d", to: "gh_harbour", banked: 82, hullPoints: 90 }]);
     expect(r.ships.ship_cap_d).toMatchObject({ water: "gh_harbour", docked: true }); // towed home
   });
 });
