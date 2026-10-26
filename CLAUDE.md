@@ -7,14 +7,14 @@ The full design is in `docs/GAME_DESIGN.md`. It is long, so do not read it all a
 ## Current focus
 
 * Next task: P3.2b, bring Old Shellback's check 5 into its band (Gunline 86%, Boarder 100% and Firebrand 88% are over the 80% top) with `B.shellback` and the numbers he reads, and keep the other nine checks passing. P3.2 was split on 26 October 2026: P3.2a Drill luck and check 8 is done (D216, D217), then P3.2b, P3.2c (the decision on D108 with the gate pace) and P3.2d (the guard test, the full run, the golden Tide and the docs). The findings and the order are in `docs/DECISIONS.md` under "What is left of P3.2". The brief is `docs/briefs/P3-combat-testing.md`. Task ids come from the Rumtide Roadmap tracker on claude.ai.
-* Done work is in `git log` and `docs/DECISIONS.md`.
+* Done work is in `git log` and `docs/DECISIONS.md` (older entries in `docs/decisions/`, listed at the top of `docs/DECISIONS.md`).
 * Decisions waiting on Biscu are in `docs/STATUS.md`.
 
 ## Version 0.3 engine rules (engine_v3)
 
 * The v0.3 engine lives in `supabase/functions/_shared/engine_v3/`, next to the v0.2 engine in `engine/`.
 * `docs/GAMEPLAY.md` is the source of truth for v0.3 gameplay. Where it disagrees with `docs/GAME_DESIGN.md`, GAMEPLAY.md wins for `engine_v3`. GAME_DESIGN.md still covers the pillars, art and audio, co op, fairness and architecture.
-* Read the 2026-10-18 entry in `docs/DECISIONS.md` before changing `engine_v3`, and add your own calls there with the task id.
+* Read the 2026-10-18 entry "Version 0.3 engine core" in `docs/decisions/v03-core-to-p3-1.md` before changing `engine_v3`, and add your own calls at the top of `docs/DECISIONS.md` with the task id.
 * Do not edit the v0.2 `engine/` while building v0.3, unless a task says so.
 * Randomness comes only from `rngFor(seed, ...labels)` in `engine_v3/rng.ts`. Give every new kind of roll its own labels so it never shifts anyone else's rolls.
 * Engine functions never mutate their inputs; `resolveTide` clones the state it is given. Encounters go through the `EncounterResolver` hook in `tide.ts`, so combat stays out of movement code.
@@ -69,12 +69,23 @@ The full design is in `docs/GAME_DESIGN.md`. It is long, so do not read it all a
 * When a design decision changes, update `docs/DECISIONS.md` in the same commit.
 * Do not use dashes in prose you write (docs, comments, game text). Use commas or full stops instead.
 
+## Saving tokens
+
+Usage limits are shared by every session and subagent, so work cheaply:
+
+* **Long runs.** The full `npm run sim:v3` (11 to 20 minutes) and long bot seasons take longer than the 10 minute limit on one command. Start them as a background command, with `-- --json sim-results/<name>.json` for the simulator (make the `sim-results` folder first, it is git ignored), then wait for the notice that the command finished. Never wait with `sleep` loops and never check on a run again and again. Never start the same run twice. While tuning use `-- --quick` and `-- --check N`, and do the full run once, at the end of the task.
+* **Big docs.** `docs/GAMEPLAY.md` (about 31,000 tokens), `docs/GAME_DESIGN.md` (about 22,000) and the files in `docs/decisions/` are too big to read whole. Find the heading or the decision id with Grep and read only that part, with an offset and a limit.
+* **Decisions.** `docs/DECISIONS.md` holds only the newest work. Its top section says where older ids live and when to move old sections out. Keep every line of every doc under 2,000 characters, because longer lines are cut off when read and then edits on them fail.
+* **Searches.** Never search or read inside `node_modules`, `dist` or `.claude/worktrees`.
+* **Subagents.** Each one starts with nothing and reads everything again. Do small tasks yourself. When you do delegate, name the exact sections to read, not whole files.
+* **Doc updates.** Keep `docs/STATUS.md` short: the next task, a few lines on where things stand, and what waits on Biscu. The details belong in `docs/DECISIONS.md` and nowhere else.
+
 ## Definition of done
 
 A task is done when its own checks pass and all of this is true:
 
 * In the same commit, update `docs/DECISIONS.md` with the new rule calls, the next task line under Current focus in this file, and `docs/STATUS.md`.
-* Run `npm run check` and `npm run prose:check`.
+* Run `npm run check` and `npm run prose:check`. Run the full simulator only if the task's own check asks for it.
 * Push the branch and open a pull request. Biscu let Claude merge pull requests on 19 October 2026: once both checks pass, merge it, pull `main`, and give Biscu the link and what to check.
 * Never describe branch or merge state in a doc. Git and the pull request hold that.
 * Biscu never edits docs by hand, so you make every doc change.

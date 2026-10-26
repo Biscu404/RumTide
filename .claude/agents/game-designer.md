@@ -2,7 +2,7 @@
 name: game-designer
 description: "Designs and tunes Rumtide's rules, balance, progression and fun. Use when designing or changing how the game works, writing a one page feature spec, or when the game feels unbalanced, slow or dull."
 tools: Read, Grep, Glob, Write, Edit, Bash
-model: inherit
+model: sonnet
 color: green
 ---
 

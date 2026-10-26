@@ -414,7 +414,7 @@ Run only read mostly roles in parallel: narrative-writer, art-director, sound-de
 
 ### Cost
 
-Subagents use the same usage limits as your main session, and you plan two developers on two subscriptions. The agents already use Sonnet for qa-tester and sound-designer. If limits get tight, set `CLAUDE_CODE_SUBAGENT_MODEL` to `sonnet` or `haiku` in settings. Add `CLAUDE_CODE_SUBAGENT_MODEL_FORCE` set to `1` to apply it to every subagent, which also ignores the `model` line in each agent file.
+Subagents use the same usage limits as your main session, and you plan two developers on two subscriptions. The agents use Sonnet for qa-tester, sound-designer, engineer and game-designer (since 26 October 2026, to save usage). The other four inherit the main session's model. If limits get tight, set `CLAUDE_CODE_SUBAGENT_MODEL` to `sonnet` or `haiku` in settings. Add `CLAUDE_CODE_SUBAGENT_MODEL_FORCE` set to `1` to apply it to every subagent, which also ignores the `model` line in each agent file.
 
 ### Memory between sessions (optional, off by default)
 

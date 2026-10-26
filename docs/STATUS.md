@@ -1,44 +1,37 @@
 # Rumtide status
 
-**Date:** 2026-10-26. Authority order: `docs/DECISIONS.md`, then `docs/GAMEPLAY.md`, then `docs/GAME_DESIGN.md`.
+**Date:** 2026-10-26. Short on purpose: the details are in `docs/DECISIONS.md`, which this file only points to. Authority order: `docs/DECISIONS.md` (with `docs/decisions/`), then `docs/GAMEPLAY.md`, then `docs/GAME_DESIGN.md`.
 
 ## Next task
 
-**P3.2b** (game designer and qa-tester) brings Old Shellback's check 5 into its band. **P3.2 was split on 26 October 2026 into four tasks** (the table and the findings are in `docs/DECISIONS.md` under "What is left of P3.2"): **P3.2a** Drill luck and check 8, **done** (D216, D217); **P3.2b** Old Shellback and check 5, next; **P3.2c** the decision on D108 with the gate pace; **P3.2d** the guard test, the full run, the golden Tide and the docs. The brief is `docs/briefs/P3-combat-testing.md`. **P3.B2 is built** (D142 to D181, D201 to D212): six distances, the seven Fighting Styles with their templates, the deck fight, Drill, Fire Pots, Hot Shot, fire, overtime, the reworked Old Shellback, and the replay told in plain words (`combat/lines.ts`, from the narrative writer's `docs/text/replay-lines.md`). `docs/GAMEPLAY.md` is rewritten to match (D213). **P3.B3 is built** (D182 to D200): the simulator plays the styles on ships that really have them, with ten checks. `npm run sim:v3 -- --set path=number` tries a number of `balance.ts` for one run, so P3.2 can search without editing the file. A full run takes 11 minutes on an idle machine, the quick run about 3.
+**P3.2b** (game designer and qa-tester): bring Old Shellback's check 5 into its band of 35% to 80%. Gunline 86%, Boarder 100% and Firebrand 88% are over the top. Only `B.shellback` and the numbers he reads should move. Then P3.2c (D108 and the gate pace) and P3.2d (the guard test, the full run, the golden Tide, the docs). The plan and the findings are under "What is left of P3.2" in `docs/DECISIONS.md`. The brief is `docs/briefs/P3-combat-testing.md`.
 
-**Where the checks stand, with no number tuned.** The full run before the Old Shellback rework (the table under D197) passed eight of ten. Since then only check 5 has been read again, on the quick run (D212):
-* **Check 8 (Drill) passes since P3.2a (D216, D217).** A luck on the Drill bonus of each drilled crew in each deck round (`drill.luck` 3) takes Drill 5 against Drill 0 from 100% to 73.1% of decided battles and Drill 15 from 100% to 82.5%, with `perLevel` unchanged, and leaves every fight between crews with no Drill as it was. A luck on every crew's kills was tried first and broke four wheel pairs of the Boarder. The Drill 15 line is now read on decided battles (D217). The Power Rating still under-rates Drill: a Drill 10 Boarder rates 1.2 times a fresh sloop and beats a fresh field 87.7%.
-* **Check 5 (Old Shellback) fails.** The best doctrine of each style beats him: Bombardier 49%, Gunline 86%, Skirmisher 54%, Rammer 56%, Boarder 100%, Firebrand 88%, against a band of 35% to 80%. Three styles are over the top. Grapeshot into his claws wins most of those fights. The Smuggler (not judged) is at 56%. The gate pace is meaningless while the Boarder beats him every time. The numbers are the spec's and nothing is tuned.
-* Passing, full run, nearest their lines: Gunline over Skirmisher 79.3% (cap 80), Firebrand over Boarder 56.0% and Boarder over Bombardier 56.1% (floor 55), Bombardier and Skirmisher 63.2% (cap 65), the Boarder at 5 levels of equal spending 58.2% (cap 60), twice the Power Rating 86.9%, the Smuggler against the Rammer 33.9% (floor 30). Board from Short, the Mortar outside its own mirror and Ram pass check 2 thinly. The pooled field share hides the water: the Bombardier wins 85% in an uncharted Reef and 12% in Kelp. Re-run the full simulator first, because the Old Shellback rework changed battles with him and the replay words only.
+## Where things stand
 
-Not measured by anything yet: fleets of styled ships, and the Gazette, which has no v0.3 generator, so `docs/text/gazette-battles.md` is content waiting for it. `npm run bots` still plays the v0.2 engine. P3.3 is Biscu's: watch 10 sample replays and judge how they feel.
+* Nine of the ten simulator checks pass on the quick run. Only check 5 fails (D212). Check 8 passes since P3.2a (D216, D217).
+* The full run has not been repeated since the Old Shellback rework (the last table is under D197). Run it once at the end of P3.2d, not during tuning.
+* Not measured yet: fleets of styled ships, and the Gazette (no v0.3 generator). `npm run bots` still plays the v0.2 engine. P3.3 is Biscu's: watch 10 sample replays.
 
 ## Waiting on Biscu
 
-Confirm these rule calls, all in `docs/DECISIONS.md`:
-* **D201 to D212 and D214** (P3.B2 piece 3): Old Shellback as built, and the text. The calls to read first: the tell is for the replay only and no doctrine condition reads it, on purpose (D204); a points result against him is a Draw and driven off counts as beaten (D205); and the snatch is the flagship's only (D206). The writer's invented facts are PROPOSED until you approve them: how his tell looks, "a very cross crab" scuttling out of a broken galleon, and "he" for Old Shellback (D214).
-* **D216 and D217** (P3.2a): a rule and a test line. Drill now has luck, so a drilled crew can have a bad day worse than an untrained one, and the Drill 15 line of check 8 is read on decided battles. No number could fix it, and both are one number or one line to change.
-* **D185 to D192** (P3.B3): the lines drawn on the new checks. The wheel 55% to 80% and 35% to 65% are the spec's. The ones the build chose: Drill 5 against Drill 0 must win 55% to 80% (D190), Lashed fast passes at 40% or less from 100 tries (D191), the Smuggler is the seventh style and sits outside check 1 (D192), and equal spending is played at 5 and 10 levels with no floor (D186).
-* **D113 and D114** (P3.1): the lines drawn on two checks that say "about". Twice the Power Rating passes at 83% to 92% of the fought battles (battles that end Escaped are left out, because a random plan flees by chance), and Old Shellback passes at 40% to 60%. P3.2 tunes to these lines. D140 since replaced the Old Shellback line with a band per style, 35% to 80%, and D136 changed the Power Rating formula to meet the first line.
-* **D97** (P2.5): every ship of a fleet that loses a Sunk or Captured battle is towed home, and they all pay the loot together. The other reading tows only the ships at 0 Hull.
-* **D95** (P2.5): any ship at 0 Hull ends a fleet battle against its whole side, and one ship striking its colours takes its fleet out of the fight (v0.2 7.2).
-* **D91** (P2.5): the two flagships' Helm moves move the one range. A fleet mate's Helm move only sets its own rake or flank shot, though its Board and Open Range can still grapple and cut free.
-* **D57** (P2.2): the fairness factor and the Cradle halving apply to PvP only, and a Sunk ship gives up at most the multiplier's share. GAMEPLAY 8.7 read literally strips the loser of everything whatever the factor.
-* **D35** (P2.1): ships only grapple when both play Close In while already at Close, or through Board. Every other shrink stops at Close.
-* **D36** (P2.1): any growth past the farthest distance ends the battle as Escaped. With six distances that is Far (D121).
-* **D42** (P2.1): the Shallows. A Brigantine or Frigate without Local Knowledge must win a Helm contest to reach Close, or the range stops one band short (Short, with six distances, D121).
+Confirm these rule calls (find each id with the table at the top of `docs/DECISIONS.md`):
+* **D201 to D212 and D214** (P3.B2 piece 3): Old Shellback as built and the text. Read D204, D205 and D206 first. The writer's invented facts in D214 are PROPOSED until approved.
+* **D216 and D217** (P3.2a): Drill has luck now, so a drilled crew can have a worse day than an untrained one; the Drill 15 line is read on decided battles.
+* **D185 to D192** (P3.B3): the lines drawn on the new checks, mainly D186, D190, D191 and D192.
+* **D113 and D114** (P3.1): the lines on two checks that say "about" (D140 and D136 since changed them).
+* **D97, D95, D91** (P2.5): fleet battles, towing and Helm moves.
+* **D57** (P2.2): the fairness factor and loot on a Sunk ship.
+* **D35, D36, D42** (P2.1): grappling, escaping past Far, and the Shallows.
 
-Answer these open questions:
-* **v0.2 playtest:** does the internal playtest in `docs/PLAYTEST.md` still happen now that Season 0 is the v0.3 column?
-* **P0.3 defaults:** only default #6 of the P0.3 table was Biscu's call. #1 and #2 start to matter at P6.3 and P5.
-* **Streak breaker:** GAMEPLAY 19.1 is unbuilt (D34) and no task owns it.
+Open questions:
+* Does the v0.2 internal playtest in `docs/PLAYTEST.md` still happen?
+* P0.3 defaults #1 and #2 start to matter at P6.3 and P5.
+* The streak breaker of GAMEPLAY 19.1 is unbuilt (D34) and no task owns it.
 
 ## Top risks
 
-| # | Risk | Evidence | Impact | Next step |
-|-|-|-|-|-|
-| 1 | Scope and schedule | GAMEPLAY 21 says the Season 0 column is several times the v0.2 MVP, "2 to 3 months of evenings". Biscu chose all of it. The roadmap runs to at least P13, and P2 combat is built but untuned. The boarding rework (D116 to D120) adds three tasks before tuning can finish, plus a sixth upgrade track of 15 levels and a third supply. The Fighting Styles (D121 to D134) add six styles, two distances, the Ram, the Mortar, Hot Shot, fire and a reworked Old Shellback, all in Season 0. No Season 0 date is recorded. | The date slips and friends drift before launch. | Agree the lite fallback trigger and a review date now. |
-| 2 | Fairness and balance measured, one check left to tune | The v0.3 combat simulator (`npm run sim:v3`, ten checks, P3.B3) plays the six Fighting Styles and the Deck orders. Nine of ten pass on the quick run since P3.2a (check 8 fixed by a luck on Drill, D216). Check 5 fails: on the reworked Old Shellback three styles beat him more than 80% of the time (D212), and every number he has is a cliff (the findings are under "What is left of P3.2"). P2.1 to P2.6 made 82 rule calls (D27 to D108) and only D27, D64, D65, D75, D76, D100 and D105 were Biscu's. No v0.3 bot season exists (`tools/bots` runs v0.2). One fight a Tide makes a queue at his gate (D108). GAMEPLAY 20 has no tool behind it yet. | A dominant doctrine or a harsh loss hits friends first. This damages the pillar "fair fights and soft falls". | P3.2b to P3.2d in order. Confirm D35, D36, D42, D57, D91, D95, D97 and D217. |
-| 3 | Nothing playable on v0.3 until P12 and P13, and the live stack is unproven | Only the engine tests and `tools/v3` use `engine_v3`. DECISIONS lists items "not run anywhere": Deno entry files, the cron migration, migrations 3 to 5 on a real project. `docs/PLAYTEST.md` is all unticked. The server assumes one Tide a day. | A failed Tide on a live project is the worst day. Two Tides a day doubles the exposure. | Run one live rehearsal Tide before P12. Have qa-tester gate P12. |
-| 4 | Content and art gap | `client/public/assets/` holds only `.gitkeep` and an empty `sprites/`. `art/`, `docs/text/`, `docs/audio/`, `docs/qa/` and `docs/specs/` are empty, and `docs/LORE.md` does not exist. GAMEPLAY 12.6 needs 30 Squalls, 8 Tales, 6 Sagas and 4 trait Tales. | A working engine with no nightly story. This hurts the pillar "a story every night". | Start `docs/CREW.md` C2 to C5 alongside P2. |
-| 5 | Doc drift | GAME_DESIGN 16.1 still says 14 Tides while GAMEPLAY says 28. | Confusion when a second developer joins. | Fix 16.1 to match GAMEPLAY the next time a task touches Tide counts. |
+1. **Scope and schedule.** The Season 0 column is several times the v0.2 MVP and no Season 0 date is recorded. Next: agree a lite fallback trigger and a review date.
+2. **Balance.** Check 5 still fails and every Old Shellback number is a cliff. No v0.3 bot season exists. Next: P3.2b to P3.2d in order.
+3. **Nothing playable on v0.3 until P12 and P13**, and the live stack (Deno entry files, the cron migration, migrations 3 to 5) has never run. Next: one live rehearsal Tide before P12.
+4. **Content and art gap.** No sprites, no `docs/LORE.md`, and GAMEPLAY 12.6 needs 30 Squalls, 8 Tales, 6 Sagas and 4 trait Tales. Next: `docs/CREW.md` C2 to C5.
+5. **Doc drift.** GAME_DESIGN 16.1 says 14 Tides, GAMEPLAY says 28. Next: fix 16.1 when a task touches Tide counts.

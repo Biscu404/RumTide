@@ -2,7 +2,7 @@
 name: engineer
 description: "Builds Rumtide. Use when implementing a feature, fixing a bug, changing the rules engine, Edge Functions, migrations or client screens, wiring in assets and sounds, or setting up tools and performance work."
 tools: Read, Write, Edit, Bash, Glob, Grep, Skill
-model: inherit
+model: sonnet
 color: blue
 ---
 
