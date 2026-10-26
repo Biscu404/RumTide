@@ -43,6 +43,8 @@ Beside the five, the report prints the gate pace of GAMEPLAY 2.5 (median captain
 
 ## P3.2: run the checks and tune
 
+**Split into four tasks on 26 October 2026 (D216 and the table under it in `docs/DECISIONS.md`):** P3.2a Drill luck and check 8 (done), P3.2b Old Shellback and check 5, P3.2c the decision on D108 with the gate pace, P3.2d the guard test, the full run, the golden Tide and the docs. The list below is what the four do together.
+
 * Run the full simulator. Change `balance.ts` only, and only by doubling or halving, never nudging by 5% (the rule at the top of `balance.ts`).
 * Log every change in `docs/DECISIONS.md` with the number before and after, and the check it moves.
 * Change a rule only if no number can fix a check, and say so in `docs/DECISIONS.md`.

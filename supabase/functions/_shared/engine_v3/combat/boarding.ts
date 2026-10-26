@@ -26,6 +26,8 @@ export interface StrengthOptions {
   firstOver?: boolean;
   /** The ships of the other side, for Tinderbox: a crew fighting a Firebrand on deck fights at less than its strength. */
   foes?: readonly Pick<BattleShip, "style">[];
+  /** How much of its Drill bonus the crew brings this round (deck.ts drillLuck). 1 when the draw is not asked for. */
+  drillLuck?: number;
 }
 
 /**
@@ -35,7 +37,7 @@ export interface StrengthOptions {
  * and guard of the deck fight (deck.ts).
  */
 export function boardingStrength(ship: BattleShip, terrain: Terrain, opts: StrengthOptions = {}): number {
-  let strength = ship.hands * (NEUTRAL + ship.boardingBonus) * drillFactor(ship.drill ?? 0);
+  let strength = ship.hands * (NEUTRAL + ship.boardingBonus) * drillFactor(ship.drill ?? 0, opts.drillLuck ?? NEUTRAL);
   if (terrain === "kelp") strength *= C.kelpBoarding;
   if (opts.firstOver) strength *= C.edge.firstOverTheRail;
   return strength * fightersFactor(ship) * tinderboxFactor(opts.foes ?? []);

@@ -7,8 +7,10 @@
 // with when it cannot use its order: a Guns order, a Volley with no Powder, Fire Pots with no pot or no right to throw it.
 
 import { B } from "../balance.ts";
+import type { Rng } from "../rng.ts";
 import { drillUnlocked } from "../ship.ts";
 import { canThrowPots } from "./styles.ts";
+import type { ShipId } from "../types.ts";
 import type { BattleShip, DeckOrder, GunsOrder, Pairing } from "./types.ts";
 
 const C = B.combat;
@@ -53,6 +55,13 @@ export function crewOrder(ship: Pick<BattleShip, "style" | "drill" | "firePots" 
     default: return "fists";
   }
 }
+
+/**
+ * How much of its Drill bonus a crew brings to this round's deck fight: a draw from 1 - luck to 1 + luck, from the child stream
+ * "deck/drill/<ship>" of the round's stream, so it never shifts another roll. Only a drilled crew has a bonus to vary, so a fight
+ * between crews with no Drill is as it was. Without it a Drill edge of a few points wins every deck fight (D198).
+ */
+export const drillLuck = (rng: Rng, shipId: ShipId): number => rng.stream("deck", "drill", shipId).range(NEUTRAL - B.drill.luck, NEUTRAL + B.drill.luck);
 
 /** Second Wave (Drill 15): after the exchange the crew strikes once more at a share of its strength. */
 export const hasSecondWave = (ship: Pick<BattleShip, "drill">): boolean => drillUnlocked(ship.drill ?? 0, "secondWave");

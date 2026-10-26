@@ -194,6 +194,7 @@ export interface MeleeRecord {
   lost: Record<BattleSide, number>; // Hands each side lost
   hands: Record<BattleSide, number>; // Hands each side has left
   firstOver?: BattleSide; // only in the grapple round: the boarder's Board fought as a Charge with First over the rail
+  drillLuck?: Record<ShipId, number>; // the share of its Drill bonus each drilled crew brought this round (deck.ts drillLuck)
 }
 
 /** Where a fire came from (fighting styles spec section 3). */

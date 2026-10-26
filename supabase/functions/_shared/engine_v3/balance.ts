@@ -173,6 +173,9 @@ export const B = {
     stageSize: 5, perLevel: [0.04, 0.06, 0.08],
     unlocks: { firePots: 5, grapnels: 10, secondWave: 15 },
     secondWaveShare: 0.25,
+    // Drill luck (P3.2): in each round of a deck fight a crew's Drill bonus counts from 1 - luck to 1 + luck times what it is
+    // worth, a seeded draw, so a drilled crew wins most deck fights and not every one. A crew with no Drill has no bonus to vary.
+    luck: 3,
   },
 
   // Power Rating (D26, D136): S = (max Hull / hullPer + Cannons + Sails + Hands / handsPer) / divisor, and the rating is

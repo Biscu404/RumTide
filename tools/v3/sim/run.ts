@@ -4,7 +4,7 @@ import { EFFORTS } from "./effort.ts";
 import type { Effort } from "./effort.ts";
 import { BOSS_HIGH, BOSS_LOW, judgeBoss, runBoss } from "./boss.ts";
 import type { BossData, BossVerdict } from "./boss.ts";
-import { DRILL5_HIGH, DRILL5_LOW, DRILL_LONG, DRILL_SHORT, judgeDrill, runDrill } from "./drill.ts";
+import { DRILL5_HIGH, DRILL5_LOW, DRILL_LONG, DRILL_SHORT, judgeDrill, runDrill, strongerDecided } from "./drill.ts";
 import type { DrillData, DrillVerdict } from "./drill.ts";
 import { FIELD_CAP, FIELD_FLOOR, judgeField, judgeSeats, runField } from "./field.ts";
 import type { FieldData, FieldVerdict, SeatVerdict } from "./field.ts";
@@ -245,7 +245,7 @@ export function render(r: Results): string[] {
     out.push(`   Drill ${DRILL_SHORT}: wins ${pctWithRange(five.tally.win, five.tally.win + five.tally.loss, 1)} of the decided battles. Pass: ${pct(DRILL5_LOW)} to ${pct(DRILL5_HIGH)}. ${mark(verdict.drill5.pass)}`);
     const fifteen = verdict.drill15.row;
     const line = verdict.drill15.line;
-    out.push(`   Drill ${DRILL_LONG}: wins ${pct(fifteen.fought, 1)} of the fought battles (the measure of check 4). A Drill ${DRILL_LONG} Boarder rates ${(data.ratio * 10).toFixed(1)} to 10, ${data.ratio.toFixed(2)} times a fresh sloop. Check 4 gives ${pct(line.below.strongerWins, 1)} at ${line.below.actual.toFixed(2)} and ${pct(line.above.strongerWins, 1)} at ${line.above.actual.toFixed(2)}, so ${pct(line.interpolated, 1)} here. Pass: ${pct(line.low, 1)} to ${pct(line.high, 1)}. ${mark(verdict.drill15.pass)}`);
+    out.push(`   Drill ${DRILL_LONG}: wins ${pct(fifteen.decided, 1)} of the decided battles. A Drill ${DRILL_LONG} Boarder rates ${(data.ratio * 10).toFixed(1)} to 10, ${data.ratio.toFixed(2)} times a fresh sloop. Check 4 gives ${pct(strongerDecided(line.below), 1)} of its decided battles at ${line.below.actual.toFixed(2)} and ${pct(strongerDecided(line.above), 1)} at ${line.above.actual.toFixed(2)}, so ${pct(line.interpolated, 1)} here. Pass: ${pct(line.low, 1)} to ${pct(line.high, 1)}. ${mark(verdict.drill15.pass)}`);
     out.push(`   Not judged, the same Boarder against an undrilled Gunline (share of decided battles won): ${verdict.gunline.map((g) => `Drill ${g.drill} ${pct(g.decided)}`).join(", ")}.`);
     out.push("");
   }

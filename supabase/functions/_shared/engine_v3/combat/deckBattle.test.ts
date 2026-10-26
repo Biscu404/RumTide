@@ -427,3 +427,51 @@ describe("the streams of the deck fight (D16)", () => {
     expect(JSON.stringify(play(5))).not.toBe(JSON.stringify(play(6)));
   });
 });
+
+describe("Drill luck in a battle (P3.2, D198)", () => {
+  /** Both crews Board, the hunter has Drill 5 and the target none: the deck fight is the whole battle. */
+  const fight = (seed: number, drill = 5) => run(always("closeIn", "board"), always("closeIn", "board"), { drill }, {}, { seed });
+  const winners = (n = 150) => {
+    let drilled = 0, undrilled = 0;
+    for (let seed = 1; seed <= n; seed++) {
+      const w = fight(seed).outcome.winner;
+      if (w === "hunter") drilled++;
+      else if (w === "target") undrilled++;
+    }
+    return { drilled, undrilled };
+  };
+
+  it("lets a drilled crew win most deck fights and lose some, where it won them all without luck", () => {
+    const { drilled, undrilled } = winners();
+    expect(drilled).toBeGreaterThan(undrilled);
+    expect(undrilled).toBeGreaterThan(0);
+    const drill = B.drill as { luck: number };
+    const was = drill.luck;
+    drill.luck = 0;
+    try {
+      const flat = winners();
+      expect(flat.undrilled).toBe(0);
+      expect(flat.drilled).toBeGreaterThan(0);
+    } finally {
+      drill.luck = was;
+    }
+  });
+
+  it("records the draw of a drilled crew in the rounds it fights on deck, and none for a crew without Drill", () => {
+    const seed = findSeed((s) => fight(s), (r) => r.rounds.some((x) => x.melee !== null));
+    const melees = fight(seed).rounds.flatMap((r) => (r.melee ? [r.melee] : []));
+    expect(melees.length).toBeGreaterThan(0);
+    for (const m of melees) {
+      expect(Object.keys(m.drillLuck ?? {})).toEqual(["ship_hunter"]);
+      expect(m.drillLuck!.ship_hunter).toBeGreaterThanOrEqual(1 - B.drill.luck);
+      expect(m.drillLuck!.ship_hunter).toBeLessThanOrEqual(1 + B.drill.luck);
+    }
+  });
+
+  it("leaves a fight between crews with no Drill without any draw, and repeats from the same seed", () => {
+    const plain = fight(7, 0);
+    expect(plain.rounds.every((r) => r.melee === null || r.melee.drillLuck === undefined)).toBe(true);
+    expect(JSON.stringify(plain)).not.toContain("drillLuck");
+    expect(fight(7)).toEqual(fight(7));
+  });
+});

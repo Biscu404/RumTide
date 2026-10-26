@@ -52,7 +52,7 @@ export function drillBonus(level: number): number {
 }
 
 /** What Drill multiplies boarding strength by, and the Hands of the Power Rating. 1 at Drill 0. */
-export const drillFactor = (level: number): number => 1 + drillBonus(level);
+export const drillFactor = (level: number, luck = 1): number => 1 + drillBonus(level) * luck;
 
 /** Finishing a stage unlocks Fire Pots (5), Grapnels (10) and Second Wave (15). */
 export const drillUnlocked = (level: number, unlock: DrillUnlock): boolean => level >= B.drill.unlocks[unlock];
