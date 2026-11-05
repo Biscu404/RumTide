@@ -1,10 +1,10 @@
 # Rumtide status
 
-**Date:** 2026-10-26. Short on purpose: the details are in `docs/DECISIONS.md`, which this file only points to. Authority order: `docs/DECISIONS.md` (with `docs/decisions/`), then `docs/GAMEPLAY.md`, then `docs/GAME_DESIGN.md`.
+**Date:** 2026-11-05. Short on purpose: the details are in `docs/DECISIONS.md`, which this file only points to. Authority order: `docs/DECISIONS.md` (with `docs/decisions/`), then `docs/GAMEPLAY.md`, then `docs/GAME_DESIGN.md`.
 
 ## Next task
 
-**P3.2b** (game designer and qa-tester): bring Old Shellback's check 5 into its band of 35% to 80%. Gunline 86%, Boarder 100% and Firebrand 88% are over the top. Only `B.shellback` and the numbers he reads should move. Then P3.2c (D108 and the gate pace) and P3.2d (the guard test, the full run, the golden Tide, the docs). The plan and the findings are under "What is left of P3.2" in `docs/DECISIONS.md`. The brief is `docs/briefs/P3-combat-testing.md`.
+**P3.2b**: bring Old Shellback's check 5 into its band of 35% to 80% (Gunline 86%, Boarder 100% and Firebrand 88% are over the top) with `B.shellback` and the numbers he reads, and keep the other nine checks passing. Then P3.2c (D108 and the gate pace) and P3.2d (the guard test, the full run, the golden Tide, the docs). P3.2 was split on 26 October 2026; P3.2a (Drill luck and check 8) is done (D216, D217). The plan and the findings are under "What is left of P3.2" in `docs/DECISIONS.md`. The brief is `docs/briefs/P3-combat-testing.md`.
 
 ## Where things stand
 
@@ -33,5 +33,5 @@ Open questions:
 1. **Scope and schedule.** The Season 0 column is several times the v0.2 MVP and no Season 0 date is recorded. Next: agree a lite fallback trigger and a review date.
 2. **Balance.** Check 5 still fails and every Old Shellback number is a cliff. No v0.3 bot season exists. Next: P3.2b to P3.2d in order.
 3. **Nothing playable on v0.3 until P12 and P13**, and the live stack (Deno entry files, the cron migration, migrations 3 to 5) has never run. Next: one live rehearsal Tide before P12.
-4. **Content and art gap.** No sprites, no `docs/LORE.md`, and GAMEPLAY 12.6 needs 30 Squalls, 8 Tales, 6 Sagas and 4 trait Tales. Next: `docs/CREW.md` C2 to C5.
+4. **Content and art gap.** No sprites, no `docs/LORE.md`, and GAMEPLAY 12.6 needs 30 Squalls, 8 Tales, 6 Sagas and 4 trait Tales. Next: C2 to C5 in `docs/archive/CREW-install.md`.
 5. **Doc drift.** GAME_DESIGN 16.1 says 14 Tides, GAMEPLAY says 28. Next: fix 16.1 when a task touches Tide counts.

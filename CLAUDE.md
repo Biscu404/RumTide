@@ -1,64 +1,34 @@
 # Rumtide: instructions for Claude Code
 
-Rumtide is a pixel art pirate game for a small group of friends. It is asynchronous, browser first, built to grow from 6 players to many more. The v0.2 prototype runs one Tide (turn) per day; the v0.3 design moves to two Tides a day, at 13:00 and 20:00 Europe/Bucharest.
+Rumtide is a pixel art pirate game for friends: asynchronous, browser first, growing from 6 players to many more. v0.2 runs one Tide (turn) a day; v0.3 runs two, at 13:00 and 20:00 Europe/Bucharest.
 
-The full design is in `docs/GAME_DESIGN.md`. It is long, so do not read it all at once. Read only the sections you need, using the index below. Research and sources are in `docs/RESEARCH.md`.
+Next task and what waits on Biscu: `docs/STATUS.md`. Done work: `git log` and `docs/DECISIONS.md` (older in `docs/decisions/`). Task ids: the Rumtide Roadmap tracker on claude.ai. Research: `docs/RESEARCH.md`. Command help: `docs/COMMANDS.md`.
 
-## Current focus
+## Docs
 
-* Next task: P3.2b, bring Old Shellback's check 5 into its band (Gunline 86%, Boarder 100% and Firebrand 88% are over the 80% top) with `B.shellback` and the numbers he reads, and keep the other nine checks passing. P3.2 was split on 26 October 2026: P3.2a Drill luck and check 8 is done (D216, D217), then P3.2b, P3.2c (the decision on D108 with the gate pace) and P3.2d (the guard test, the full run, the golden Tide and the docs). The findings and the order are in `docs/DECISIONS.md` under "What is left of P3.2". The brief is `docs/briefs/P3-combat-testing.md`. Task ids come from the Rumtide Roadmap tracker on claude.ai.
-* Done work is in `git log` and `docs/DECISIONS.md` (older entries in `docs/decisions/`, listed at the top of `docs/DECISIONS.md`).
-* Decisions waiting on Biscu are in `docs/STATUS.md`.
+* Order of authority when documents disagree: `docs/DECISIONS.md`, then `docs/GAMEPLAY.md` (the source of truth for `engine_v3`), then `docs/GAME_DESIGN.md`, which still covers the pillars, art and audio, co op, fairness and architecture.
+* v0.3 sections are found through the index in `docs/GAMEPLAY.md`, which names the file in `docs/gameplay/` for each section number.
+* `docs/GAME_DESIGN.md` (v0.2) sections are found by Grep for their heading, never by reading it whole. Its 4.4 (encounter rules) must be implemented exactly as written; its 14 holds `balance.ts` and the formulas to copy.
+
+## Stack and rules
+
+* TypeScript everywhere, built with Vite, tested with Vitest. Supabase (Postgres, Auth, Edge Functions, pg_cron). Static hosting on Cloudflare Pages. Every dependency is pinned to an exact version (`.npmrc` sets `save-exact`).
+* Phaser 4, pinned to exactly `4.2.1`, for `MapScene` and `ReplayScene` only. Every menu, form and text screen is Preact. Before any Phaser work, read the matching file in `docs/reference/phaser/`; do not assume Phaser 3 APIs. For an API those notes miss, check https://docs.phaser.io or the installed types in `node_modules/phaser/types/phaser.d.ts`, which match the pin.
+* The rules engines (`supabase/functions/_shared/engine` and `engine_v3`) are pure TypeScript: no network, no database, no `Date.now`, no `Math.random`. Randomness comes only from the seeded Rng passed in (in `engine_v3`, `rngFor(seed, ...labels)` in `engine_v3/rng.ts`; give every new kind of roll its own labels so it never shifts anyone else's rolls). Iterate collections in sorted id order so every Tide is reproducible from its snapshot and seed.
+* Engine files import each other with the `.ts` extension (`./types.ts`), because Edge Functions run on Deno. The client and tools import the engine as `@engine/...`.
+* Every gameplay number lives in `balance.ts`. Never hardcode one anywhere else. Season differences (length, cost multiplier, hulls, galleon Tides) come from `SEASON_PRESETS`.
+* The client never writes game tables. All game writes go through Edge Functions, which validate with Zod and then with the engine. The server owns positions, stats, gold, cargo, outcomes and seeds. The logic of each function lives in `supabase/functions/_shared/api/handlers.ts` over the `GameStore` interface; each `index.ts` only wires a request to it. Change a migration and the `SupabaseStore` together.
+* Every engine change needs a unit test. Run the tests and the bot season before finishing a task.
+* Keep `supabase/` and `client/` cleanly separate. When a second developer joins, one owns `supabase/` and the other owns `client/`, and engine changes need both to review.
 
 ## Version 0.3 engine rules (engine_v3)
 
-* The v0.3 engine lives in `supabase/functions/_shared/engine_v3/`, next to the v0.2 engine in `engine/`.
-* `docs/GAMEPLAY.md` is the source of truth for v0.3 gameplay. Where it disagrees with `docs/GAME_DESIGN.md`, GAMEPLAY.md wins for `engine_v3`. GAME_DESIGN.md still covers the pillars, art and audio, co op, fairness and architecture.
+* `engine_v3` lives in `supabase/functions/_shared/engine_v3/`, next to the v0.2 `engine/`. Do not edit `engine/` while building v0.3, unless a task says so.
 * Read the 2026-10-18 entry "Version 0.3 engine core" in `docs/decisions/v03-core-to-p3-1.md` before changing `engine_v3`, and add your own calls at the top of `docs/DECISIONS.md` with the task id.
-* Do not edit the v0.2 `engine/` while building v0.3, unless a task says so.
-* Randomness comes only from `rngFor(seed, ...labels)` in `engine_v3/rng.ts`. Give every new kind of roll its own labels so it never shifts anyone else's rolls.
 * Engine functions never mutate their inputs; `resolveTide` clones the state it is given. Encounters go through the `EncounterResolver` hook in `tide.ts`, so combat stays out of movement code.
 * Only erasable TypeScript in `engine_v3` (no enums, namespaces or parameter properties), so Node, Deno and the browser can all run it.
 * Maps are JSON in `supabase/functions/_shared/maps/` (`cradle.json` is v0.3) and must pass `validateMap`.
 * `engine_v3/golden/six-ships.json` is the golden Tide. If a change alters it on purpose, run `npm run golden:update`, read the diff and mention it. If it changes and you did not mean it to, you have a bug.
-
-## Design doc index (docs/GAME_DESIGN.md, v0.2)
-
-* Top of file: one page summary and the key decisions table
-* 3.5: Season 0 beta scope, pacing tables, success checks
-* 4: world, map, movement and encounter rules (4.4 must be implemented exactly as written)
-* 5: ships, stats, upgrades, pacing
-* 6: economy and trade
-* 7: combat, loot, parley
-* 8: co op and fleets
-* 9: fairness and anti bullying rules
-* 10: events and story
-* 12: reminders, notifications, catch up for missed Tides
-* 14: `balance.ts`, `SEASON_PRESETS` and all formulas (copy from here)
-* 15: architecture, data model, what the server owns
-* 16: scope tiers (what is in the MVP and what is not)
-* 19: build plan, day by day
-
-## Stack
-
-* TypeScript everywhere, built with Vite, tested with Vitest
-* Phaser 4, pinned to exactly `4.2.1`, for `MapScene` and `ReplayScene` only
-* Preact for every menu, form and text screen
-* Supabase: Postgres, Auth, Edge Functions, pg_cron
-* Static hosting on Cloudflare Pages
-
-## Rules
-
-* The rules engine (`supabase/functions/_shared/engine`) is pure TypeScript. No network, no database, no `Date.now`, no `Math.random`. Randomness comes only from the seeded Rng passed in.
-* Every gameplay number lives in `balance.ts`. Never hardcode one anywhere else. Season differences (length, cost multiplier, hulls, galleon Tides) come from `SEASON_PRESETS`.
-* The client never writes game tables. All game writes go through Edge Functions, which validate with Zod and then with the engine. The server owns positions, stats, gold, cargo, outcomes and seeds. The logic of each function lives in `supabase/functions/_shared/api/handlers.ts` over the `GameStore` interface; the `index.ts` of each function only wires a request to it. Change a migration and the `SupabaseStore` together.
-* Inside the engine, iterate collections in sorted id order so every Tide is reproducible from its snapshot and seed.
-* Every engine change needs a unit test. Run the tests and the bot season before finishing a task.
-* Phaser is pinned to version 4. Check the Phaser 4 docs (https://docs.phaser.io) and do not assume Phaser 3 APIs. The installed types in `node_modules/phaser/types/phaser.d.ts` always match the pinned version, so check an API there when in doubt.
-* Engine files import each other with the `.ts` extension (`./types.ts`), because Edge Functions run on Deno. The client and tools import the engine as `@engine/...`.
-* Every dependency is pinned to an exact version (`.npmrc` sets `save-exact`).
-* Keep Phaser to `MapScene` and `ReplayScene`. All menus are Preact.
-* Keep `supabase/` and `client/` cleanly separate. When a second developer joins, one owns `supabase/` and the other owns `client/`, and engine changes need both to review.
 
 ## How to work
 
@@ -73,41 +43,34 @@ The full design is in `docs/GAME_DESIGN.md`. It is long, so do not read it all a
 
 Usage limits are shared by every session and subagent, so work cheaply:
 
-* **Long runs.** The full `npm run sim:v3` (11 to 20 minutes) and long bot seasons take longer than the 10 minute limit on one command. Start them as a background command, with `-- --json sim-results/<name>.json` for the simulator (make the `sim-results` folder first, it is git ignored), then wait for the notice that the command finished. Never wait with `sleep` loops and never check on a run again and again. Never start the same run twice. While tuning use `-- --quick` and `-- --check N`, and do the full run once, at the end of the task.
-* **Big docs.** `docs/GAMEPLAY.md` (about 31,000 tokens), `docs/GAME_DESIGN.md` (about 22,000) and the files in `docs/decisions/` are too big to read whole. Find the heading or the decision id with Grep and read only that part, with an offset and a limit.
-* **Decisions.** `docs/DECISIONS.md` holds only the newest work. Its top section says where older ids live and when to move old sections out. Keep every line of every doc under 2,000 characters, because longer lines are cut off when read and then edits on them fail.
-* **Searches.** Never search or read inside `node_modules`, `dist` or `.claude/worktrees`.
+* **Long runs.** The full `npm run sim:v3` (11 to 20 minutes) and long bot seasons pass the 10 minute command limit. Start them as a background command (`-- --json sim-results/<name>.json` for the simulator; make the git ignored `sim-results` folder first) and wait for the finish notice. Never wait with `sleep` loops, never check again and again, never start the same run twice. While tuning use `-- --quick` and `-- --check N`; do the full run once, at the end of the task.
+* **Big docs.** Read the `docs/GAMEPLAY.md` index, then only the one file in `docs/gameplay/` you need (`08-combat.md` is about 9,000 tokens, so read just its part). `docs/GAME_DESIGN.md` (about 22,000) and `docs/decisions/` are too big to read whole: find the heading or decision id with Grep and read only that part, with an offset and a limit.
+* **Tests.** Never read a test file over 20 KB whole. Add new tests in a new small file next to the module (for example `shellback.p32b.test.ts`) and find the helpers you need with Grep.
+* **Golden Tide.** After a change, read `git diff --stat` first, then only the hunks you need.
+* **Decisions.** `docs/DECISIONS.md` holds only the newest work; its top section says where older ids live and when to move old sections out. Keep every line of every doc under 2,000 characters, because longer lines are cut off when read and then edits on them fail.
+* **Searches.** Never search or read inside `node_modules`, `dist`, `.claude/worktrees` or `package-lock.json` (`.claude/settings.json` denies Read of them). The one exception is a Bash grep for one API name in the Phaser types.
 * **Subagents.** Each one starts with nothing and reads everything again. Do small tasks yourself. When you do delegate, name the exact sections to read, not whole files.
-* **Doc updates.** Keep `docs/STATUS.md` short: the next task, a few lines on where things stand, and what waits on Biscu. The details belong in `docs/DECISIONS.md` and nowhere else.
+* **Doc updates.** Keep `docs/STATUS.md` short: the next task, a few lines on where things stand, and what waits on Biscu. The next task is written there and nowhere else; the details belong in `docs/DECISIONS.md` and nowhere else.
 
 ## Definition of done
 
 A task is done when its own checks pass and all of this is true:
 
-* In the same commit, update `docs/DECISIONS.md` with the new rule calls, the next task line under Current focus in this file, and `docs/STATUS.md`.
+* In the same commit, update `docs/DECISIONS.md` with the new rule calls and `docs/STATUS.md` with the next task.
 * Run `npm run check` and `npm run prose:check`. Run the full simulator only if the task's own check asks for it.
 * Push the branch and open a pull request. Biscu let Claude merge pull requests on 19 October 2026: once both checks pass, merge it, pull `main`, and give Biscu the link and what to check.
 * Never describe branch or merge state in a doc. Git and the pull request hold that.
 * Biscu never edits docs by hand, so you make every doc change.
 
-## Commands
+## Commands (flags and timings in `docs/COMMANDS.md`)
 
-* Start the dev server: `npm run dev`
-* Run the tests: `npm test`
-* Check types: `npm run typecheck`
-* Build for production: `npm run build` (output in `dist/`)
-* Run the balance simulation: `npm run sim` (checks the combat table of section 7.3, a bot trader against the solo pacing of sections 3.5 and 5.5, and the galleon odds of section 8.2)
-* Check everything at once: `npm run check` (types and all tests, v0.2 and v0.3)
-* Resolve one v0.3 Tide and print it: `npm run tide:demo` (`npm run tide:demo -- --shellback` plays a challenge to Old Shellback instead)
-* Rewrite the v0.3 golden Tide after an intentional rule change: `npm run golden:update`
-* Run the v0.3 combat simulator, ten checks: the five of GAMEPLAY 8.9 (1 field share, 2 best play, 3 seat split, 4 Power Rating, 5 Old Shellback) and five more (6 the wheel, 7 equal spending, 8 Drill, 9 Lashed fast, 10 the Smuggler escapes): `npm run sim:v3` (the full run takes 11 minutes on an idle machine and up to 20 on a busy one, most of it check 2; `-- --quick` takes about 3 minutes, for tuning loops; `-- --check 1,6` for some checks, 1 to 10; `-- --json file` to keep the numbers; `-- --set combat.rake=1.5` tries a number of `balance.ts` for one run without editing the file, and can be repeated; a bad flag exits 2, a failed check exits 1)
-* Run a bot season: `npm run bots` (six scripted captains and a six raider brawl play Season 0 on the real engine over 30 seeds each, `npm run bots -- 100` for more; every season is played twice, directly and through the Edge Function handlers, and the two must end identically; fails on any impossible state, crash, non deterministic season or insane total)
+* `npm run dev`, `build`, `test`, `typecheck`, `check` (types and all tests)
+* `npm run sim` v0.2 balance simulation; `bots` bot season; `sim:v3` v0.3 combat simulator, ten checks
+* `npm run tide:demo` resolve one v0.3 Tide; `golden:update` rewrite the golden Tide
+* `npm run assets:check` art palette; `prose:check` dashes in prose
 
 ## Crew (specialist roles)
 
-* Eight roles live in `.claude/agents/`: producer, art-director, pixel-artist, game-designer, narrative-writer, engineer, qa-tester, sound-designer. Use the matching role for its kind of work. Details and workflows are in `docs/CREW.md`.
-* When documents disagree, the order of authority is `docs/DECISIONS.md`, then `docs/GAMEPLAY.md`, then `docs/GAME_DESIGN.md`.
-* Art follows the `rumtide-art-bible` skill (Endesga 32 only). Run `npm run assets:check` after touching assets.
-* Player facing text follows the `rumtide-lore` skill. Run `npm run prose:check` after writing text.
-* Slash commands: `/feature` runs one feature through the crew, `/gate` runs a quality gate.
+* Eight roles live in `.claude/agents/` (producer, art-director, pixel-artist, game-designer, narrative-writer, engineer, qa-tester, sound-designer); see `docs/CREW.md`. Engine, balance, simulator and doc tasks are done in the main session, never delegated. Use a role only for art, sound or player facing text, or when Biscu runs `/feature` (one feature through the crew) or `/gate` (a quality gate).
+* Art follows the `rumtide-art-bible` skill (Endesga 32 only); run `npm run assets:check` after touching assets. Player facing text follows `rumtide-lore`; run `npm run prose:check` after writing text.
 * Roles report back in under 200 words: what changed, files touched, what to check, open questions.
