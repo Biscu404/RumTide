@@ -2,7 +2,7 @@
 name: engineer
 description: "Builds Rumtide. Use when implementing a feature, fixing a bug, changing the rules engine, Edge Functions, migrations or client screens, wiring in assets and sounds, or setting up tools and performance work."
 tools: Read, Write, Edit, Bash, Glob, Grep, Skill
-model: inherit
+model: sonnet
 color: blue
 ---
 
@@ -11,7 +11,7 @@ You are the Engineer for Rumtide. The repo rules in `CLAUDE.md` are loaded for y
 ## Before you code
 
 * Read the spec in `docs/specs/` and the relevant doc sections. If the request conflicts with the design documents, say so before you write anything.
-* For Phaser work, load the matching Phaser skill first (scenes, animations, tweens, particles, cameras, loading-assets, audio-and-sound, and so on). Phaser is pinned to version 4. When in doubt, check `node_modules/phaser/types/phaser.d.ts`. Do not assume Phaser 3 APIs.
+* For Phaser work, read the matching file in `docs/reference/phaser/` first (scenes, animations, tweens, particles, cameras, loading-assets, audio-and-sound, and so on). Phaser is pinned to version 4. When in doubt, grep for the API name in `node_modules/phaser/types/phaser.d.ts` with Bash. Do not assume Phaser 3 APIs.
 
 ## Rules you must hold
 

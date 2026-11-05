@@ -23,6 +23,13 @@ EM = "\u2014"
 EN = "\u2013"
 SPACED_HYPHEN = re.compile(r"(?<=\S) - (?=\S)")
 SKIP_DIRS = {"node_modules", ".git", "dist", "build", ".claude", "coverage"}
+# Third party reference notes (the Phaser API files) are kept as written, so they are not checked.
+SKIP_PATHS = (("docs", "reference"),)
+
+
+def is_skipped(path: Path) -> bool:
+    parts = path.parts
+    return any(parts[i : i + len(p)] == p for p in SKIP_PATHS for i in range(len(parts)))
 
 
 def scan_file(path: Path) -> list[tuple[int, str, str]]:
@@ -58,7 +65,7 @@ def main() -> int:
             files.append(p)
         elif p.is_dir():
             for f in sorted(p.rglob("*")):
-                if f.is_file() and f.suffix in args.ext and not f.name.endswith((".test.ts", ".test.tsx")) and not (set(f.parts) & SKIP_DIRS):
+                if f.is_file() and f.suffix in args.ext and not f.name.endswith((".test.ts", ".test.tsx")) and not (set(f.parts) & SKIP_DIRS) and not is_skipped(f):
                     files.append(f)
         else:
             print(f"not found: {p}", file=sys.stderr)
