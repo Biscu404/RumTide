@@ -1,6 +1,6 @@
 # Rumtide status
 
-**Date:** 2026-11-05. Short on purpose: the details are in `docs/DECISIONS.md`, which this file only points to. Authority order: `docs/DECISIONS.md` (with `docs/decisions/`), then `docs/GAMEPLAY.md`, then `docs/GAME_DESIGN.md`.
+**Date:** 2026-11-05. Short on purpose: the details are in `docs/DECISIONS.md`, which this file only points to. Which doc wins when they disagree is in `CLAUDE.md`.
 
 ## Next task
 
@@ -8,13 +8,13 @@
 
 ## Where things stand
 
-* Nine of the ten simulator checks pass on the quick run. Only check 5 fails (D212). Check 8 passes since P3.2a (D216, D217).
+* While tuning, run `npm run sim:tune` (about 1 minute). Nine of the ten simulator checks pass on the quick run. Only check 5 fails (D212). Check 8 passes since P3.2a (D216, D217).
 * The full run has not been repeated since the Old Shellback rework (the last table is under D197). Run it once at the end of P3.2d, not during tuning.
 * Not measured yet: fleets of styled ships, and the Gazette (no v0.3 generator). `npm run bots` still plays the v0.2 engine. P3.3 is Biscu's: watch 10 sample replays.
 
 ## Waiting on Biscu
 
-Confirm these rule calls (find each id with the table at the top of `docs/DECISIONS.md`):
+Confirm these rule calls (find each id with the table at the top of `docs/DECISIONS.md`). **Blocks nothing in code, but P3.2b tunes the boss that D201 to D212 and D214 define, so confirm those first.** The rest wait without blocking anything:
 * **D201 to D212 and D214** (P3.B2 piece 3): Old Shellback as built and the text. Read D204, D205 and D206 first. The writer's invented facts in D214 are PROPOSED until approved.
 * **D216 and D217** (P3.2a): Drill has luck now, so a drilled crew can have a worse day than an untrained one; the Drill 15 line is read on decided battles.
 * **D185 to D192** (P3.B3): the lines drawn on the new checks, mainly D186, D190, D191 and D192.
@@ -33,5 +33,5 @@ Open questions:
 1. **Scope and schedule.** The Season 0 column is several times the v0.2 MVP and no Season 0 date is recorded. Next: agree a lite fallback trigger and a review date.
 2. **Balance.** Check 5 still fails and every Old Shellback number is a cliff. No v0.3 bot season exists. Next: P3.2b to P3.2d in order.
 3. **Nothing playable on v0.3 until P12 and P13**, and the live stack (Deno entry files, the cron migration, migrations 3 to 5) has never run. Next: one live rehearsal Tide before P12.
-4. **Content and art gap.** No sprites, no `docs/LORE.md`, and GAMEPLAY 12.6 needs 30 Squalls, 8 Tales, 6 Sagas and 4 trait Tales. Next: C2 to C5 in `docs/archive/CREW-install.md`.
+4. **Content and art gap.** No sprites, no `docs/LORE.md`, and GAMEPLAY 12.6 needs 30 Squalls, 8 Tales, 6 Sagas and 4 trait Tales. Next: C2 to C5 in `docs/briefs/content-tasks.md`.
 5. **Doc drift.** GAME_DESIGN 16.1 says 14 Tides, GAMEPLAY says 28. Next: fix 16.1 when a task touches Tide counts.
