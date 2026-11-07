@@ -18,6 +18,10 @@ This file holds only the newest work, so it can be read in one go. Older entries
 * Keep every table row under 2,000 characters, because longer lines are cut off when read. Split a long row into a second row with the id and the word continued.
 * When this file grows past about 40 KB, move its oldest sections into a new file in `docs/decisions/` and add a row to the table above.
 
+## 2026-11-06: CLAUDE.md trimmed (process)
+
+Process only. CLAUDE.md went from about 8.6 KB to about 7.2 KB. The wording was tightened. No rule was removed or changed, and no game rule changed.
+
 ## 2026-11-05: Using fewer tokens, round 2 (process)
 
 Process only. No game rule, balance number or engine file changed. Round 1 split this file and added "Saving tokens"; round 2 cuts what every session loads and what a task reads by default.
