@@ -11,12 +11,14 @@
     "typecheck": "tsc --noEmit",
     "sim": "node --import ./tools/register.mjs tools/sim/index.ts",
     "sim:v3": "node tools/v3/sim/index.ts",
+    "sim:tune": "node tools/v3/sim/index.ts --quick --check 1,3,4,5,6,7,8,9,10",
     "bots": "node --import ./tools/register.mjs tools/bots/index.ts",
     "tide:demo": "node tools/v3/tide-demo.ts",
     "golden:update": "node tools/v3/update-golden.ts",
     "check": "npm run typecheck && npm test",
-    "assets:check": "py tools/assets/check_palette.py client/public/assets",
-    "prose:check": "py tools/agents/check_prose.py docs client/src supabase"
+    "verify": "npm run check && npm run prose:check && npm run assets:check",
+    "assets:check": "node tools/run-py.mjs tools/assets/check_palette.py client/public/assets",
+    "prose:check": "node tools/run-py.mjs tools/agents/check_prose.py docs client/src supabase"
   },
   "dependencies": {
     "phaser": "4.2.1",

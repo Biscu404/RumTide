@@ -1,5 +1,7 @@
 # Rumtide crew: install and use guide
 
+**Status, 7 November 2026:** six of the eight roles and the `/feature` and `/gate` skills are parked in `docs/archive/crew/`, with the two commands that restore them. Only `narrative-writer` and `engineer` are live in `.claude/agents/`. Read the rest of this guide as written for all eight.
+
 Eight specialist roles for Claude Code, a few project skills, and the tools that make them work. This guide takes you from a plain repo to a working crew in about an hour, then shows how to use it well.
 
 ## What you are installing
@@ -204,7 +206,7 @@ After two weeks, check which roles you actually used and which instructions Clau
 | The producer cannot spawn a role | It is running as a subagent, not as the main session | Start it with `claude --agent producer`. The allowlist only works there. |
 | The engineer ignores the Phaser skills | `Skill` missing from its `tools` line | Add `Skill` to the line |
 | A role edits files it should not | Instruction not specific enough | Add a "you must not" line, and consider removing the Write or Edit tool |
-| Phaser 3 code appears | The model fell back to old training data | Tell the engineer to load the right Phaser skill and check `node_modules/phaser/types/phaser.d.ts` |
+| Phaser 3 code appears | The model fell back to old training data | Tell the engineer to read the matching file in `docs/reference/phaser/` and check `node_modules/phaser/types/phaser.d.ts` for a missing API |
 | Warning about agent descriptions over 15,000 tokens | Too many agents or very long descriptions | Shorten the `description` lines, move detail into the body |
 | `pixel-art-studio` fails on `import PIL` | Pillow is not installed for the Python you are using | `python3 -m pip install pillow`, or `py -m pip install pillow` on Windows |
 | The installer says HASH MISMATCH | The upstream commit is not the one pinned, or the download was altered | Do not continue. Check the URL and hash and look at the upstream repo before anything else. |

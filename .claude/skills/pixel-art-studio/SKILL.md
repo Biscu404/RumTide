@@ -1,6 +1,6 @@
 ---
 name: pixel-art-studio
-description: Claude IS the pixel artist — designs and places every pixel directly via Python/Pillow (scripts/pixelstudio.py). No Aseprite, no MCP server. Creates sprites, characters, items, tiles/tilesets, animations (idle/walk/run/attack), applies limited palettes, hue-shifted ramps, dithering, shading, selective outlines, and exports PNG / animated GIF / spritesheet+JSON for game engines. Can also STUDY a pixel-art file the user provides and grow its knowledge base. PREFER THIS SKILL over pixel-art-creator / pixel-art-animator / pixel-art-professional / pixel-art-exporter (those require the aseprite MCP) unless the user explicitly asks for Aseprite. Trigger on pixel art, sprite, sprite sheet, 8-bit, 16-bit, retro game art, tileset, pixel animation, GIF sprite, วาด pixel art, สร้าง sprite, ทำ pixel art, พิกเซล, ตัวละครเกม, ไอคอนเกม, เรียนรู้จากไฟล์ pixel art.
+description: Draws pixel art directly with Python and Pillow (scripts/pixelstudio.py): sprites, tiles, animations, limited palettes, PNG, GIF and spritesheet export. Use for any pixel art, sprite or tileset task, unless the user asks for Aseprite.
 ---
 
 # Pixel Art Studio

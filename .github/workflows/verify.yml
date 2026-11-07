@@ -1,0 +1,29 @@
+name: verify
+
+# Runs the same command Claude runs before finishing a task: types, all tests, prose check, assets check.
+# It does not run the simulator (`npm run sim:v3`), which takes too long and is run by hand.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: actions/setup-node@v4.4.0
+        with:
+          node-version: 22.23.4
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run verify
