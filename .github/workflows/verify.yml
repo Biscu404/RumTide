@@ -25,5 +25,6 @@ jobs:
         with:
           node-version: 22.23.4
           cache: npm
+      - run: python3 -m pip install pillow==13.0.0
       - run: npm ci --no-audit --no-fund
       - run: npm run verify
