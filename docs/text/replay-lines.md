@@ -1010,7 +1010,7 @@ One line each, to make the point of the spec that a trait is never a hidden bonu
 * **Shown once per battle:** `shellback.shell.intro`, `tinderbox`, `fighters`, `drill.stage`, `drill.secondWave`, `edge.holds`. A long fight would repeat them every round.
 * **A spec question for the designer.** The tell is a line in the replay, but a doctrine is a standing order and cannot read a line. For the tell to be a real clue a captain can plan on, it needs something a doctrine condition can read, such as "Their last Helm move was Hold" or "Their last Guns order was Hold Fire", that only comes before the rear up. If the tell is only flavour, the three lines are still fine, but the spec's "read the tell in the fight" is then only true for a captain who watches the live replay.
 
-## Facts I invented (PROPOSED)
+## Facts I invented (approved by Biscu, 12 November 2026)
 
 * How Old Shellback gives the tell: he goes still, the sea drains out of his shell, the galleon creaks, his claws lift, the water boils around his legs.
 * That after a Sunk defeat a "very cross crab" scuttles out of the broken galleon and away along the seabed. (GAMEPLAY 1.4 says he wears the galleon as a shell, so a crab inside it is a small step, but it is not written.)

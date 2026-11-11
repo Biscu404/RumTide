@@ -236,7 +236,7 @@ Subject: the captain whose ship opened range past Far. `{style}` is that ship's 
 * **A new record flag** for "driven off" and for the Old Shellback snatch, as listed under "Needs from engineer" in the replay lines file in `docs/text/`. G19, G20 and G21 use them.
 * **Priority.** When several triggers fit one battle, a suggested order is G18, G21, G19, G20, G05, G06, G01, G03, G12, G13, G09, G10, G07, G08, G23, G14, G15, G16, G11, G24, G17, G02, G04, G22. The producer or the engineer may change it.
 
-## Facts I invented (PROPOSED)
+## Facts I invented (approved by Biscu, 12 November 2026)
 
 * "SHELLBACK" on its own is how Polly shortens Old Shellback in a headline, as in G20.
 * Polly's paper can "YAWN" and a crab can "NAP" (G18, G21). These are jokes, not world facts.

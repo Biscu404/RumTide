@@ -1,6 +1,6 @@
 # Rumtide status
 
-**Date:** 2026-11-05. Short on purpose: the details are in `docs/DECISIONS.md`, which this file only points to. Which doc wins when they disagree is in `CLAUDE.md`.
+**Date:** 2026-11-12. Short on purpose: the details are in `docs/DECISIONS.md`, which this file only points to. Which doc wins when they disagree is in `CLAUDE.md`.
 
 ## Next task
 
@@ -14,14 +14,7 @@
 
 ## Waiting on Biscu
 
-Confirm these rule calls (find each id with the table at the top of `docs/DECISIONS.md`). **Blocks nothing in code, but P3.2b tunes the boss that D201 to D212 and D214 define, so confirm those first.** The rest wait without blocking anything:
-* **D201 to D212 and D214** (P3.B2 piece 3): Old Shellback as built and the text. Read D204, D205 and D206 first. The writer's invented facts in D214 are PROPOSED until approved.
-* **D216 and D217** (P3.2a): Drill has luck now, so a drilled crew can have a worse day than an untrained one; the Drill 15 line is read on decided battles.
-* **D185 to D192** (P3.B3): the lines drawn on the new checks, mainly D186, D190, D191 and D192.
-* **D113 and D114** (P3.1): the lines on two checks that say "about" (D140 and D136 since changed them).
-* **D97, D95, D91** (P2.5): fleet battles, towing and Helm moves.
-* **D57** (P2.2): the fairness factor and loot on a Sunk ship.
-* **D35, D36, D42** (P2.1): grappling, escaping past Far, and the Shallows.
+No rule call waits for confirmation. Biscu accepted every one as built on 12 November 2026 (the entry of that date in `docs/DECISIONS.md`), and from now on Claude makes the balance and design detail calls and logs them there (CLAUDE.md, "How to work").
 
 Open questions:
 * Does the v0.2 internal playtest in `docs/PLAYTEST.md` still happen?
