@@ -19,6 +19,16 @@ This file holds only the newest work, so it can be read in one go. Older entries
 * Keep every table row under 2,000 characters, because longer lines are cut off when read. Split a long row into a second row with the id and the word continued.
 * When this file grows past about 40 KB, move its oldest sections into a new file in `docs/decisions/` and add a row to the table above.
 
+## 2026-11-12: Confirmations accepted, Claude makes the detail calls (process)
+
+Process only. No game rule, balance number or engine file changed, and the golden Tide did not move.
+
+* **Biscu accepted every confirmation that was waiting, as built,** on 12 November 2026. They are no longer open and nothing waits on them: D35, D36 and D42 (P2.1); D57 (P2.2); D91, D95 and D97 (P2.5); D113 and D114 (P3.1); D185 to D192 (P3.B3); D201 to D212 and D214 (P3.B2 piece 3); D216 and D217 (P3.2a). The rows stay where they are, in this file and in `docs/decisions/`, and count as confirmed.
+* **The invented facts of D214 are approved** and are no longer PROPOSED: both lists under "Facts I invented" in `docs/text/replay-lines.md` and `docs/text/gazette-battles.md`, with Old Shellback's tell, the very cross crab that scuttles out of the broken galleon, and "he" for Old Shellback in the lines. The two headings now say approved. The spec question about the tell in `docs/text/replay-lines.md` is a question, not an invented fact, and stays open for the designer.
+* **The list under "Waiting on Biscu" in `docs/STATUS.md` is empty.** Its open questions stay, because they are questions and not confirmations.
+* **A new rule in "How to work" in CLAUDE.md:** Biscu trusts Claude's judgement on balance and design details. Make the call, test it, log it here and carry on. Ask Biscu only when a call changes a pillar, the Season 0 scope or the story. So new rule calls are no longer queued in STATUS for confirmation.
+* **The branch `p3-2-tuning` is not to be deleted,** because P3.2c needs it. This answers the last line of the entry of 7 November 2026 below.
+
 ## 2026-11-07: Process efficiency (process)
 
 Process only. No game rule, balance number or engine file changed, and the golden Tide did not move. It follows a read only health check of the whole project that Biscu asked for.

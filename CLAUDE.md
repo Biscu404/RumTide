@@ -35,6 +35,7 @@ Next task and what waits on Biscu: `docs/STATUS.md`. Done work: `git log` and `d
 * If a request conflicts with the design doc, say so before writing code.
 * For v0.3, build only what the current brief in `docs/briefs/` asks. New ideas go in `docs/IDEAS.md`.
 * When a design decision changes, update `docs/DECISIONS.md` in the same commit.
+* Biscu trusts Claude's judgement on balance and design details. Make the call, test it, log it in `docs/DECISIONS.md` and carry on. Ask Biscu only when a call changes a pillar, the Season 0 scope or the story.
 * No dashes in prose you write (docs, comments, game text); use commas or full stops.
 
 ## Saving tokens
