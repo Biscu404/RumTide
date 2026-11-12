@@ -1064,18 +1064,23 @@ describe("fighting Old Shellback in a Tide (2.5)", () => {
     expect(lineVariants("shellback.back", vars).some((v) => text.includes(v))).toBe(true);
   });
 
-  it("retreats into his shell where he lay: never towed, never sunk for good, whole again next Tide", () => {
+  it("retreats into his shell where he lay: never towed, never sunk for good, whole again at once (D225)", () => {
     const first = beatHim().result;
     expect(first.state.captains.p!.bossesBeaten).toEqual([SHELLBACK_ID]);
     expect(only(first, "towed")).toEqual([]); // the loser is the boss and is not towed
     const crab = first.state.ships[SHIP]!;
     expect(crab).toMatchObject({ waterId: NARROWS, docked: false });
-    expect(crab.hullPoints < 300 || crab.hands < 52).toBe(true); // he was hurt, one way or the other
+    const final = battles(first)[0]!.record.final.find((s) => s.shipId === SHIP)!;
+    expect(final.hullPoints < S.hull || final.hands < S.clawHands).toBe(true); // he was hurt, one way or the other
+    // He came out of his shell right after the battle, in the same Tide, and the replay says so.
+    expect(crab).toMatchObject({ hullPoints: S.hull, hands: S.clawHands });
+    const afterBattle = first.replay[first.replay.findIndex((e) => e.kind === "battle") + 1];
+    expect(afterBattle).toMatchObject({ kind: "bossRecovers", ship: SHIP, hullPoints: S.hull, maxHullPoints: S.hull });
 
     const second = resolve(first.state, { p: idle(7) }, 2000);
-    expect(only(second, "bossRecovers")).toMatchObject([{ ship: SHIP, hullPoints: 300, maxHullPoints: 300 }]);
+    expect(only(second, "bossRecovers")).toEqual([]); // nothing left to mend at the start of the next Tide
     expect(second.encounters).toEqual([]); // and the captain who beat him is left alone
-    expect(second.state.ships[SHIP]).toMatchObject({ hullPoints: 300, hands: 52, waterId: NARROWS });
+    expect(second.state.ships[SHIP]).toMatchObject({ hullPoints: S.hull, hands: S.clawHands, waterId: NARROWS });
   });
 
   it("is never towed even when he is sunk, and the captain who sank him passes the gate", () => {
@@ -1093,8 +1098,9 @@ describe("fighting Old Shellback in a Tide (2.5)", () => {
     expect(battle!.aftermath).toMatchObject({ towed: false, beaten: { boss: SHELLBACK_ID, by: ["p"] } });
     expect(r.state.ships[SHIP]).toMatchObject({ waterId: NARROWS, docked: false });
     expect(r.state.captains.p!.bossesBeaten).toEqual([SHELLBACK_ID]);
-    // Sunk, he is whole again next Tide.
-    expect(resolve(r.state, {}, 3).state.ships[SHIP]!.hullPoints).toBe(300);
+    // Sunk, he is whole again at once (D225), and stays so next Tide.
+    expect(r.state.ships[SHIP]!.hullPoints).toBe(S.hull);
+    expect(resolve(r.state, {}, 3).state.ships[SHIP]!.hullPoints).toBe(S.hull);
   });
 
   /** He starts the Tide whole, so wound him just before the fight. */

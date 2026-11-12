@@ -141,26 +141,35 @@ export const bossPlan = (captain: Pick<Captain, "id" | "defaultDoctrine">): Voya
 // ---------- Upkeep ----------
 
 /**
+ * Makes Old Shellback whole with this Tide's statline (D106): full Hull, Rigging, claws and magazine, whatever the last fight left
+ * of him. Changes `ship` and returns the replay event when anything changed, `t` being the tick it happens on (0 at the start of a
+ * Tide). No randomness and no clock.
+ */
+export function restoreBoss(state: SeasonState, ship: Ship, tide: number, t = 0): ReplayEvent | null {
+  const before = JSON.stringify([ship.statline, ship.hullPoints, ship.hands]);
+  applyStatline(ship, shellbackStatline(tide, SEASON_PRESETS[state.preset].shellbackDecayFromTide));
+  if (JSON.stringify([ship.statline, ship.hullPoints, ship.hands]) === before) return null;
+  return { t, kind: "bossRecovers", ship: ship.id, hullPoints: ship.hullPoints, maxHullPoints: ship.statline?.maxHull ?? ship.hullPoints };
+}
+
+/**
  * Run at the start of every Tide, before anyone sails: each boss is whole again, with this Tide's Hull and his habits as the code has
  * them (D106, D203). Beaten, he
- * "retreats into his shell and is back next Tide, a little angrier". Changes `state` and returns the replay events of the
+ * "retreats into his shell and is back next Tide, a little angrier". He is also made whole after every fight, so the next captain
+ * who reaches him in the same Tide meets him whole (D225, see encounter.ts). Changes `state` and returns the replay events of the
  * bosses that had something to recover, in captain id order. No randomness and no clock.
  */
 export function upkeepBosses(state: SeasonState, tide: number): ReplayEvent[] {
   const events: ReplayEvent[] = [];
-  const decayFrom = SEASON_PRESETS[state.preset].shellbackDecayFromTide;
   for (const id of Object.keys(state.captains).sort()) {
     const captain = state.captains[id] as Captain;
     const ship = state.ships[captain.shipId];
     if (!ship || !isBoss(captain) || captain.id !== SHELLBACK_ID) continue;
-    const before = JSON.stringify([ship.statline, ship.hullPoints, ship.hands]);
-    applyStatline(ship, shellbackStatline(tide, decayFrom));
+    const event = restoreBoss(state, ship, tide);
     // His habits come from the code too, so a rework reaches a season already running (D203).
     captain.doctrines = [shellbackDoctrine()];
     captain.defaultDoctrine = SHELLBACK_DOCTRINE;
-    if (JSON.stringify([ship.statline, ship.hullPoints, ship.hands]) !== before) {
-      events.push({ t: 0, kind: "bossRecovers", ship: ship.id, hullPoints: ship.hullPoints, maxHullPoints: ship.statline?.maxHull ?? ship.hullPoints });
-    }
+    if (event) events.push(event);
   }
   return events;
 }

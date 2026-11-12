@@ -209,7 +209,9 @@ export function render(r: Results): string[] {
     }
     out.push(`   Win chance by Tide (best doctrine of ${data.paceStyle}, then its own template): ${data.pace.map((p) => `T${p.tide} ${pct(p.best)}/${pct(p.starter)}`).join("  ")}`);
     const g = data.gate;
-    out.push(`   The gate (D108, one fight a Tide), for the best doctrine of ${data.paceStyle}: ${g.captains} captains at his door from Tide ${g.firstTide}. The median captain passes on Tide ${g.medianTide.toFixed(1)} (target 7 to 9), the last on Tide ${g.lastTide.toFixed(1)}, by Tide 12 in ${pct(g.lastByTwelve)} of seasons (target: nobody later).`);
+    const q = data.queue;
+    out.push(`   The gate (D225, he fights every captain who reaches him each Tide), for the best doctrine of ${data.paceStyle}: ${g.captains} captains at his door from Tide ${g.firstTide}. The median captain passes on Tide ${g.medianTide.toFixed(1)} (target 7 to 9), the last on Tide ${g.lastTide.toFixed(1)}, by Tide 12 in ${pct(g.lastByTwelve)} of seasons (target: nobody later).`);
+    out.push(`   For comparison, one fight a Tide as P2.6 built it (D108): the median captain passes on Tide ${q.medianTide.toFixed(1)}, the last on Tide ${q.lastTide.toFixed(1)}, by Tide 12 in ${pct(q.lastByTwelve)} of seasons.`);
     out.push("");
   }
 
