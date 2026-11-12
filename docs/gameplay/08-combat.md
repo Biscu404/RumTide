@@ -318,5 +318,5 @@ Those five lines say "about" and "the field", so the simulator (`npm run sim:v3`
 | 9 Lashed fast | An equal fresh sloop that tries to Cut Free from a Boarder holding the edge | It wins at most 40% of its tries (a third, with room for noise), from at least 100 tries |
 | 10 The Smuggler | A fresh Smuggler against each of the six styles | It escapes at least 30% of its battles against every style |
 
-* Beside the ten checks the report prints the **gate pace** of 2.5, worked out from the win chance on each Tide: the median captain should pass by Tide 7 to 9 and nobody later than Tide 12. It is printed, not pass or fail.
+* Beside the ten checks the report prints the **gate pace** of 2.5, worked out from the win chance on each Tide: the median captain should pass by Tide 7 to 9 and nobody later than Tide 12. It is printed, not pass or fail. It is measured with the rule of 2.5, that he fights every captain who reaches him each Tide (D225), and the pace of one fight a Tide is printed beside it to compare.
 * The results and the findings that P3.2 tunes from are in `docs/DECISIONS.md` (D197 to D200). The brief is `docs/briefs/P3-combat-testing.md`.

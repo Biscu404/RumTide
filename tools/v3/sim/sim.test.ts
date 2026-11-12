@@ -678,7 +678,9 @@ describe("Old Shellback for every style (check 5)", () => {
   const styleBoss = (style: StyleBoss["style"], beaten: number, judged = true): StyleBoss => ({ style, judged, best: scored(beaten), finalists: [], references: [], trace: [] });
   const data = (beaten: number[], smuggler = 0): BossData => ({
     styles: [...FIGHTING_STYLES.map((f, i) => styleBoss(f.style, beaten[i]!)), styleBoss("smuggler", smuggler, false)],
-    paceStyle: "bombardier", pace: [], gate: { captains: 6, firstTide: 5, medianTide: 7, lastTide: 10, lastByTwelve: 1 },
+    paceStyle: "bombardier", pace: [],
+    gate: { fightsPerTide: 6, captains: 6, firstTide: 5, medianTide: 5, lastTide: 5, lastByTwelve: 1 },
+    queue: { fightsPerTide: 1, captains: 6, firstTide: 5, medianTide: 7, lastTide: 10, lastByTwelve: 1 },
   });
 
   it("passes when every style is 35% to 80%, and the old band of 40% to 60% is gone", () => {
@@ -706,24 +708,24 @@ describe("Old Shellback for every style (check 5)", () => {
   });
 });
 
-describe("the gate pace (D108)", () => {
+describe("the gate pace with one fight a Tide (D108)", () => {
   it("passes a captain a Tide when every fight is won, so six captains pass on Tides 5 to 10", () => {
-    const g = gatePace([1], 5, 6, 50);
+    const g = gatePace([1], 5, 6, 50, 1);
     expect(g.medianTide).toBe(7);
     expect(g.lastTide).toBe(10);
     expect(g.lastByTwelve).toBe(1);
   });
 
   it("is slower when the fight is a coin flip, and never done when it cannot be won", () => {
-    const slow = gatePace([0.5], 5, 6, 400);
+    const slow = gatePace([0.5], 5, 6, 400, 1);
     expect(slow.lastTide).toBeGreaterThan(14);
     expect(slow.lastByTwelve).toBeLessThan(0.5);
-    expect(gatePace([0], 5, 6, 3).lastByTwelve).toBe(0);
+    expect(gatePace([0], 5, 6, 3, 1).lastByTwelve).toBe(0);
   });
 
   it("gets faster when the chance rises with the Tide, as Old Shellback tires", () => {
-    const flat = gatePace([0.3], 5, 6, 600);
-    const tiring = gatePace([0.3, 0.3, 0.3, 0.3, 0.5, 0.6, 0.7, 0.8], 5, 6, 600);
+    const flat = gatePace([0.3], 5, 6, 600, 1);
+    const tiring = gatePace([0.3, 0.3, 0.3, 0.3, 0.5, 0.6, 0.7, 0.8], 5, 6, 600, 1);
     expect(tiring.lastTide).toBeLessThan(flat.lastTide);
   });
 });

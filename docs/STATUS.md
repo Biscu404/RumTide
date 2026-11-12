@@ -4,7 +4,7 @@
 
 ## Next task
 
-**P3.2b**: bring Old Shellback's check 5 into its band of 35% to 80% (Gunline 86%, Boarder 100% and Firebrand 88% are over the top) with `B.shellback` and the numbers he reads, and keep the other nine checks passing. Then P3.2c (D108 and the gate pace) and P3.2d (the guard test, the full run, the golden Tide, the docs). P3.2 was split on 26 October 2026; P3.2a (Drill luck and check 8) is done (D216, D217). The plan and the findings are under "What is left of P3.2" in `docs/DECISIONS.md`. The brief is `docs/briefs/P3-combat-testing.md`.
+**P3.2b**: bring Old Shellback's check 5 into its band of 35% to 80% (Gunline 86%, Boarder 100% and Firebrand 88% are over the top) with `B.shellback` and the numbers he reads, and keep the other nine checks passing. Then P3.2d (the guard test, the full run, the golden Tide, the docs). P3.2 was split on 26 October 2026; P3.2a (Drill luck and check 8) is done (D216, D217), and so is P3.2c (the queue at his gate, D225, D226). The plan and the findings are under "What is left of P3.2" in `docs/DECISIONS.md`. The brief is `docs/briefs/P3-combat-testing.md`.
 
 ## Where things stand
 

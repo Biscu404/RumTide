@@ -51,7 +51,7 @@ Beside the five, the report prints the gate pace of GAMEPLAY 2.5 (median captain
 * The golden Tide will move. Run `npm run golden:update`, read the diff, and mention it.
 * Add a test that the quick run passes all ten checks, so a later number change cannot undo this quietly.
 * Start with check 8 (D198): no `drill.perLevel` moves it, so the deck fight needs a luck roll first, then the number. Check 5 can now be tuned on the reworked Old Shellback (D212): three styles are over the 80% top.
-* Decide D108 (the queue at Old Shellback's gate) with the gate pace.
+* Decide D108 (the queue at Old Shellback's gate) with the gate pace. Done in P3.2c: he fights every captain who reaches him each Tide (D225, D226).
 
 ## P3.3: Biscu watches 10 sample replays
 
