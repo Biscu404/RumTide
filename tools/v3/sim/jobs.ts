@@ -6,6 +6,8 @@ import type { BattleRecord, BattleSide, Doctrine, Range } from "../../../supabas
 import { cradle, SIX_SHIPS_WIND } from "../sixShips.ts";
 import { buildShip, duel, sceneByName, scoreOf, seedFor, shareLead, verdictFor } from "./arena.ts";
 import type { Fighter, ShipSpec } from "./arena.ts";
+import { applyPatch } from "./patch.ts";
+import type { Patch } from "./patch.ts";
 import type { Play } from "./plays.ts";
 import { addVerdict, emptyTally, mergeTally } from "./stats.ts";
 import type { Tally } from "./stats.ts";
@@ -177,6 +179,8 @@ export interface BossJob {
   label: string;
   from: number;
   count: number;
+  /** Numbers of balance.ts to use for these fights only (sweep.ts): set before the first fight and put back after the last. */
+  patch?: Patch;
 }
 
 export interface BossResult {
@@ -201,6 +205,15 @@ export function mergeBoss(into: BossResult, from: BossResult): BossResult {
 
 /** A sloop with the doctrine lies in wait in the Narrows on `tide`, and Old Shellback and the Tide loop do the rest. */
 export function runBoss(job: BossJob): BossResult {
+  const restore = applyPatch(job.patch ?? {});
+  try {
+    return fightBoss(job);
+  } finally {
+    restore();
+  }
+}
+
+function fightBoss(job: BossJob): BossResult {
   const out = emptyBoss();
   for (let i = job.from; i < job.from + job.count; i++) {
     const state = newSeason({

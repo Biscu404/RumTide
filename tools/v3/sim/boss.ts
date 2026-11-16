@@ -116,7 +116,7 @@ export interface StyleBoss {
   trace: SearchTrace[];
 }
 
-async function searchStyle(pool: Pool, effort: Effort, style: FightingStyle, judged: boolean): Promise<StyleBoss> {
+export async function searchStyle(pool: Pool, effort: Effort, style: FightingStyle, judged: boolean): Promise<StyleBoss> {
   const B = effort.boss;
   const space = spaceFor(style);
   const rng = new Rng(`p3/boss/search/${style}`);
