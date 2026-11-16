@@ -19,5 +19,5 @@
       "@engine/*": ["./supabase/functions/_shared/engine/*"]
     }
   },
-  "include": ["client/src", "supabase/functions/_shared", "tools", "vite.config.ts", "vitest.config.ts"]
+  "include": ["client/src", "sandbox/src", "vite.sandbox.config.ts", "supabase/functions/_shared", "tools", "vite.config.ts", "vitest.config.ts"]
 }

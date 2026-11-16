@@ -19,6 +19,19 @@ This file holds only the newest work, so it can be read in one go. Older entries
 * Keep every table row under 2,000 characters, because longer lines are cut off when read. Split a long row into a second row with the id and the word continued.
 * When this file grows past about 40 KB, move its oldest sections into a new file in `docs/decisions/` and add a row to the table above.
 
+## 2026-11-16: The sandbox, and combat tuning paused (Biscu's call)
+
+Biscu had seen nothing on a screen since 15 October and asked for a sandbox to open in a browser and click, to judge whether the v0.3 game is any good, before any more engine or balance work. Combat tuning is paused by Biscu's decision at nine of ten checks: P3.2b and P3.2d wait until Biscu restarts them. The brief is `docs/briefs/sandbox.md` (three stages: a battle viewer, one Tide in the Cradle, a short solo run to Old Shellback). Stage 1 is built. No rule in `engine_v3` changed, no number in `balance.ts` moved and the golden Tide did not move. The engine needed no new helper.
+
+| Id | Call | Why |
+|-|-|-|
+| D227 | The sandbox is its own page: the `sandbox/` folder, `vite.sandbox.config.ts`, `npm run sandbox`, port 5180. It imports `engine_v3` by relative path and takes its colours from `client/src/palette.ts`. | Biscu's rule: nothing that exists may break. The v0.2 client keeps its own entry, alias and port, and there is still one palette. |
+| D228 | A sandbox battle is `runBattle` called directly, with ships built as the simulator's arena builds them: a fresh sloop of the chosen style, full of Hull, Rigging, Hands and Powder, playing the style's template doctrine. Open water, a Breeze, Tide 6, one ship a side, the left ship as the hunter side. | The viewer then shows the same fights the simulator measures. A whole Tide around one battle (as the simulator's boss job runs) is stage 2. |
+| D229 | Old Shellback in the viewer is a ship with his statline of Tide 6 (Hull 300, whole), his own doctrine and his captain id, so his shell, moods, snatch and retreat all apply. He does not lie in wait: he is the target side. | His habits hang on his captain id (D100), so nothing else is needed. Who springs the fight only matters with terrain and ambush, which stage 1 leaves out. |
+| D230 | The round log and the ending have their own plain wording in `sandbox/src/words.ts`, which only reads the `BattleRecord` and the `Doctrine`. It does not use `describeBattle`. | `describeBattle` writes Gazette lines and needs the aftermath (loot, towing) of a whole Tide. Biscu asked for the rule that fired, the Helm move, the Guns order and what they did, in words for someone who never read the docs. |
+| D231 | The viewer names six endings: Sunk, Captured, Surrendered, Escaped, Won on points and Draw, and Driven off for Old Shellback pulling back into his shell. | Biscu listed four. The engine has the others (8.7, D205), and hiding them would leave battles with no ending. |
+| D232 | The seed is shown and can be typed in. "Fight again" picks a new one with the browser's own random number. | So a battle worth a second look can be run again. The random number only picks the seed, outside the engine, which stays seeded and pure. |
+
 ## 2026-11-12: The queue at Old Shellback's gate (P3.2c)
 
 The third piece of P3.2, done beside P3.2b, which was still tuning his numbers. So the call is made on the whole band of check 5 (a best win chance of 35% to 80%) and holds wherever P3.2b lands inside it. One rule changed in `engine_v3`, no number in `balance.ts` moved, and the golden Tide did not move (no ship in it meets him). The ids D218 to D224 are left free for P3.2b.

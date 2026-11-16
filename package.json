@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "sandbox": "vite --config vite.sandbox.config.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "sim": "node --import ./tools/register.mjs tools/sim/index.ts",
@@ -18,7 +19,7 @@
     "check": "npm run typecheck && npm test",
     "verify": "npm run check && npm run prose:check && npm run assets:check",
     "assets:check": "node tools/run-py.mjs tools/assets/check_palette.py client/public/assets",
-    "prose:check": "node tools/run-py.mjs tools/agents/check_prose.py docs client/src supabase"
+    "prose:check": "node tools/run-py.mjs tools/agents/check_prose.py docs client/src supabase sandbox"
   },
   "dependencies": {
     "phaser": "4.2.1",

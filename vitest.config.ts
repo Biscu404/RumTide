@@ -6,6 +6,6 @@ import viteConfig from "./vite.config.ts";
 export default mergeConfig(viteConfig, defineConfig({
   root: fileURLToPath(new URL(".", import.meta.url)),
   test: {
-    include: ["supabase/**/*.test.ts", "tools/**/*.test.ts", "client/**/*.test.{ts,tsx}"],
+    include: ["supabase/**/*.test.ts", "tools/**/*.test.ts", "client/**/*.test.{ts,tsx}", "sandbox/**/*.test.{ts,tsx}"],
   },
 }));

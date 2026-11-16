@@ -47,7 +47,7 @@ describe("the bot season", () => {
     expect(result.legend).toBeGreaterThan(0.75);
     expect(result.legend).toBeLessThan(1.05);
     expect(result.peak).toBe(3);
-  });
+  }, 20_000); // about 2 seconds alone, but past the default 5 when every test file runs at once on a slow machine
 });
 
 describe("the bot season through the Edge Function handlers", () => {
