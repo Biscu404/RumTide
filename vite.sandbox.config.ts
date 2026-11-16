@@ -10,5 +10,9 @@ export default defineConfig({
   root: fromRoot("./sandbox"),
   plugins: [preact()],
   server: { port: 5180, strictPort: true, fs: { allow: [fromRoot(".")] } },
-  build: { outDir: fromRoot("./dist-sandbox"), emptyOutDir: true },
+  build: {
+    outDir: fromRoot("./dist-sandbox"), emptyOutDir: true,
+    // Two pages: the battle viewer (stage 1) and one Tide (stage 2).
+    rollupOptions: { input: { index: fromRoot("./sandbox/index.html"), tide: fromRoot("./sandbox/tide.html") } },
+  },
 });

@@ -40,3 +40,27 @@ Files: `sandbox/index.html`, `sandbox/src/setup.ts` (builds the ships and runs t
 * The doctrines are the templates and cannot be edited yet.
 * The log has its own plain wording in `words.ts`. It does not use the Gazette lines of `describe.ts`, which need loot and a whole Tide around the battle.
 * No loot, towing or bounty is shown: the viewer stops when the battle ends.
+
+## Stage 2: one Tide in the Cradle
+
+Asked for by Biscu on 16 November 2026, before trying stage 1, so stage 2 is a second page and changes no stage 1 file.
+
+* Its own page, `sandbox/tide.html`, opened at http://localhost:5180/tide.html. The battle viewer stays at http://localhost:5180 as it was.
+* The sea: the real Cradle map, Tide 6, the wind the season seed gives. You are docked in Gullhaven Harbour in a fresh sloop of the Fighting Style you pick. Four bot captains start where the six ship fixture puts them: a hunter, a trader, an ambusher and a slow merchant.
+* A chart: the waters and lanes your captain knows, coloured by terrain, Charted ones solid and Sketched ones dotted, with every ship on it as a lettered dot.
+* A planner: up to three steps (the engine's limit for a new captain) from Sail to, Lie in wait, Dock, Survey, Land and Repair. A Sail step picks a destination, how you sail (peaceful, quiet or hunting) and who you attack. Tapping a water adds a Sail step. Under each step is what it should cost in Watches as your captain reckons it, or why it will not happen.
+* Ready runs `resolveTide` with your plan and the bots' orders. Then the Tide plays back Watch by Watch (Next Watch, Play, Skip to the end) on the chart, with a log in normal words, a card for each battle that opens round by round, and at the end a before and after table for your ship and one line for each other ship.
+* The seed is shown and can be typed in. Plan this Tide again keeps the sea, so two voyages can be compared against the same wind and the same bots.
+* It works at phone width.
+
+Files: `sandbox/tide.html`, `sandbox/src/tideSetup.ts` (builds the sea, runs the Tide, the planner's estimate, reading the replay), `sandbox/src/tideWords.ts` (plain words), `sandbox/src/tide.tsx` (the page), `sandbox/src/tide.test.ts`.
+
+## The simple versions built in stage 2
+
+* One Tide only. Nothing carries over: no next Tide, no market, no selling, no upgrades. That is stage 3 and later.
+* Old Shellback is left out. Nobody can reach the Narrows in one Tide from the start chart, and he is the end of stage 3.
+* Each bot picks one of two or three fixed plans by the seed. They do not look at the sea or react to you. Real NPC brains are P9.
+* You see where the other ships start. The real game shows only ships in sight (your own water).
+* The planner has no conditions on steps, no Plan B, no pinned routes, no doctrine choice (you fight with your style's template), no parley setting, and no hunting of one named captain.
+* The chart does not draw currents or the wind. Their effect is inside the Watch counts.
+* Battles inside the Tide are told as text (stage 1's wording), not with stage 1's picture.

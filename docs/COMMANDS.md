@@ -3,7 +3,7 @@
 The full help for every command. `CLAUDE.md` keeps one short line per command.
 
 * Start the dev server: `npm run dev`
-* Start the sandbox (the v0.3 battle viewer, `docs/briefs/sandbox.md`): `npm run sandbox`, then open http://localhost:5180. It needs no server and no login. Stop it with Ctrl and C.
+* Start the sandbox (the v0.3 battle viewer, `docs/briefs/sandbox.md`): `npm run sandbox`, then open http://localhost:5180. One Tide in the Cradle (stage 2) is at http://localhost:5180/tide.html. It needs no server and no login. Stop it with Ctrl and C.
 * Run the tests: `npm test`
 * Check types: `npm run typecheck`
 * Build for production: `npm run build` (output in `dist/`)
