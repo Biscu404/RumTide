@@ -1,13 +1,16 @@
 # Rumtide status
 
-**Date:** 2026-11-12. Short on purpose: the details are in `docs/DECISIONS.md`, which this file only points to. Which doc wins when they disagree is in `CLAUDE.md`.
+**Date:** 2026-11-16. Short on purpose: the details are in `docs/DECISIONS.md`, which this file only points to. Which doc wins when they disagree is in `CLAUDE.md`.
 
 ## Next task
 
-**P3.2b**: bring Old Shellback's check 5 into its band of 35% to 80% (Gunline 86%, Boarder 100% and Firebrand 88% are over the top) with `B.shellback` and the numbers he reads, and keep the other nine checks passing. Then P3.2d (the guard test, the full run, the golden Tide, the docs). P3.2 was split on 26 October 2026; P3.2a (Drill luck and check 8) is done (D216, D217), and so is P3.2c (the queue at his gate, D225, D226). The plan and the findings are under "What is left of P3.2" in `docs/DECISIONS.md`. The brief is `docs/briefs/P3-combat-testing.md`.
+**Sandbox stage 1**: Biscu tries the battle viewer (`npm run sandbox`, then http://localhost:5180) and says what to change or whether stage 2 starts. The brief is `docs/briefs/sandbox.md`: stage 2 is one Tide in the Cradle with a few bot captains, stage 3 a short solo run that ends at Old Shellback. Do not start a stage before Biscu says so.
+
+Combat tuning is paused at nine of ten checks by Biscu's call of 16 November 2026. P3.2b (Old Shellback's check 5) and P3.2d wait until Biscu restarts them; the plan and the findings are under "What is left of P3.2" in `docs/DECISIONS.md`, and the brief is `docs/briefs/P3-combat-testing.md`. P3.2a and P3.2c are done.
 
 ## Where things stand
 
+* The sandbox battle viewer is built: two ships, one battle on the real `engine_v3`, round by round, in the browser with no server.
 * While tuning, run `npm run sim:tune` (about 1 minute). Nine of the ten simulator checks pass on the quick run. Only check 5 fails (D212). Check 8 passes since P3.2a (D216, D217).
 * The full run has not been repeated since the Old Shellback rework (the last table is under D197). Run it once at the end of P3.2d, not during tuning.
 * Not measured yet: fleets of styled ships, and the Gazette (no v0.3 generator). `npm run bots` still plays the v0.2 engine. P3.3 is Biscu's: watch 10 sample replays.
@@ -24,7 +27,7 @@ Open questions:
 ## Top risks
 
 1. **Scope and schedule.** The Season 0 column is several times the v0.2 MVP and no Season 0 date is recorded. Next: agree a lite fallback trigger and a review date.
-2. **Balance.** Check 5 still fails and every Old Shellback number is a cliff. No v0.3 bot season exists. Next: P3.2b to P3.2d in order.
-3. **Nothing playable on v0.3 until P12 and P13**, and the live stack (Deno entry files, the cron migration, migrations 3 to 5) has never run. Next: one live rehearsal Tide before P12.
+2. **Balance.** Check 5 still fails and every Old Shellback number is a cliff. No v0.3 bot season exists. Next: P3.2b and P3.2d, once Biscu restarts the tuning.
+3. **Nothing playable on v0.3 until P12 and P13, except the sandbox**, and the live stack (Deno entry files, the cron migration, migrations 3 to 5) has never run. Next: one live rehearsal Tide before P12.
 4. **Content and art gap.** No sprites, no `docs/LORE.md`, and GAMEPLAY 12.6 needs 30 Squalls, 8 Tales, 6 Sagas and 4 trait Tales. Next: C2 to C5 in `docs/briefs/content-tasks.md`.
 5. **Doc drift.** GAME_DESIGN 16.1 says 14 Tides, GAMEPLAY says 28. Next: fix 16.1 when a task touches Tide counts.
