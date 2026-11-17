@@ -2,8 +2,7 @@
 // The Tide comes from tideSetup.ts (the real engine_v3) and every sentence from tideWords.ts and stage 1's words.ts.
 // The battle viewer of stage 1 is its own page (index.html, main.tsx) and shares no state with this one.
 
-import { render } from "preact";
-import { useEffect, useMemo, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { FIGHTING_STYLES, LEVEL, laneVisible, levelOf, styleTemplate, templateDoctrine } from "../../supabase/functions/_shared/engine_v3/index.ts";
 import type {
   Captain, FightingStyle, HuntFilter, ReplayEvent, SeasonState, ShipId, Stance, Step, Terrain, TideResult, WaterId,
@@ -36,7 +35,7 @@ const MARK: Record<ShipId, { colour: string; letter: string }> = {
   ship_cap_biscuit: { colour: C.foam, letter: "O" },
 };
 
-const CSS = `
+export const CSS = `
   * { box-sizing: border-box; }
   body { margin: 0; background: ${C.ink}; color: ${C.parchment}; font: 16px/1.45 system-ui, sans-serif; }
   main { max-width: 760px; margin: 0 auto; padding: 16px; }
@@ -329,7 +328,7 @@ function Battle(props: { event: BattleEvent; before: SeasonState }) {
   );
 }
 
-function Outcome(props: { setup: TideSetup; result: TideResult; steps: Step[]; onAgain: () => void; onNewSea: () => void }) {
+function Outcome(props: { setup: TideSetup; result: TideResult; steps: Step[]; onAgain: () => void; onNewSea?: () => void }) {
   const { setup, result } = props;
   const before = setup.state;
   const [shown, setShown] = useState(0);
@@ -382,7 +381,7 @@ function Outcome(props: { setup: TideSetup; result: TideResult; steps: Step[]; o
           <ul>{othersWords(result).map((line) => <li>{line}</li>)}</ul>
           <div class="buttons">
             <button onClick={props.onAgain}>Plan this Tide again</button>
-            <button class="plain" onClick={props.onNewSea}>Try a new sea (new seed)</button>
+            {props.onNewSea ? <button class="plain" onClick={props.onNewSea}>Try a new sea (new seed)</button> : null}
           </div>
           <p class="dim" style={{ marginTop: "8px" }}>Planning again keeps the same sea: the same wind and the same plans for the other captains, so you can see what a different voyage would have done.</p>
         </div>
@@ -414,24 +413,55 @@ function Outcome(props: { setup: TideSetup; result: TideResult; steps: Step[]; o
 
 // ---------- The page ----------
 
-function App() {
-  const [style, setStyle] = useState<FightingStyle>("gunline");
-  const [seed, setSeed] = useState(1);
-  const [steps, setSteps] = useState<Step[]>([]);
+/** The closed beta on the live site (D249 to D258). The sea is fixed by the shared Tide number, so everyone who
+ *  plans Tide 3 sees the same wind and the same other captains. The plan is handed up on every change and the
+ *  site saves it. Remount the page (a new `key`) when the Tide changes: `saved` is only read at the start. */
+export interface BetaLink {
+  tide: number;
+  saved: { style: string; steps: Record<string, unknown>[] } | null;
+  saveNote: string;
+  onChange: (plan: { style: FightingStyle; steps: Step[] }) => void;
+}
+
+/** A saved plan can be old or hand edited, so it is checked against the engine before it is trusted. */
+function startingPlan(saved: BetaLink["saved"], tide: number): { style: FightingStyle; steps: Step[] } {
+  const style = (FIGHTING_STYLES as readonly string[]).includes(saved?.style ?? "") ? (saved!.style as FightingStyle) : "gunline";
+  const steps = (saved?.steps ?? []) as Step[];
+  try {
+    estimatePlan(newTide(style, tide), { steps });
+    return { style, steps };
+  } catch {
+    return { style, steps: [] };
+  }
+}
+
+export function App({ beta }: { beta?: BetaLink }) {
+  const start = useMemo(() => beta ? startingPlan(beta.saved, beta.tide) : { style: "gunline" as FightingStyle, steps: [] as Step[] }, []);
+  const [style, setStyle] = useState<FightingStyle>(start.style);
+  const [seed, setSeed] = useState(beta ? beta.tide : 1);
+  const [steps, setSteps] = useState<Step[]>(beta ? start.steps : []);
   const [result, setResult] = useState<TideResult | null>(null);
   const setup = useMemo(() => newTide(style, seed), [style, seed]);
   const captain = you(setup.state);
+  // A plan from an older version of the rules can name a water or site that is gone: show the problems, never crash.
   const est = estimatePlan(setup, { steps });
   const slots = stepsAllowed(setup);
   const newSea = () => { setSeed(1 + Math.floor(Math.random() * MAX_SEED)); setResult(null); };
+  // Hand every change of the plan up, but not the plan the page started with, or opening the page would count as saving one.
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) { first.current = false; return; }
+    beta?.onChange({ style, steps });
+  }, [style, steps]);
 
   return (
     <main>
-      <h1>Rumtide sandbox: one Tide</h1>
+      <h1>{beta ? `Rumtide beta: Tide ${beta.tide}` : "Rumtide sandbox: one Tide"}</h1>
       <p class="dim">
         You and four other captains share the Cradle Isles for one Tide. Plan a voyage, press Ready and watch what happened.
-        The <a href="./">battle viewer</a> is its own page.
+        {beta ? " Everyone in the beta sees the same sea this Tide. Your plan is saved as you change it." : <> The <a href="./">battle viewer</a> is its own page.</>}
       </p>
+      {beta ? <p class="dim" role="status">{beta.saveNote}</p> : null}
 
       {result === null ? (
         <>
@@ -444,11 +474,11 @@ function App() {
                 </select>
               </div>
               <div>
-                <label for="seed">Seed (the same seed gives the same sea)</label>
-                <input id="seed" type="number" min="0" value={seed} onInput={(e) => setSeed(Math.max(0, Math.floor(Number(e.currentTarget.value) || 0)))} />
+                <label for="seed">{beta ? `Sea (the sea of Tide ${beta.tide}, the same for everyone)` : "Seed (the same seed gives the same sea)"}</label>
+                <input id="seed" type="number" min="0" value={seed} disabled={!!beta} onInput={(e) => setSeed(Math.max(0, Math.floor(Number(e.currentTarget.value) || 0)))} />
               </div>
             </div>
-            <div class="buttons"><button class="plain small" onClick={newSea}>New seed</button></div>
+            {beta ? null : <div class="buttons"><button class="plain small" onClick={newSea}>New seed</button></div>}
             <details>
               <summary>How your ship fights if it comes to a battle</summary>
               <p class="dim" style={{ marginTop: "6px" }}>You do not steer a battle. Your ship follows these rules: each round it reads them from the top and obeys the first one that is true.</p>
@@ -470,13 +500,8 @@ function App() {
           <Planner setup={setup} steps={steps} setSteps={setSteps} onReady={() => setResult(runTide(setup, { steps }))} />
         </>
       ) : (
-        <Outcome setup={setup} result={result} steps={steps} onAgain={() => setResult(null)} onNewSea={() => { setSteps([]); newSea(); }} />
+        <Outcome setup={setup} result={result} steps={steps} onAgain={() => setResult(null)} onNewSea={beta ? undefined : () => { setSteps([]); newSea(); }} />
       )}
     </main>
   );
 }
-
-const style = document.createElement("style");
-style.textContent = CSS;
-document.head.append(style);
-render(<App />, document.getElementById("app")!);

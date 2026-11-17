@@ -1,7 +1,6 @@
 // The sandbox battle viewer page (docs/briefs/sandbox.md, stage 1). Preact and plain SVG, no server, no login.
 // The battle comes from setup.ts (the real engine_v3) and every sentence from words.ts.
 
-import { render } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { RANGES } from "../../supabase/functions/_shared/engine_v3/index.ts";
 import type { BattleSide, FightingStyle, Range } from "../../supabase/functions/_shared/engine_v3/index.ts";
@@ -19,7 +18,7 @@ const SIDE_COLOUR: Record<BattleSide, string> = { hunter: C.gold, target: C.rose
 const MAX_SEED = 999999;
 const FIRST_ROUND_WAIT_MS = 600; // Play waits this long before the first round
 
-const CSS = `
+export const CSS = `
   * { box-sizing: border-box; }
   body { margin: 0; background: ${C.ink}; color: ${C.parchment}; font: 16px/1.45 system-ui, sans-serif; }
   main { max-width: 760px; margin: 0 auto; padding: 16px; }
@@ -339,7 +338,7 @@ function Doctrines(props: { left: Pick; right: Pick }) {
   );
 }
 
-function App() {
+export function App() {
   const [left, setLeft] = useState<FightingStyle>("gunline");
   const [right, setRight] = useState<Pick>("boarder");
   const [seed, setSeed] = useState(1);
@@ -508,8 +507,3 @@ function App() {
     </main>
   );
 }
-
-const style = document.createElement("style");
-style.textContent = CSS;
-document.head.append(style);
-render(<App />, document.getElementById("app")!);

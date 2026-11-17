@@ -55,3 +55,7 @@ deleted. The app shows the active season, or when none is running the most recen
 orders are closed, and Legend (the final ranking) and the Gazette stay open until the next season starts. Only
 one season can be active, so a new one cannot start until the old one has ended or finished its Tides.
 `docs/PLAYTEST.md` has the whole playtest runbook.
+
+## The closed beta
+
+The sandbox pages are on the live site at `/sandbox`, `/sandbox/tide` and `/sandbox/admin`, behind the same login as the game. Migration `20261117000001_beta_tide.sql` adds `beta_state` (the one shared Tide number), `beta_tide_log`, `beta_plans` (each player's saved plan for each Tide), `is_admin()` and `beta_submissions()`. Nothing else is needed: no Edge Function, no secret. Game masters are the rows of `admins`, as above. The rules are checked by `supabase/tests/beta_tide.sql`: run it in the SQL editor of a project that has the migrations, and it must end with the error `RT_TEST_OK` (it rolls itself back on purpose). See D249 to D257 in `docs/DECISIONS.md`.

@@ -7,6 +7,8 @@ import { supabase } from "../net/supabase.ts";
 import { loadWorld, type World } from "../net/world.ts";
 import { DEFAULT_MAP_ID, mapById } from "../scenes/maps.ts";
 import { Admin } from "./Admin.tsx";
+import { Beta } from "./Beta.tsx";
+import { BETA_PATH, betaPage } from "./betaModel.ts";
 import { Login } from "./Login.tsx";
 import { FleetPanel } from "./FleetPanel.tsx";
 import { GazettePanel } from "./GazettePanel.tsx";
@@ -51,6 +53,17 @@ export function App() {
 
 function Online({ client }: { client: NonNullable<typeof supabase> }) {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
+  // No router: the site has one game screen and the three beta pages, told apart by the path (D251).
+  const [path, setPath] = useState(window.location.pathname);
+  useEffect(() => {
+    const onPop = () => setPath(window.location.pathname);
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+  const go = useCallback((to: string) => {
+    window.history.pushState(null, "", to);
+    setPath(to);
+  }, []);
 
   useEffect(() => {
     client.auth.getSession().then(({ data }) => setSession(data.session));
@@ -59,8 +72,11 @@ function Online({ client }: { client: NonNullable<typeof supabase> }) {
   }, [client]);
 
   if (session === undefined) return <p class="center dim">Loading</p>;
+  // Signed out visitors get the login whatever the path is, and land on the page they asked for once they are in.
   if (!session) return <Login client={client} />;
-  return <Game client={client} session={session} />;
+  const page = betaPage(path);
+  if (page) return <Beta client={client} session={session} page={page} go={go} />;
+  return <Game client={client} session={session} onBeta={() => go(BETA_PATH.battle)} />;
 }
 
 function tabLabel(id: DeskTab, me: Me, invitations: number): string {
@@ -73,7 +89,7 @@ function tabLabel(id: DeskTab, me: Me, invitations: number): string {
   }
 }
 
-function Game({ client, session }: { client: NonNullable<typeof supabase>; session: Session }) {
+function Game({ client, session, onBeta }: { client: NonNullable<typeof supabase>; session: Session; onBeta: () => void }) {
   const [world, setWorld] = useState<World>(NO_WORLD);
   const [me, setMe] = useState<Me | null>(null);
   const [fleets, setFleets] = useState<FleetsState>(NO_FLEETS);
@@ -143,6 +159,7 @@ function Game({ client, session }: { client: NonNullable<typeof supabase>; sessi
         <span class="spacer" />
         <SoundToggle />
         <button class="secondary" disabled={loading} onClick={() => void refresh()}>Refresh</button>
+        <button class="secondary" onClick={onBeta}>Beta sandbox</button>
         <button class="secondary" onClick={() => setInAdmin(true)}>Game master</button>
         <button class="secondary" onClick={() => void client.auth.signOut()}>Sign out</button>
       </header>
