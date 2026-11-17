@@ -161,3 +161,15 @@ select {
     .dock { max-height: 50dvh; }
   }
 }
+
+/* The closed beta (D249 to D258): the shell around the sandbox pages and the game master's tab. */
+.beta-body { flex: 1; min-height: 0; overflow-y: auto; }
+.beta-admin { max-width: 640px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.beta-admin h1, .beta-admin h2 { margin: 0; color: var(--accent); }
+.beta-admin h2 { font-size: 1.05em; }
+.beta-card { display: flex; flex-direction: column; gap: 8px; padding: 12px; background: var(--panel); border: 2px solid var(--line); }
+.beta-card p, .beta-card ul { margin: 0; }
+.beta-card .row { display: flex; flex-wrap: wrap; gap: 8px; }
+.bigtide { font-size: 2.2em; font-weight: bold; color: var(--text); }
+.beta-table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+.beta-table th, .beta-table td { text-align: left; padding: 6px 8px 6px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
