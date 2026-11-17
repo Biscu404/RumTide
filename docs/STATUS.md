@@ -20,6 +20,8 @@ Beside it, **P3.3** is Biscu's: watch 10 sample replays (`docs/briefs/P3-combat-
 
 ## Waiting on Biscu
 
+**The two account check of the closed beta** (D249 to D257): Claude could not sign in to the live site, because a password is not Claude's to type. Claude checked the database rules as a player and as the admin (`supabase/tests/beta_tide.sql`, `RT_TEST_OK`), checked that a visitor with only the public key cannot read or change anything (401), and checked that `/sandbox/tide` shows the login when signed out. Not yet seen by anyone: the second account's page changing by itself when the admin advances the Tide. Biscu does it once with the friend: friend opens rumtide.pages.dev/sandbox/tide signed in, Biscu advances on /sandbox/admin, the friend's page says the new Tide within 10 seconds.
+
 No rule call waits for confirmation. Biscu accepted every one as built on 12 November 2026 (the entry of that date in `docs/DECISIONS.md`), and from now on Claude makes the balance and design detail calls and logs them there (CLAUDE.md, "How to work").
 
 Open questions:
