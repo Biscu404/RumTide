@@ -31,6 +31,10 @@ Each stage ends with Biscu trying it. The next stage does not start until Biscu 
 
 Files: `sandbox/index.html`, `sandbox/src/setup.ts` (builds the ships and runs the battle), `sandbox/src/words.ts` (turns the battle record into plain words), `sandbox/src/main.tsx` (the page), and tests next to them.
 
+## Stage 1 readability pass (17 November 2026)
+
+Biscu found the viewer hard to follow, so it also does this (D243 to D248): a short story for each round (what each ship chose and the one rule that fired, then what happened when the choices met), ships that glide with wakes, hook ropes and shots, Hull, Rigging and Hands bars with a yellow ghost and a floating loss number, Slow, Normal and Fast play, and a log that highlights the round shown. It follows the device's reduced motion setting, with a tick box to override it. The engine is untouched.
+
 ## The simple versions built in stage 1
 
 * Every battle is in open water in a Breeze on Tide 6. No terrain, wind, ambush, Charted water or cargo choices.
