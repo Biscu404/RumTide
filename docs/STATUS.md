@@ -4,7 +4,7 @@
 
 ## Next task
 
-**Sandbox stages 1 and 2**: Biscu tries both pages (`npm run sandbox`, then http://localhost:5180 for the battle viewer and http://localhost:5180/tide.html for one Tide in the Cradle) and says what to change or whether stage 3 starts. The brief is `docs/briefs/sandbox.md`: stage 3 is a short solo run of several Tides that ends at Old Shellback. Do not start it before Biscu says so.
+**Sandbox stages 1 and 2**: Biscu tries both pages (`npm run sandbox`, then http://localhost:5180 for the battle viewer and http://localhost:5180/tide.html for one Tide in the Cradle) and says what to change or whether stage 3 starts. The battle viewer had a readability pass on 17 November (D243 to D248): look at that first. The brief is `docs/briefs/sandbox.md`: stage 3 is a short solo run of several Tides that ends at Old Shellback. Do not start it before Biscu says so.
 
 Beside it, **P3.3** is Biscu's: watch 10 sample replays (`docs/briefs/P3-combat-testing.md`). Combat tuning is finished: P3.2a to P3.2d are all done.
 

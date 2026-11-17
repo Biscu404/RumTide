@@ -39,8 +39,8 @@ export const GUNS_HINT: Record<GunsOrder, string> = {
   firePots: "throw burning pitch onto their deck",
 };
 
-const DECK_NAME: Record<DeckOrder, string> = { charge: "Charge", volley: "Volley", repel: "Repel", firePots: "Fire Pots", fists: "bare fists" };
-const TRACK_NAME: Record<DamageTrack, string> = { hull: "Hull", rigging: "Rigging", hands: "Hands" };
+export const DECK_NAME: Record<DeckOrder, string> = { charge: "Charge", volley: "Volley", repel: "Repel", firePots: "Fire Pots", fists: "bare fists" };
+export const TRACK_NAME: Record<DamageTrack, string> = { hull: "Hull", rigging: "Rigging", hands: "Hands" };
 const MOOD_WORDS: Record<Mood, string> = {
   closing: "he is still coming closer",
   rearing: "he is rearing up",
@@ -191,7 +191,7 @@ const CONTEST_WORDS: Record<Exclude<Contest["kind"], "cutFree" | "ram">, string>
 };
 
 /** One Helm contest as a sentence, with the chance the winner had. A Ram's contest is told by the Ram itself. */
-function contestWords(c: Contest, names: Record<BattleSide, string>): string | null {
+export function contestWords(c: Contest, names: Record<BattleSide, string>): string | null {
   if (c.kind === "ram") return null;
   const chance = `it had a ${pct(c.winner === c.side ? c.chance : 1 - c.chance)} chance`;
   if (c.kind === "cutFree") {
