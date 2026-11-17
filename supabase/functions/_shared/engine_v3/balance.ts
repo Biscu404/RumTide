@@ -234,11 +234,16 @@ export const B = {
   // before it and grapples after it. snatch: a ship that crosses his bow at Short or Close while he Closes In is caught in his
   // claws. He retreats into his shell, and is beaten, when his Hull falls below retreatHull of its full or his claws below
   // retreatClaws of theirs. pointsBeatHim: whether a Victory on points beats him (it does not).
+  // P3.2b (D218 to D221). clawShell: the part of a Grapeshot hit that reaches his claws while he is not rearing up (none: they are
+  // tucked behind the shell). deckCycle: whether the cycle of Deck orders counts in a deck fight with him (it does not: no order
+  // beats claws and claws beat none). temper: each fight his claws fight from 1 - temper to 1 + temper times their strength, one
+  // seeded roll for the whole fight.
   shellback: {
-    hull: 300, clawHands: 52, decayPerTide: 0.08,
+    hull: 300, clawHands: 36, decayPerTide: 0.08,
     cannons: 22, sails: 10, helm: 10,
     armour: 0.8, mortarFactor: 3, rearUpRounds: [2, 3, 4], snatch: true,
     retreatHull: 0.35, retreatClaws: 0.25, pointsBeatHim: false,
+    clawShell: 0, deckCycle: false, temper: 0.75,
   },
 
   // Agendas (15) and wagers (17). Used from P11.

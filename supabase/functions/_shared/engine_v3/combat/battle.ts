@@ -45,7 +45,7 @@ import type { Shot } from "./fleet.ts";
 import { fireGuns, recordFiring, shotPoints } from "./guns.ts";
 import type { GunsResult } from "./guns.ts";
 import { battleRng, contestRecord, isCrippled, helmScore, resolveHelm, startingRange, windGauge } from "./helm.ts";
-import { isShellback, moodOf, rearUpRoundFor, retreatCause, shellArmour, shellFactor, snatches } from "./shellback.ts";
+import { isShellback, moodOf, rearUpRoundFor, retreatCause, shellArmour, shellFactor, snatches, temperFor } from "./shellback.ts";
 import {
   emberChance, firesLongNines, hasGrapnels, hasStyle, isRam, playableOrder, ramHull, ramSelf, shotFireChance, spotters, zeroingFactor,
 } from "./styles.ts";
@@ -274,6 +274,8 @@ export function runBattle(input: BattleInput): BattleRecord {
   // he is in the battle, so no other roll moves (D16, D202).
   const shellbacks = all.filter((id) => isShellback(ships[id]!));
   const rearUp = shellbacks.length > 0 ? rearUpRoundFor(rngFor(seed, "battle", flag.hunter, flag.target, "rearUp").next()) : 0;
+  // His temper, one more roll of its own stream: what his claws count in every deck fight round of this fight (D220).
+  const temper = shellbacks.length > 0 ? temperFor(rngFor(seed, "battle", flag.hunter, flag.target, "temper").next()) : undefined;
 
   const gauge = windGauge(ships[flag.hunter]!, ships[flag.target]!, terrain, wind);
   // Spotters: a battle with a Bombardier flagship starts at Far.
@@ -594,8 +596,9 @@ export function runBattle(input: BattleInput): BattleRecord {
         const firstOver = grappleRound && edge !== null ? all.filter((id) => sideOf(id) === edge && boarded(id)) : [];
         const drilled = all.filter((id) => (next[id]!.drill ?? 0) > 0);
         const luck = drilled.length > 0 ? Object.fromEntries(drilled.map((id) => [id, drillLuck(rng, id)])) : undefined;
-        const m = fleetMelee({ ids, flagships: flag, ships: next, decks, terrain, bonus, firstOver, ...(luck ? { drillLuck: luck } : {}) });
-        melee = { ...m.record, ...(firstOver.length > 0 ? { firstOver: edge! } : {}), ...(luck ? { drillLuck: luck } : {}) };
+        const wild = temper !== undefined ? Object.fromEntries(shellbacks.map((id) => [id, temper])) : undefined;
+        const m = fleetMelee({ ids, flagships: flag, ships: next, decks, terrain, bonus, firstOver, ...(luck ? { drillLuck: luck } : {}), ...(wild ? { temper: wild } : {}) });
+        melee = { ...m.record, ...(firstOver.length > 0 ? { firstOver: edge! } : {}), ...(luck ? { drillLuck: luck } : {}), ...(temper !== undefined ? { temper } : {}) };
         for (const id of all) next[id] = withHands(next[id]!, next[id]!.hands - m.lost[id]!);
         for (const side of BATTLE_SIDES) {
           const credit = sideShare(shipsOf(side, next), "hands", m.record.lost[side]);

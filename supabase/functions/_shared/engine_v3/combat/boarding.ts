@@ -28,6 +28,8 @@ export interface StrengthOptions {
   foes?: readonly Pick<BattleShip, "style">[];
   /** How much of its Drill bonus the crew brings this round (deck.ts drillLuck). 1 when the draw is not asked for. */
   drillLuck?: number;
+  /** Old Shellback's temper: what his claws' strength counts in this fight (shellback.ts temperFor). 1 for every other crew. */
+  temper?: number;
 }
 
 /**
@@ -40,7 +42,7 @@ export function boardingStrength(ship: BattleShip, terrain: Terrain, opts: Stren
   let strength = ship.hands * (NEUTRAL + ship.boardingBonus) * drillFactor(ship.drill ?? 0, opts.drillLuck ?? NEUTRAL);
   if (terrain === "kelp") strength *= C.kelpBoarding;
   if (opts.firstOver) strength *= C.edge.firstOverTheRail;
-  return strength * fightersFactor(ship) * tinderboxFactor(opts.foes ?? []);
+  return strength * fightersFactor(ship) * tinderboxFactor(opts.foes ?? []) * (opts.temper ?? NEUTRAL);
 }
 
 // ---------- Capture ----------

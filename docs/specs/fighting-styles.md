@@ -143,7 +143,8 @@ At most 3 rules with conditions, then Otherwise, so every template fits the base
   * **His shell:** every hit on him does 80%, except in the round he rears up. A Mortar shell falls on the shell from above and does three times its damage to him, ignoring the shell, which is what a bomb vessel is for.
   * **His moods:** each fight he rears up in round 2, 3 or 4 (a seeded roll), closes in before it and grapples after it. A captain reads the tell in the fight instead of knowing the round.
   * **The claw snatch:** a ship that crosses his bow at Short or Close while he Closes In is caught: the ships are Grappled and he has the boarder's edge. The rake that wins against ships does not work on him.
-  * **Claws 52** instead of 40, **Cannons 22** instead of 10 (D140). Hull stays 300 and his Helm stays 10.
+  * **Claws 36** (40 before the styles, 52 in D140, 36 since P3.2b, D221), **Cannons 22** instead of 10 (D140). Hull stays 300 and his Helm stays 10.
+  * **Added in P3.2b (D218 to D220):** Grapeshot takes none of his claws except in the round he rears up, the cycle of Deck orders is set aside in a deck fight with him, and each fight his claws fight at 0.25 to 1.75 times their strength (his temper, one seeded roll). GAMEPLAY 2.5 has the rules.
   * **Beaten** means Sunk, Captured, or driven off: he retreats into his shell when his Hull falls below 35% or his claws below 25%. A Victory on points never beats him.
   * Measured: the best doctrine a search found for each style beats him Bombardier 49%, Gunline 69%, Skirmisher 55%, Rammer 77%, Boarder 54%, Firebrand 48%. The search starts from every style template and from a crab hunter's plan, and checks its best doctrine over 300 fresh fights. The style templates themselves are not boss doctrines and mostly lose, which is fine: the gate rewards a captain who writes a plan for him.
 * **Fleets:** each ship uses its own trait. A Ram and a fire land on the enemy flagship, as guns do (D91). A battle starts at Far if either flagship is a Bombardier.
@@ -179,7 +180,7 @@ At most 3 rules with conditions, then Otherwise, so every template fits the base
 * `combat.overtime`: 2.
 * `combat.victoryMargin`: 0.05 (was 0.1, D132).
 * `power.exponent`: 1.6 (D136).
-* `shellback`: `clawHands` 52, `cannons` 22, `helm` 10, `armour` 0.8, `mortarFactor` 3, `rearUpRounds` [2, 3, 4], `snatch` true, `retreatHull` 0.35, `retreatClaws` 0.25, `pointsBeatHim` false.
+* `shellback`: `clawHands` 36 (52 until P3.2b), `clawShell` 0, `deckCycle` false, `temper` 0.75, `cannons` 22, `helm` 10, `armour` 0.8, `mortarFactor` 3, `rearUpRounds` [2, 3, 4], `snatch` true, `retreatHull` 0.35, `retreatClaws` 0.25, `pointsBeatHim` false.
 * `combat.deck` (boarding spec): starting values `pairWin` 1.8, `pairLose` 0.75, Fire Pots `hit` 1.4. `combat.edge`: `firstOverTheRail` 1.25, `lashedFast` 2.
 * Luck stays 0.9 to 1.1. A wider luck range softened the counters a little in the search, but it would take skill out of every fight.
 

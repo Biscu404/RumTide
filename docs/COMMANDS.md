@@ -8,8 +8,8 @@ The full help for every command. `CLAUDE.md` keeps one short line per command.
 * Check types: `npm run typecheck`
 * Build for production: `npm run build` (output in `dist/`)
 * Run the balance simulation: `npm run sim` (checks the combat table of section 7.3, a bot trader against the solo pacing of sections 3.5 and 5.5, and the galleon odds of section 8.2)
-* Check everything before finishing a task: `npm run verify` (`check`, then `prose:check`, then `assets:check`; about 45 seconds; GitHub runs the same command on every pull request)
-* Check types and all tests: `npm run check` (v0.2 and v0.3)
+* Check everything before finishing a task: `npm run verify` (`check`, then `prose:check`, then `assets:check`; about 70 seconds; GitHub runs the same command on every pull request)
+* Check types and all tests: `npm run check` (v0.2 and v0.3; it includes the guard of the combat tuning, `tools/v3/sim/guard.p32d.test.ts`, which plays the quick run of checks 1 and 3 to 10 and takes about a minute)
 * Check the art palette: `npm run assets:check` (run it after touching assets; it finds Python itself through `tools/run-py.mjs`: `py`, `python3` or `python`)
 * Check the prose rules: `npm run prose:check` (flags dashes in docs, client and supabase text; `docs/reference/` is third party text and is skipped)
 * Resolve one v0.3 Tide and print it: `npm run tide:demo` (`npm run tide:demo -- --shellback` plays a challenge to Old Shellback instead)

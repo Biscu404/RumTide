@@ -154,22 +154,23 @@ describe("Old Shellback in the season (2.5)", () => {
 describe("his statline (spec section 7, D140)", () => {
   it("has the numbers of the Fighting Styles spec", () => {
     expect(S).toEqual({
-      hull: 300, clawHands: 52, decayPerTide: 0.08, cannons: 22, sails: 10, helm: 10,
+      hull: 300, clawHands: 36, decayPerTide: 0.08, cannons: 22, sails: 10, helm: 10,
       armour: 0.8, mortarFactor: 3, rearUpRounds: [2, 3, 4], snatch: true, retreatHull: 0.35, retreatClaws: 0.25, pointsBeatHim: false,
+      clawShell: 0, deckCycle: false, temper: 0.75,
     });
   });
 
-  it("has Hull 300, no Rigging, claws that fight as 52 Hands, Cannons 22 and a Helm score of 10", () => {
+  it("has Hull 300, no Rigging, claws that fight as 36 Hands, Cannons 22 and a Helm score of 10", () => {
     const ship = crabSeason().ships[SHIP]!;
     expect(maxHullPoints(ship)).toBe(300);
     expect(ship.hullPoints).toBe(300);
     expect(maxRiggingPoints(ship)).toBe(0);
     expect(ship.riggingPoints).toBe(0);
-    expect(maxHands(ship)).toBe(52);
-    expect(ship.hands).toBe(52);
+    expect(maxHands(ship)).toBe(36);
+    expect(ship.hands).toBe(36);
     expect([cannonsOf(ship), sailsOf(ship)]).toEqual([22, S.sails]);
     expect(ship.statline?.helm).toBe(10);
-    const sum = (300 / B.power.hullPer + 22 + S.sails + 52 / B.power.handsPer) / B.power.divisor;
+    const sum = (300 / B.power.hullPer + 22 + S.sails + 36 / B.power.handsPer) / B.power.divisor;
     expect(powerRating(ship)).toBeCloseTo(10 * (sum / 10) ** B.power.exponent); // D136
   });
 
@@ -184,7 +185,7 @@ describe("his statline (spec section 7, D140)", () => {
 
   it("never reaches 0, and keeps the rest of the statline", () => {
     expect(shellbackStatline(500, DECAY_FROM).maxHull).toBe(1);
-    expect(shellbackStatline(20, DECAY_FROM)).toMatchObject({ maxRigging: 0, maxHands: 52, cannons: 22, sails: S.sails, helm: 10 });
+    expect(shellbackStatline(20, DECAY_FROM)).toMatchObject({ maxRigging: 0, maxHands: 36, cannons: 22, sails: S.sails, helm: 10 });
   });
 
   it("makes him whole at the start of a Tide, and says so only when something changed", () => {
@@ -195,7 +196,7 @@ describe("his statline (spec section 7, D140)", () => {
     ship.hands = 3;
     const events = upkeepBosses(state, 6);
     expect(events).toEqual([{ t: 0, kind: "bossRecovers", ship: SHIP, hullPoints: 300, maxHullPoints: 300 }]);
-    expect(ship).toMatchObject({ hullPoints: 300, hands: 52, riggingPoints: 0 });
+    expect(ship).toMatchObject({ hullPoints: 300, hands: 36, riggingPoints: 0 });
     expect(state.ships.ship_p!.hullPoints).toBe(100); // nobody else is touched
   });
 
@@ -230,8 +231,8 @@ describe("his statline (spec section 7, D140)", () => {
 
   it("builds a BattleShip from the statline, with a fixed Helm score", () => {
     expect(asBattleShip()).toMatchObject({
-      hull: "sloop", cannons: 22, sails: S.sails, maxHullPoints: 300, maxRiggingPoints: 0, maxHands: 52, hullPoints: 300,
-      riggingPoints: 0, hands: 52, fixedHelm: 10, captainId: SHELLBACK_ID,
+      hull: "sloop", cannons: 22, sails: S.sails, maxHullPoints: 300, maxRiggingPoints: 0, maxHands: 36, hullPoints: 300,
+      riggingPoints: 0, hands: 36, fixedHelm: 10, captainId: SHELLBACK_ID,
     });
     expect(testShip("hunter").fixedHelm).toBeUndefined(); // no player ship has one
   });
@@ -437,7 +438,7 @@ describe("his shell (spec section 7, D201)", () => {
   const crab = asBattleShip();
 
   it("lets a fifth of every hit by, except in the round he rears up", () => {
-    for (const order of ["roundShot", "chainShot", "grapeshot", "hotShot"] as const) {
+    for (const order of ["roundShot", "chainShot", "hotShot"] as const) {
       expect(shellFactor(crab, order, false)).toBe(S.armour);
       expect(shellFactor(crab, order, true)).toBe(1);
     }
@@ -497,13 +498,14 @@ describe("his shell (spec section 7, D201)", () => {
     }
   });
 
-  it("turns a fifth of a Grapeshot aside too, and of every shot in a fleet battle", () => {
+  it("keeps his claws behind the shell: a Grapeshot takes none of them, except in the round he rears up (D218)", () => {
     const { shelled, mine, theirs } = twins(testShip("hunter"), "grapeshot");
     const rear = rearUpOf(shelled)!;
     mine.forEach((damage, i) => {
       if (i + 1 === rear) expect(damage).toBe(theirs[i]);
-      else expect(Math.abs(damage - 0.8 * theirs[i]!)).toBeLessThanOrEqual(1);
+      else expect(damage).toBe(0);
     });
+    expect(mine[rear - 1]).toBeGreaterThan(0);
   });
 
   it("lets a Mortar shell do three times its damage and ignore the shell, rear up or not", () => {
@@ -713,7 +715,7 @@ describe("being beaten (spec section 7, D105, D205)", () => {
   });
 
   it("is driven off when his claws are low", () => {
-    const r = crabFight(testShip("hunter"), always("hold", "holdFire"), {}, asBattleShip("target", { hands: 12 }));
+    const r = crabFight(testShip("hunter"), always("hold", "holdFire"), {}, asBattleShip("target", { hands: 8 }));
     expect(r.outcome).toEqual({ kind: "struckColours", winner: "hunter", loser: "target", round: 1, drivenOff: "claws" });
   });
 
@@ -841,8 +843,9 @@ describe("Old Shellback in words (spec section 7, docs/text/replay-lines.md)", (
 
   it("tells a Grapeshot into his claws plainly, in Hands", () => {
     const r = crabFight(sturdy(), always("hold", "grapeshot"), { ambush: "medium" }, asBattleShip(), 4);
-    const first = r.rounds[0]!.ships[0]!.shot;
+    const first = r.rounds[rearUpOf(r)! - 1]!.ships[0]!.shot; // the one round his claws are out from behind the shell (D218)
     expect(first.track).toBe("hands");
+    expect(first.damage).toBeGreaterThan(0);
     expect(told(r)).toContain(`The hunter's Grapeshot takes ${first.damage} Hands off ${BOSS}.`);
   });
 
@@ -903,7 +906,7 @@ describe("Old Shellback in words (spec section 7, docs/text/replay-lines.md)", (
     expect(has(hullLines, "shellback.beaten.driven", { boss: BOSS, captains: "The hunter" })).toBe(true);
     expect(has(hullLines, "shellback.back", { boss: BOSS })).toBe(true);
     expect(hullLines.some((l) => l.includes("struck its colours"))).toBe(false);
-    const claws = crabFight(sturdy(), always("hold", "holdFire"), {}, asBattleShip("target", { hands: 12 }));
+    const claws = crabFight(sturdy(), always("hold", "holdFire"), {}, asBattleShip("target", { hands: 8 }));
     expect(has(told(claws, beaten(claws)), "shellback.driven.claws", { boss: BOSS })).toBe(true);
   });
 
@@ -1127,7 +1130,7 @@ describe("fighting Old Shellback in a Tide (2.5)", () => {
 
   it("is driven off when his claws are low, and a captain he beat once passes him again for nothing new", () => {
     const state = crabSeason();
-    const r = resolveTide({ state, world, orders: { p: challenge(6) }, seed: 1000, windOverride: BREEZE, resolveEncounter: woundedBy(300, 12) });
+    const r = resolveTide({ state, world, orders: { p: challenge(6) }, seed: 1000, windOverride: BREEZE, resolveEncounter: woundedBy(300, 8) });
     expect(battles(r)[0]!.record.outcome).toMatchObject({ kind: "struckColours", drivenOff: "claws" });
     expect(r.state.captains.p!.bossesBeaten).toEqual([SHELLBACK_ID]);
     // Beating him a second time adds nothing and does not name the captain again.

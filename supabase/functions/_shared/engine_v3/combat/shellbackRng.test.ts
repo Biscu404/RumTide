@@ -1,5 +1,5 @@
 // Old Shellback's rolls have streams of their own (D16, D177, D202). The rear up round is drawn once per fight, only when he is in it,
-// from rngFor(seed, "battle", hunter, target, "rearUp"). Every other roll of a battle with him, and every roll of a battle without
+// from rngFor(seed, "battle", hunter, target, "rearUp"), and his temper the same way from the label "temper" (D220). Every other roll of a battle with him, and every roll of a battle without
 // him, comes from the stream it always came from: the round streams rngFor(seed, "battle", hunter, target, round).
 
 import { describe, expect, it, vi } from "vitest";
@@ -31,14 +31,16 @@ describe("the streams of a battle", () => {
     }
   });
 
-  it("draws his rear up round once, from its own stream, and every other roll from the round streams", () => {
+  it("draws his rear up round and his temper once each, from their own streams, and every other roll from the round streams", () => {
     calls.length = 0;
     const r = runBattle(battleOf(testShip("hunter", "sloop", { maxHullPoints: 400, hullPoints: 400, maxHands: 60, hands: 60 }), crab(), {
       hunter: always("hold", "holdFire"), target: doctrineChooser(shellbackDoctrine(), { enemyType: "player" }),
     }, { terrain: "shallows", seed: 5 }));
     const own = calls.filter((c) => c.includes("rearUp"));
     expect(own).toEqual([[5, "battle", "ship_hunter", `ship_${SHELLBACK_ID}`, "rearUp"]]);
-    const rest = calls.filter((c) => !c.includes("rearUp"));
+    // His temper is one more roll of the fight, from a stream of its own too (D220).
+    expect(calls.filter((c) => c.includes("temper"))).toEqual([[5, "battle", "ship_hunter", `ship_${SHELLBACK_ID}`, "temper"]]);
+    const rest = calls.filter((c) => !c.includes("rearUp") && !c.includes("temper"));
     expect(rest).toHaveLength(r.rounds.length);
     r.rounds.forEach((round, i) => expect(rest[i]).toEqual([5, "battle", "ship_hunter", `ship_${SHELLBACK_ID}`, round.round]));
   });

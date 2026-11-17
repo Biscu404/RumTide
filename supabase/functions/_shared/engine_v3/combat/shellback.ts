@@ -80,12 +80,15 @@ export const moodOf = (round: number, rearUp: number): Mood => (round < rearUp ?
 /**
  * His shell: the part of a hit on him that gets through. Every hit does `armour` of its damage, except in the round he rears up.
  * A Mortar shell falls on the shell from above and does `mortarFactor` times its damage, ignoring the shell, in every round.
+ * Grapeshot is aimed at his claws, and he keeps them tucked behind the shell until he rears up: it does `clawShell` of its damage
+ * (none) in every other round (D218).
  * The same for any other ship: 1. `order` is the order the shooter really fired, so a ship without a Mortar fires Round shot.
  */
 export function shellFactor(target: Pick<BattleShip, "captainId">, order: GunsOrder, rearing: boolean): number {
   if (!isShellback(target)) return NEUTRAL;
   if (order === "mortar") return S.mortarFactor;
-  return rearing ? NEUTRAL : S.armour;
+  if (rearing) return NEUTRAL;
+  return order === "grapeshot" ? S.clawShell : S.armour;
 }
 
 /** The shell on a hit that is not a shot (a Ram, the fire burning him): `armour`, except in the round he rears up. */
@@ -109,10 +112,24 @@ export const retreatCause = (ship: Pick<BattleShip, "hullPoints" | "maxHullPoint
 export const retreats = (ship: Pick<BattleShip, "hullPoints" | "maxHullPoints" | "hands" | "maxHands">): boolean => retreatCause(ship) !== null;
 
 /**
+ * His temper (D220): what his claws' boarding strength counts in every deck fight round of this fight, from 1 - `temper` to
+ * 1 + `temper`, picked from the roll the battle drew from its own stream. `roll` is a number from 0 up to but not including 1.
+ * Without it the deck fight has no luck, and any edge wins it every time (the same finding as D198 for Drill).
+ */
+export const temperFor = (roll: number): number => NEUTRAL - S.temper + 2 * S.temper * roll;
+
+/**
+ * Whether the cycle of Deck orders is set aside for a crew (D219): it is in any deck fight he is in. No order beats claws and
+ * claws beat none, so every pairing is even. The hit and the guard of each order still count.
+ */
+export const outsideDeckCycle = (ship: Pick<BattleShip, "captainId">, foes: readonly Pick<BattleShip, "captainId">[]): boolean =>
+  !S.deckCycle && (isShellback(ship) || foes.some(isShellback));
+
+/**
  * His habits are a doctrine like a captain's, read top down, with one condition only a monster has: his mood (D102, D203). Before
  * the rear up he closes in with Round shot; in the round he rears up he holds still and holds fire, and his shell does not turn the
  * blow aside; after it he closes in and Boards. Once he holds a ship his claws Charge (the great guns are quiet while Grappled, and
- * he has no Powder to Volley): the rule comes first, so a ship he has snatched or boarded never sees him rear up (D175).
+ * he has no Powder to Volley), and the cycle of Deck orders is set aside against him (D219): the rule comes first, so a ship he has snatched or boarded never sees him rear up (D175).
  * Because he Boards or snatches he is the boarder, so he has the boarder's edge: once he holds you, he is hard to shake.
  * A doctrine cannot name the round, so the battle tells his view his mood. Every number is in `B.shellback`.
  */
