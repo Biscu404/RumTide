@@ -62,7 +62,7 @@ describe("the bot season through the Edge Function handlers", () => {
         expect(api.posts).toHaveLength(14);
       }
     }
-  });
+  }, 30000); // about 2.5 seconds alone, and several times that while the simulator guard (tools/v3/sim/guard.p32d.test.ts) has the cores
 });
 
 describe("checkState", () => {

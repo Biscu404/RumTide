@@ -70,8 +70,8 @@ export const hasSecondWave = (ship: Pick<BattleShip, "drill">): boolean => drill
  * The Hands a crew removes from the other: kill share x its boarding strength x the hit of its order x the pairing x the
  * guard of the other crew's order. Fire Pots ignore the guard of Repel. Second Wave adds `secondWaveShare` of the whole.
  */
-export function deckKill(strength: number, mine: DeckOrder, theirs: DeckOrder, secondWave: boolean): number {
+export function deckKill(strength: number, mine: DeckOrder, theirs: DeckOrder, secondWave: boolean, met: Pairing = pairing(mine, theirs)): number {
   const guard = mine === "firePots" && theirs === "repel" ? NEUTRAL : C.deck.guard[theirs];
   const wave = secondWave ? NEUTRAL + B.drill.secondWaveShare : NEUTRAL;
-  return C.boarding.killShare * strength * C.deck.hit[mine] * pairFactor(pairing(mine, theirs)) * guard * wave;
+  return C.boarding.killShare * strength * C.deck.hit[mine] * pairFactor(met) * guard * wave;
 }

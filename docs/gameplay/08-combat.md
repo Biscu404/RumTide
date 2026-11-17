@@ -149,7 +149,7 @@ The orders that fire no great guns:
 | Fists | Fists and belaying pins | 1.0 | 1.0 | Nothing | Nothing |
 
 * **Hit** is how hard a crew strikes. **Guard** is how much of the other crew's strike it takes, so Repel guards well and a Charge leaves the crew open.
-* **The cycle** works like the Helm cycle of 8.4: Charge beats Volley, Volley beats Repel, Repel beats Charge. In a pairing the order that wins strikes 1.8 times harder and the order that loses strikes at 0.75. Fire Pots and Fists are outside the cycle.
+* **The cycle** works like the Helm cycle of 8.4: Charge beats Volley, Volley beats Repel, Repel beats Charge. In a pairing the order that wins strikes 1.8 times harder and the order that loses strikes at 0.75. Fire Pots and Fists are outside the cycle. In a deck fight with Old Shellback the cycle is set aside for both crews (2.5, D219).
 * **Fists** is what a crew fights with when its order is a Guns order, a Volley with no Powder, or Fire Pots with no pot or no right to throw one. It is never a choice in a doctrine. Fists against Fists is the plain melee: each side removes 20% of its own boarding strength.
 * **In the round the ships grapple,** only a crew whose own Board made the grapple (or joined it, because both ships Boarded) fights as a Charge. Every other crew fights with Fists, whatever its rule said, so the first round cannot be Repelled. A grapple from Close In against Close In gives both crews Fists. From the next round a Charge and a Repel count as given, a Volley counts if the ship had Powder when the round began, and Fire Pots count with a pot and the right to throw it (D161).
 

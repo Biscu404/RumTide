@@ -195,6 +195,7 @@ export interface MeleeRecord {
   hands: Record<BattleSide, number>; // Hands each side has left
   firstOver?: BattleSide; // only in the grapple round: the boarder's Board fought as a Charge with First over the rail
   drillLuck?: Record<ShipId, number>; // the share of its Drill bonus each drilled crew brought this round (deck.ts drillLuck)
+  temper?: number; // only in a deck fight with Old Shellback: what his claws' strength counted, the same in every round of a fight (D220)
 }
 
 /** Where a fire came from (fighting styles spec section 3). */

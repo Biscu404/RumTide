@@ -15,6 +15,7 @@ import { boardingStrength, grappleReason, grapnelContest } from "./boarding.ts";
 import { deckKill, hasSecondWave, pairing } from "./deck.ts";
 import { applyPair, contestRecord, playableMove, pairRow, reefScrape } from "./helm.ts";
 import { boardsFromShort, hasGrapnels, styleGunsMods, styleHelmFactor } from "./styles.ts";
+import { outsideDeckCycle } from "./shellback.ts";
 import type {
   BattleShip, BattleSide, ContestRecord, DamageTrack, DeckOrder, GrappleRecord, GunsOrder, HelmMove, MeleeRecord, Pairing, Range,
   SideBonus,
@@ -270,6 +271,7 @@ export interface MeleeInput {
   bonus: Record<BattleSide, SideBonus>;
   firstOver?: readonly ShipId[]; // crews whose Board fights as a Charge with First over the rail
   drillLuck?: Record<ShipId, number>; // the share of its Drill bonus each drilled crew brings this round (deck.ts drillLuck)
+  temper?: Record<ShipId, number>; // what Old Shellback's claws count in this fight (shellback.ts temperFor)
 }
 
 export interface FleetMelee {
@@ -297,10 +299,10 @@ export function fleetMelee(i: MeleeInput): FleetMelee {
     const theirs = decks[i.flagships[other(side)]] as DeckOrder;
     for (const ship of crew(side)) {
       const mine = decks[ship.shipId] as DeckOrder;
-      strengthOf[ship.shipId] = boardingStrength(ship, terrain, { firstOver: i.firstOver?.includes(ship.shipId) ?? false, foes, drillLuck: i.drillLuck?.[ship.shipId] ?? 1 });
-      pairings[ship.shipId] = pairing(mine, theirs);
+      strengthOf[ship.shipId] = boardingStrength(ship, terrain, { firstOver: i.firstOver?.includes(ship.shipId) ?? false, foes, drillLuck: i.drillLuck?.[ship.shipId] ?? 1, temper: i.temper?.[ship.shipId] ?? 1 });
+      pairings[ship.shipId] = outsideDeckCycle(ship, foes) ? "even" : pairing(mine, theirs);
       strength[side] += strengthOf[ship.shipId] as number;
-      killed[side] += deckKill(strengthOf[ship.shipId] as number, mine, theirs, hasSecondWave(ship));
+      killed[side] += deckKill(strengthOf[ship.shipId] as number, mine, theirs, hasSecondWave(ship), pairings[ship.shipId]);
     }
   }
   const lost: Record<ShipId, number> = {};

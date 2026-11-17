@@ -8,7 +8,7 @@
 * Grapnels: the Boarder has them from Drill 0 as Grapnel lines. Every other style still unlocks them at Drill 10.
 * Fire Pots: a Firebrand has them from Drill 0, with 2 pots to start, and its fires burn for 3 rounds and can sink a ship (D138). A Fire Pot from any other style keeps the rule of section 2.
 * Starting numbers: `pairWin` 1.8, `pairLose` 0.75, Fire Pots `hit` 1.4, First over the rail 1.25 (D130), Lashed fast 2.
-* Old Shellback's habits in section 5 are replaced by the rework of D133: his shell, his moods, the claw snatch, claws 52, Cannons 22, and being driven off (D140).
+* Old Shellback's habits in section 5 are replaced by the rework of D133: his shell, his moods, the claw snatch, claws 52 (36 since D221), Cannons 22, and being driven off (D140).
 * Acceptance item 2 (the Brawler at 40% of the field) becomes the wheel check of the Fighting Styles spec.
 * Cutting free quiets the guns of both ships for that round (D135, see Edge cases).
 * A Drill level is priced like a level of any other upgrade (D141, section 4).
